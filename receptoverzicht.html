@@ -401,6 +401,8 @@ async function openDetail(id) {
     ]},
     { titel: 'Mashing', rows: [
       ['Mash thickness', b.beslag_dikte, ''],
+      ['Mash water', w.maischwater, ''],
+      ['pH mash', w.ph_maische, ''],
       ['Mash-in temp', b.mash_inmaischen_temp, '°C'],
       ['Mash-in time', b.mash_inmaischen_tijd, 'min'],
       ['Step-up 1 temp', b.mash_verhogen1_temp, '°C'],
@@ -417,10 +419,21 @@ async function openDetail(id) {
     { titel: 'Filtration', rows: [
       ['Mash filter chambers', b.kamers_mashfilter, ''],
       ['Cumm. sparging volume', b.cumm_sparging_vol, 'hl'],
+      ['Sparging 1st', b.sparging_1e, 'hl'],
+      ['Sparging 2nd', b.sparging_2e, 'hl'],
+      ['Sparging 3rd', b.sparging_3e, 'hl'],
+      ['Sparging 4th', b.sparging_4e, 'hl'],
+      ['1st runoff', b.eerste_afloop, 'hl'],
+      ['Sparge water', b.spoelwater, 'hl'],
+      ['Sparge runoff', b.spoel_afloop, 'hl'],
+      ['Total filtered volume', b.totaal_gefiltreerd_volume, 'hl'],
+      ['Lauter factor', b.lauterfactor, ''],
     ]},
     { titel: 'Boiling', rows: [
       ['Expected extract at start of boil', b.verwacht_extract_begin_kook, '°P'],
       ['Boil volume', b.volume_kook, 'hl'],
+      ['pH start boil', w.ph_start_koken, ''],
+      ['pH end boil', w.ph_eind_koken, ''],
       ['Boil intensity', b.intensiteit_koken, 'KJ/min'],
       ['Desired evaporation', b.gewenste_verdamping, '%'],
     ]},
@@ -431,6 +444,13 @@ async function openDetail(id) {
     { titel: 'Cooling', rows: [
       ['Water addition volume (back-cooling)', b.volume_water_additie_terugkoeling, 'hl'],
       ['Final batch volume', b.eindvolume_brouwsel, 'hl'],
+      ['Aeration', w.beluchting, 'l/h'],
+    ]},
+    { titel: 'Automatic dosing', rows: [
+      ['Mash-in acid', b.inmaischen_zuur_l, 'L'],
+      ['Mash-in tannins', b.inmaischen_tannines_l, 'L'],
+      ['Boil acid', b.koken_zuur_l, 'L'],
+      ['Inline sparge acid', b.inline_sparge_zuur_l, 'L'],
     ]},
   ].map(sectie => ({ ...sectie, rows: sectie.rows.filter(([,v]) => v !== null && v !== undefined) }))
    .filter(sectie => sectie.rows.length > 0);
@@ -442,9 +462,7 @@ async function openDetail(id) {
   const waterRows = [
     ['Ca', w.ca, 'ppm'], ['Mg', w.mg, 'ppm'], ['Na', w.na, 'ppm'],
     ['Cl', w.cl, 'ppm'], ['SO4', w.so4, 'ppm'], ['Cl:SO4 ratio', w.ratio_cl_so4, ''],
-    ['Alkalinity', w.alkalinity, ''], ['Mash water', w.maischwater, ''],
-    ['pH mash', w.ph_maische, ''], ['pH start boil', w.ph_start_koken, ''],
-    ['pH end boil', w.ph_eind_koken, ''], ['Aeration', w.beluchting, 'l/h'],
+    ['Alkalinity', w.alkalinity, ''],
   ].filter(([,v]) => v !== null && v !== undefined);
 
   const verpakkingRows = [

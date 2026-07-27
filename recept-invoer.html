@@ -348,6 +348,8 @@ const BROUW_SECTIES = [
     titel: 'Mashing',
     velden: [
       ['beslag_dikte', 'Mash thickness', '', 'number'],
+      ['maischwater', 'Mash water', '', 'number', 'water'],
+      ['ph_maische', 'pH mash', '', 'number', 'water'],
       ['mash_inmaischen_temp', 'Mash-in temp', '°C', 'number'],
       ['mash_inmaischen_tijd', 'Mash-in time', 'min', 'number'],
       ['mash_verhogen1_temp', 'Step-up 1 temp', '°C', 'number'],
@@ -367,6 +369,15 @@ const BROUW_SECTIES = [
     velden: [
       ['kamers_mashfilter', 'Mash filter chambers', '', 'number'],
       ['cumm_sparging_vol', 'Cumm. sparging volume', 'hl', 'number'],
+      ['sparging_1e', 'Sparging 1st', 'hl', 'number'],
+      ['sparging_2e', 'Sparging 2nd', 'hl', 'number'],
+      ['sparging_3e', 'Sparging 3rd', 'hl', 'number'],
+      ['sparging_4e', 'Sparging 4th', 'hl', 'number'],
+      ['eerste_afloop', '1st runoff', 'hl', 'number'],
+      ['spoelwater', 'Sparge water', 'hl', 'number'],
+      ['spoel_afloop', 'Sparge runoff', 'hl', 'number'],
+      ['totaal_gefiltreerd_volume', 'Total filtered volume', 'hl', 'number'],
+      ['lauterfactor', 'Lauter factor', '', 'number'],
     ],
   },
   {
@@ -374,6 +385,8 @@ const BROUW_SECTIES = [
     velden: [
       ['verwacht_extract_begin_kook', 'Expected extract at start of boil', '°P', 'number'],
       ['volume_kook', 'Boil volume', 'hl', 'number'],
+      ['ph_start_koken', 'pH start boil', '', 'number', 'water'],
+      ['ph_eind_koken', 'pH end boil', '', 'number', 'water'],
       ['intensiteit_koken', 'Boil intensity', 'KJ/min', 'number'],
       ['gewenste_verdamping', 'Desired evaporation', '%', 'number'],
     ],
@@ -390,11 +403,24 @@ const BROUW_SECTIES = [
     velden: [
       ['volume_water_additie_terugkoeling', 'Water addition volume (back-cooling)', 'hl', 'number'],
       ['eindvolume_brouwsel', 'Final batch volume', 'hl', 'number'],
+      ['beluchting', 'Aeration', 'l/h', 'number', 'water'],
+    ],
+  },
+  {
+    titel: 'Automatic dosing',
+    velden: [
+      ['inmaischen_zuur_l', 'Mash-in acid', 'L', 'number'],
+      ['inmaischen_tannines_l', 'Mash-in tannins', 'L', 'number'],
+      ['koken_zuur_l', 'Boil acid', 'L', 'number'],
+      ['inline_sparge_zuur_l', 'Inline sparge acid', 'L', 'number'],
     ],
   },
 ];
-const BROUW_FIELDS = BROUW_SECTIES.flatMap(s => s.velden); // platte lijst, voor opslaan
-const WATER_FIELDS = [
+// Platte lijst voor opslaan in recipe_brouwspecificaties -- velden die met
+// 'water' gemarkeerd zijn horen bij recipe_water en worden hier bewust
+// uitgesloten (die lopen via WATER_FIELDS/leesVeldenGrid).
+const BROUW_FIELDS = BROUW_SECTIES.flatMap(s => s.velden).filter(v => v[4] !== 'water');
+const WATER_FIELDS_CHEMIE = [
   ['ca', 'Ca', 'ppm', 'number'],
   ['mg', 'Mg', 'ppm', 'number'],
   ['na', 'Na', 'ppm', 'number'],
@@ -402,6 +428,13 @@ const WATER_FIELDS = [
   ['so4', 'SO4', 'ppm', 'number'],
   ['ratio_cl_so4', 'Cl:SO4 ratio', '', 'number'],
   ['alkalinity', 'Alkalinity', '', 'number'],
+];
+// Volledige lijst -- voor opslaan/laden van recipe_water. De 5 velden die nu
+// bij Mashing/Boiling/Cooling in Brewing parameters worden getoond, staan
+// hier ook nog in (zelfde id's), zodat opslaan ze gewoon oppikt ongeacht waar
+// het invoerveld in de DOM staat.
+const WATER_FIELDS = [
+  ...WATER_FIELDS_CHEMIE,
   ['maischwater', 'Mash water', '', 'number'],
   ['ph_maische', 'pH mash', '', 'number'],
   ['ph_start_koken', 'pH start boil', '', 'number'],
@@ -510,15 +543,19 @@ function leesCheckboxGrid(fields) {
 // Brouwparameters: zelfde compacte rij-stijl als renderVeldenGrid, maar dan
 // met subsectie-koppen (General/Milling/Mashing/...) ertussen, allemaal in
 // dezelfde twee-koloms flow.
-function renderBrouwSecties(containerId, secties, data) {
+function renderBrouwSecties(containerId, secties, data, waterData) {
   const container = document.getElementById(containerId);
   container.innerHTML = secties.map(sectie => `
     <div class="re-subkop">${sectie.titel}</div>
-    ${sectie.velden.map(([key, label, unit, type]) => `
+    ${sectie.velden.map(([key, label, unit, type, bron]) => {
+      const bronData = bron === 'water' ? waterData : data;
+      const waarde = bronData && bronData[key] !== null && bronData[key] !== undefined ? bronData[key] : '';
+      return `
       <div class="re-paramrow-simple">
         <label for="veld-${key}">${label}${unit ? ' (' + unit + ')' : ''}</label>
-        <input type="${type}" id="veld-${key}" value="${data && data[key] !== null && data[key] !== undefined ? data[key] : ''}" />
-      </div>`).join('')}
+        <input type="${type}" id="veld-${key}" value="${waarde}" />
+      </div>`;
+    }).join('')}
   `).join('') + `
     <div class="re-full-span">
       <div class="re-subkop">Comments</div>
@@ -821,8 +858,8 @@ async function initReceptInvoer() {
 
   renderParamGrid('re-specs-grid', SPECS_FIELDS, null);
   renderParamGrid('re-ferm-grid', FERM_FIELDS, null);
-  renderBrouwSecties('re-brouw-grid', BROUW_SECTIES, null);
-  renderVeldenGrid('re-water-grid', WATER_FIELDS, null);
+  renderBrouwSecties('re-brouw-grid', BROUW_SECTIES, null, null);
+  renderVeldenGrid('re-water-grid', WATER_FIELDS_CHEMIE, null);
   renderVeldenGrid('re-verpakking-grid', VERPAKKING_FIELDS, null);
   renderFormatenCheckboxen('re-formaten-checkboxen', []);
   renderCheckboxGrid('re-processtappen-checkboxen', PROCESSTAPPEN_FIELDS, null);
@@ -931,8 +968,8 @@ document.getElementById('re-kopieer-btn').addEventListener('click', async () => 
 
   renderParamGrid('re-specs-grid', SPECS_FIELDS, specs.data || {});
   renderParamGrid('re-ferm-grid', FERM_FIELDS, ferm.data || {});
-  renderBrouwSecties('re-brouw-grid', BROUW_SECTIES, brouw.data || {});
-  renderVeldenGrid('re-water-grid', WATER_FIELDS, water.data || {});
+  renderBrouwSecties('re-brouw-grid', BROUW_SECTIES, brouw.data || {}, water.data || {});
+  renderVeldenGrid('re-water-grid', WATER_FIELDS_CHEMIE, water.data || {});
   renderVeldenGrid('re-verpakking-grid', VERPAKKING_FIELDS, verpakking.data || {});
   renderFormatenCheckboxen('re-formaten-checkboxen', (verpakking.data && verpakking.data.formaten) || []);
   renderCheckboxGrid('re-processtappen-checkboxen', PROCESSTAPPEN_FIELDS, processtappen.data || {});
@@ -984,8 +1021,8 @@ async function laadBestaandRecept(id) {
 
   renderParamGrid('re-specs-grid', SPECS_FIELDS, specs.data || {});
   renderParamGrid('re-ferm-grid', FERM_FIELDS, ferm.data || {});
-  renderBrouwSecties('re-brouw-grid', BROUW_SECTIES, brouw.data || {});
-  renderVeldenGrid('re-water-grid', WATER_FIELDS, water.data || {});
+  renderBrouwSecties('re-brouw-grid', BROUW_SECTIES, brouw.data || {}, water.data || {});
+  renderVeldenGrid('re-water-grid', WATER_FIELDS_CHEMIE, water.data || {});
   renderVeldenGrid('re-verpakking-grid', VERPAKKING_FIELDS, verpakking.data || {});
   renderFormatenCheckboxen('re-formaten-checkboxen', (verpakking.data && verpakking.data.formaten) || []);
   renderCheckboxGrid('re-processtappen-checkboxen', PROCESSTAPPEN_FIELDS, processtappen.data || {});
