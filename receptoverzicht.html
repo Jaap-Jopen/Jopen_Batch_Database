@@ -195,6 +195,9 @@
   .full-span { column-span: all; margin-bottom: 10px; }
   .full-span .param-row { grid-template-columns: 140px 1fr; }
   .full-span .param-row span:last-child { white-space: normal; }
+  .badge-row { display:inline-block; border:2px solid #d9534f; background:#fff3f0; border-radius:6px; padding:6px 12px; margin:4px 10px 4px 0; }
+  .badge-row span:first-child { display:block; color:#a83a1a; font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; }
+  .badge-row span:last-child { font-family: var(--mono); font-weight:600; }
 </style>
 </head>
 <body>
@@ -386,9 +389,13 @@ async function openDetail(id) {
     ['Lager temp', f.lager_temp, '°C', f.lager_temp_tol],
     ['Pasteurization', f.pasteurisatie, 'PU', f.pasteurisatie_tol],
     ['Turbidity after separation', f.troebeling_na_sep, 'EBC', f.troebeling_na_sep_tol],
-    ['Beer risk', f.bier_risico, '', null],
-    ['Beer status', f.bier_status, '', null],
+    ['Bitterness BH', f.bitterheid_bh, 'EBU', f.bitterheid_bh_tol],
   ].filter(([,v]) => v !== null && v !== undefined);
+
+  const generalBadgeRows = [
+    ['Beer risk', f.bier_risico],
+    ['Beer status', f.bier_status],
+  ].filter(([,v]) => v !== null && v !== undefined && v !== '');
 
   const brouwSecties = [
     { titel: 'General', rows: [
@@ -506,6 +513,12 @@ async function openDetail(id) {
       </div>`).join('')}</div>`;
   }
 
+  function badgeRowsHtml(rows) {
+    if (rows.length === 0) return '';
+    return rows.map(([label, val]) => `
+      <div class="badge-row"><span>${escapeHtml(label)}</span><span>${escapeHtml(String(val))}</span></div>`).join('');
+  }
+
   // Voor brouwparameters: zelfde compacte tabel, maar met subsectie-koppen
   // (General/Milling/Mashing/...) ertussen, in één doorlopende twee-koloms flow.
   function paramSectiesHtml(secties) {
@@ -612,6 +625,20 @@ async function openDetail(id) {
 
   const laatsteRevisie = revisieData.length > 0 ? revisieData[0] : null;
 
+  const dryHopNotesRows = [
+    ['Dry hop comment (warm)', pt.dry_hop_comment_warm, ''],
+    ['Dry hop method (warm)', pt.dry_hop_methode_warm, ''],
+    ['Dry hop comment (16°C)', pt.dry_hop_comment_16c, ''],
+    ['Dry hop method (16°C)', pt.dry_hop_methode_16c, ''],
+    ['Dry hop 1 day', pt.dry_hop_1_dag, ''],
+    ['Dry hop 2 day', pt.dry_hop_2_dag, ''],
+  ].filter(([,v]) => v !== null && v !== undefined && v !== '');
+
+  const cellarNotesRows = [
+    ['Cellar addition day', pt.kelder_toevoeging_dag, ''],
+    ['Processing comment', pt.comment_verwerken, ''],
+  ].filter(([,v]) => v !== null && v !== undefined && v !== '');
+
   const generalRows = [
     ['Short name', r.short_name, ''],
     ['Beer style', r.bierstijl, ''],
@@ -648,6 +675,7 @@ async function openDetail(id) {
 
     <div class="section-title">General</div>
     ${paramColumnsHtml(generalRows) || '<div class="empty">None entered.</div>'}
+    ${badgeRowsHtml(generalBadgeRows)}
 
     <div class="section-title">End product specifications</div>
     ${paramColumnsHtml(specRows) || '<div class="empty">None entered.</div>'}
@@ -663,6 +691,7 @@ async function openDetail(id) {
 
     <div class="section-title">Hops and Herbs</div>
     ${ingTabelHtml(['hopgift_kook', 'dry_hop'], true, true, true, false)}
+    ${paramColumnsHtml(dryHopNotesRows)}
 
     <div class="section-title">Hops total weights</div>
     ${hopSomHtml()}
@@ -674,6 +703,7 @@ async function openDetail(id) {
     ${ingTabelHtml(['gist'], false)}
 
     <div class="section-title">Additions Cellar</div>
+    ${paramColumnsHtml(cellarNotesRows)}
     ${ingTabelHtml(['toegift_kelder'], false)}
 
     <div class="section-title">Target water profile</div>
