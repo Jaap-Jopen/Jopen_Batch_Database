@@ -36,8 +36,8 @@ function renderNav(huidigeGebruiker) {
   container.innerHTML = `
     <nav class="jopen-nav">
       <div class="jopen-nav-merk">
-        <img src="jopen-logo.png" alt="Jopen" class="jopen-nav-logo" />
-        Jopen Brouwerij
+        <span class="jopen-nav-logo-wrap"><img src="jopen-logo.png" alt="Jopen" class="jopen-nav-logo" /></span>
+        Jopen
       </div>
       <div class="jopen-nav-links">${links}</div>
       <div class="jopen-nav-rechts">${rechterkant}</div>

@@ -41,9 +41,20 @@ a { color: var(--jopen-red); }
   gap: 8px;
 }
 
-.jopen-nav-logo {
-  height: 32px;
+.jopen-nav-logo-wrap {
+  background: #ffffff;
+  border-radius: 50%;
   width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.jopen-nav-logo {
+  height: 26px;
+  width: 26px;
   display: block;
 }
 
