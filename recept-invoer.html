@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jopen — Recipe editor</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="jopen-shared.css">
+<style>
+  :root {
+    --ink: #1c2b26;
+    --paper: #f6f4ee;
+    --line: #d8d2c4;
+    --hop: #4c6b4f;
+    --hop-dark: #33473a;
+    --amber: #b4772c;
+    --mono: "IBM Plex Mono", "Courier New", monospace;
+    --serif: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  }
+  .re-main { font-family: var(--serif); color: var(--ink); background: var(--paper); padding: 24px 32px 80px; max-width: 1000px; margin: 0 auto; }
+  .re-titel { font-size: 28px; margin: 0 0 4px; }
+  .re-subtitel { font-family: var(--mono); font-size: 12px; color: #6b6355; margin-bottom: 24px; }
+
+  .re-section { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 20px 24px; margin-bottom: 20px; }
+  .re-section h2 {
+    margin: 0 0 14px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--hop-dark); font-family: var(--mono); border-bottom: 1px solid var(--line); padding-bottom: 8px;
+  }
+  .re-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px 20px; }
+  .re-field label { display: block; font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #6b6355; margin-bottom: 4px; }
+  .re-field input, .re-field select, .re-field textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px;
+    font-family: var(--serif); font-size: 14px; background: #fff;
+  }
+  .re-field.wide { grid-column: 1 / -1; }
+
+  table.re-ing-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+  table.re-ing-table th { text-align: left; font-family: var(--mono); font-size: 10px; text-transform: uppercase; color: #6b6355; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  table.re-ing-table td { padding: 6px 8px; border-bottom: 1px solid #ece8dc; }
+  table.re-ing-table select, table.re-ing-table input { width: 100%; padding: 5px 6px; border: 1px solid var(--line); border-radius: 4px; font-family: var(--serif); font-size: 13px; }
+  .re-verwijder-regel { background: transparent; border: 1px solid var(--line); border-radius: 4px; color: #a33f2c; cursor: pointer; padding: 4px 8px; }
+
+  .re-btn { background: var(--hop-dark); color: #fff; border: none; padding: 10px 18px; border-radius: 4px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; cursor: pointer; }
+  .re-btn:hover { background: var(--hop); }
+  .re-btn.secundair { background: transparent; color: var(--hop-dark); border: 1px solid var(--line); }
+  .re-btn.groot { background: var(--amber); }
+  .re-btn.groot:hover { opacity: 0.9; }
+
+  .re-melding { margin-top: 14px; font-size: 13px; font-family: var(--mono); }
+  .re-melding.fout { color: #a33f2c; }
+  .re-melding.ok { color: var(--hop-dark); }
+
+  .re-versie-vak { background: #f3e3c9; border: 1px solid var(--amber); border-radius: 6px; padding: 16px 20px; margin-bottom: 20px; }
+  .re-versie-vak h2 { color: #8a5a1e; border-bottom: 1px solid var(--amber); }
+  .re-versie-vak textarea { min-height: 60px; }
+  .re-versie-uitleg { font-size: 13px; color: #6b6355; margin: 0 0 12px; }
+
+  .re-loading { text-align: center; padding: 60px 20px; font-family: var(--mono); font-size: 13px; color: #7a7266; }
+  .re-geen-rechten { text-align: center; padding: 60px 20px; font-family: var(--mono); font-size: 13px; color: #a33f2c; }
+</style>
+</head>
+<body>
+
+<div id="jopen-nav"></div>
+
+<main class="re-main">
+  <div id="re-geen-rechten" class="re-geen-rechten" style="display:none;">
+    You need editor or admin access to create or edit recipes.
+  </div>
+
+  <div id="re-loading" class="re-loading">Loading…</div>
+
+  <div id="re-inhoud" style="display:none;">
+    <h1 class="re-titel" id="re-titel">New recipe</h1>
+    <div class="re-subtitel" id="re-subtitel"></div>
+
+    <form id="re-form">
+
+      <div class="re-section">
+        <h2>Basic info</h2>
+        <div class="re-grid">
+          <div class="re-field wide">
+            <label for="veld-naam">Name *</label>
+            <input type="text" id="veld-naam" required />
+          </div>
+          <div class="re-field">
+            <label for="veld-short_name">Short name</label>
+            <input type="text" id="veld-short_name" />
+          </div>
+          <div class="re-field">
+            <label for="veld-bierstijl">Beer style</label>
+            <input type="text" id="veld-bierstijl" />
+          </div>
+          <div class="re-field">
+            <label for="veld-locatie">Location</label>
+            <input type="text" id="veld-locatie" />
+          </div>
+          <div class="re-field">
+            <label for="veld-status">Status</label>
+            <select id="veld-status">
+              <option value="concept">Draft</option>
+              <option value="actief">Active</option>
+              <option value="gearchiveerd">Archived</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="re-section">
+        <h2>Specifications</h2>
+        <div class="re-grid" id="re-specs-grid"></div>
+      </div>
+
+      <div class="re-section">
+        <h2>Fermentation</h2>
+        <div class="re-grid" id="re-ferm-grid"></div>
+      </div>
+
+      <div class="re-section">
+        <h2>Water profile</h2>
+        <div class="re-grid" id="re-water-grid"></div>
+      </div>
+
+      <div class="re-section">
+        <h2>Costs</h2>
+        <div class="re-grid" id="re-kosten-grid"></div>
+      </div>
+
+      <div class="re-section">
+        <h2>Ingredients</h2>
+        <table class="re-ing-table">
+          <thead><tr><th>Role</th><th>Ingredient</th><th>Amount</th><th>Unit</th><th>Timing</th><th>Order</th><th>Note</th><th></th></tr></thead>
+          <tbody id="re-ing-tbody"></tbody>
+        </table>
+        <button type="button" class="re-btn secundair" id="re-ing-toevoegen-btn">+ Add ingredient row</button>
+      </div>
+
+      <div class="re-versie-vak" id="re-versie-vak" style="display:none;">
+        <h2>Save as</h2>
+        <p class="re-versie-uitleg">A small change updates this recipe in place. A major change keeps the current version archived and viewable, and creates a new active version.</p>
+        <div class="re-field wide">
+          <label for="veld-wijziging">What did you change? *</label>
+          <textarea id="veld-wijziging" required></textarea>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px;">
+        <button type="button" class="re-btn" id="re-opslaan-nieuw-btn" style="display:none;">Create recipe</button>
+        <button type="button" class="re-btn" id="re-opslaan-klein-btn" style="display:none;">Save small change</button>
+        <button type="button" class="re-btn groot" id="re-opslaan-groot-btn" style="display:none;">Save as new major version</button>
+      </div>
+      <div id="re-melding" class="re-melding"></div>
+    </form>
+  </div>
+</main>
+
+<script src="config.js"></script>
+<script src="nav.js"></script>
+<script>
+const SPECS_FIELDS = [
+  ['origineel_extract', 'Original extract', '°P', 'number'],
+  ['rest_extract', 'Final extract', '°P', 'number'],
+  ['alcohol', 'Alcohol', '% v/v', 'number'],
+  ['bitterheid', 'Bitterness', 'EBU', 'number'],
+  ['kleur', 'Color', 'EBC', 'number'],
+  ['ph', 'pH', '', 'number'],
+  ['adf_pct', 'ADF', '%', 'number'],
+  ['troebeling_lab', 'Turbidity (lab)', 'EBC', 'number'],
+  ['co2_fles', 'CO2 bottle', 'g/l', 'number'],
+  ['co2_can', 'CO2 can', 'g/l', 'number'],
+  ['co2_fust', 'CO2 keg', 'g/l', 'number'],
+  ['headspace_o2', 'Headspace O2', 'ppb', 'number'],
+  ['dissolved_o2', 'Dissolved O2', 'ppb', 'number'],
+];
+const FERM_FIELDS = [
+  ['pitching_temp', 'Pitching temp', '°C', 'number'],
+  ['main_ferm_temp', 'Main ferment temp', '°C', 'number'],
+  ['t_release', 'T release', '°C', 'number'],
+  ['temp_dry_warm', 'Dry hop warm temp', '°C', 'number'],
+  ['extract_dry_warm_1', 'Extract dry warm 1', '°P', 'number'],
+  ['extract_dry_warm_2', 'Extract dry warm 2', '°P', 'number'],
+  ['extract_dry_warm_3', 'Extract dry warm 3', '°P', 'number'],
+  ['vergistingstijd', 'Fermentation time', 'days', 'number'],
+  ['lagertijd', 'Lager time', 'days', 'number'],
+  ['lager_temp', 'Lager temp', '°C', 'number'],
+  ['pasteurisatie', 'Pasteurization', 'PU', 'number'],
+  ['troebeling_na_sep', 'Turbidity after separation', 'EBC', 'number'],
+  ['bier_risico', 'Beer risk', '', 'text'],
+  ['bier_status', 'Beer status', '', 'text'],
+];
+const WATER_FIELDS = [
+  ['ca', 'Ca', 'ppm', 'number'],
+  ['mg', 'Mg', 'ppm', 'number'],
+  ['na', 'Na', 'ppm', 'number'],
+  ['cl', 'Cl', 'ppm', 'number'],
+  ['so4', 'SO4', 'ppm', 'number'],
+  ['ratio_cl_so4', 'Cl:SO4 ratio', '', 'number'],
+  ['alkalinity', 'Alkalinity', '', 'number'],
+  ['maischwater', 'Mash water', '', 'number'],
+  ['ph_maische', 'pH mash', '', 'number'],
+  ['ph_start_koken', 'pH start boil', '', 'number'],
+  ['ph_eind_koken', 'pH end boil', '', 'number'],
+  ['beluchting', 'Aeration', 'l/h', 'number'],
+];
+const KOSTEN_FIELDS = [
+  ['cost_clr_per_kge', 'Cost CLR/kg extract', '€', 'number'],
+  ['cost_bh_per_kge', 'Cost BH/kg extract', '€', 'number'],
+  ['cost_grondstoffen_hl', 'Raw material cost/HL', '€', 'number'],
+  ['bierverlies_pct', 'Beer loss', '%', 'number'],
+];
+const ROL_OPTIES = [
+  ['hoofdmout', 'Malt'], ['hopgift_kook', 'Hop (boil)'], ['dry_hop', 'Dry hop'],
+  ['toegift_brouwerij', 'Brewhouse addition'], ['toegift_kelder', 'Cellar addition'], ['gist', 'Yeast'],
+];
+
+let huidigeGebruiker = null;
+let alleIngredientenLijst = [];
+let bestaandRecept = null;
+let ingredientRegelTeller = 0;
+
+function urlParam(naam) {
+  return new URLSearchParams(window.location.search).get(naam);
+}
+
+function renderVeldenGrid(containerId, fields, data) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = fields.map(([key, label, unit, type]) => `
+    <div class="re-field">
+      <label for="veld-${key}">${label}${unit ? ' (' + unit + ')' : ''}</label>
+      <input type="${type}" id="veld-${key}" value="${data && data[key] !== null && data[key] !== undefined ? data[key] : ''}" />
+    </div>`).join('');
+}
+
+function leesVeldenGrid(fields) {
+  const result = {};
+  fields.forEach(([key, , , type]) => {
+    const el = document.getElementById('veld-' + key);
+    const v = el.value;
+    if (v === '') { result[key] = null; return; }
+    result[key] = type === 'number' ? Number(v) : v;
+  });
+  return result;
+}
+
+function ingredientOpties(geselecteerdId) {
+  return alleIngredientenLijst.map(i =>
+    `<option value="${i.id}" ${String(i.id) === String(geselecteerdId) ? 'selected' : ''}>${escapeHtml(i.naam)}${i.categorie_naam ? ' — ' + escapeHtml(i.categorie_naam) : ''}</option>`
+  ).join('');
+}
+
+function rolOpties(geselecteerd) {
+  return ROL_OPTIES.map(([val, label]) =>
+    `<option value="${val}" ${val === geselecteerd ? 'selected' : ''}>${label}</option>`
+  ).join('');
+}
+
+function voegIngredientRegelToe(regel = {}) {
+  const tbody = document.getElementById('re-ing-tbody');
+  const rijId = 'ing-rij-' + (ingredientRegelTeller++);
+  const tr = document.createElement('tr');
+  tr.id = rijId;
+  tr.innerHTML = `
+    <td><select class="re-ing-rol">${rolOpties(regel.rol)}</select></td>
+    <td><select class="re-ing-ingredient">${ingredientOpties(regel.ingredient_id)}</select></td>
+    <td><input type="number" class="re-ing-hoeveelheid" value="${regel.hoeveelheid ?? ''}" /></td>
+    <td><input type="text" class="re-ing-eenheid" value="${regel.eenheid ?? ''}" /></td>
+    <td><input type="text" class="re-ing-tijdstip" value="${regel.tijdstip ?? ''}" /></td>
+    <td><input type="number" class="re-ing-volgorde" value="${regel.volgorde ?? ''}" style="width:60px;" /></td>
+    <td><input type="text" class="re-ing-notitie" value="${regel.notitie ?? ''}" /></td>
+    <td><button type="button" class="re-verwijder-regel">&times;</button></td>
+  `;
+  tbody.appendChild(tr);
+  tr.querySelector('.re-verwijder-regel').addEventListener('click', () => tr.remove());
+}
+
+function leesIngredientRegels() {
+  return Array.from(document.querySelectorAll('#re-ing-tbody tr')).map(tr => ({
+    rol: tr.querySelector('.re-ing-rol').value,
+    ingredient_id: Number(tr.querySelector('.re-ing-ingredient').value),
+    hoeveelheid: tr.querySelector('.re-ing-hoeveelheid').value === '' ? null : Number(tr.querySelector('.re-ing-hoeveelheid').value),
+    eenheid: tr.querySelector('.re-ing-eenheid').value.trim() || null,
+    tijdstip: tr.querySelector('.re-ing-tijdstip').value.trim() || null,
+    volgorde: tr.querySelector('.re-ing-volgorde').value === '' ? null : Number(tr.querySelector('.re-ing-volgorde').value),
+    notitie: tr.querySelector('.re-ing-notitie').value.trim() || null,
+  }));
+}
+
+function leesBasisgegevens() {
+  return {
+    naam: document.getElementById('veld-naam').value.trim(),
+    short_name: document.getElementById('veld-short_name').value.trim() || null,
+    bierstijl: document.getElementById('veld-bierstijl').value.trim() || null,
+    locatie: document.getElementById('veld-locatie').value.trim() || null,
+    status: document.getElementById('veld-status').value,
+  };
+}
+
+async function initReceptInvoer() {
+  huidigeGebruiker = await getHuidigeGebruiker();
+
+  if (!huidigeGebruiker || (huidigeGebruiker.rol !== 'admin' && huidigeGebruiker.rol !== 'editor')) {
+    document.getElementById('re-loading').style.display = 'none';
+    document.getElementById('re-geen-rechten').style.display = 'block';
+    return;
+  }
+
+  const { data: ingData, error: ingError } = await supabaseClient
+    .from('ingredients')
+    .select('id, naam, ingredient_categories(name)')
+    .order('naam');
+  if (!ingError) {
+    alleIngredientenLijst = (ingData || []).map(i => ({ id: i.id, naam: i.naam, categorie_naam: i.ingredient_categories?.name }));
+  }
+
+  renderVeldenGrid('re-specs-grid', SPECS_FIELDS, null);
+  renderVeldenGrid('re-ferm-grid', FERM_FIELDS, null);
+  renderVeldenGrid('re-water-grid', WATER_FIELDS, null);
+  renderVeldenGrid('re-kosten-grid', KOSTEN_FIELDS, null);
+
+  const id = urlParam('id');
+  if (id) {
+    await laadBestaandRecept(id);
+  } else {
+    document.getElementById('re-titel').textContent = 'New recipe';
+    document.getElementById('re-subtitel').textContent = '';
+    document.getElementById('re-opslaan-nieuw-btn').style.display = 'inline-block';
+  }
+
+  document.getElementById('re-loading').style.display = 'none';
+  document.getElementById('re-inhoud').style.display = 'block';
+}
+
+async function laadBestaandRecept(id) {
+  const [recipe, specs, ferm, water, kosten, ingredients] = await Promise.all([
+    supabaseClient.from('recipes').select('*').eq('id', id).single(),
+    supabaseClient.from('recipe_specificaties').select('*').eq('recipe_id', id).maybeSingle(),
+    supabaseClient.from('recipe_fermentatie').select('*').eq('recipe_id', id).maybeSingle(),
+    supabaseClient.from('recipe_water').select('*').eq('recipe_id', id).maybeSingle(),
+    supabaseClient.from('recipe_kosten').select('*').eq('recipe_id', id).maybeSingle(),
+    supabaseClient.from('recipe_ingredients').select('*').eq('recipe_id', id).order('rol').order('volgorde'),
+  ]);
+
+  if (recipe.error || !recipe.data) {
+    document.getElementById('re-melding').textContent = 'Could not load recipe: ' + (recipe.error?.message || 'not found');
+    document.getElementById('re-melding').className = 're-melding fout';
+    return;
+  }
+
+  bestaandRecept = recipe.data;
+
+  document.getElementById('re-titel').textContent = 'Edit: ' + bestaandRecept.naam;
+  document.getElementById('re-subtitel').textContent =
+    `Current version v${bestaandRecept.versie_major}.${bestaandRecept.versie_minor} · ${bestaandRecept.status}`;
+
+  document.getElementById('veld-naam').value = bestaandRecept.naam || '';
+  document.getElementById('veld-short_name').value = bestaandRecept.short_name || '';
+  document.getElementById('veld-bierstijl').value = bestaandRecept.bierstijl || '';
+  document.getElementById('veld-locatie').value = bestaandRecept.locatie || '';
+  document.getElementById('veld-status').value = bestaandRecept.status || 'concept';
+
+  renderVeldenGrid('re-specs-grid', SPECS_FIELDS, specs.data || {});
+  renderVeldenGrid('re-ferm-grid', FERM_FIELDS, ferm.data || {});
+  renderVeldenGrid('re-water-grid', WATER_FIELDS, water.data || {});
+  renderVeldenGrid('re-kosten-grid', KOSTEN_FIELDS, kosten.data || {});
+
+  (ingredients.data || []).forEach(regel => voegIngredientRegelToe(regel));
+
+  document.getElementById('re-versie-vak').style.display = 'block';
+  document.getElementById('re-opslaan-klein-btn').style.display = 'inline-block';
+  document.getElementById('re-opslaan-groot-btn').style.display = 'inline-block';
+}
+
+document.getElementById('re-ing-toevoegen-btn').addEventListener('click', () => voegIngredientRegelToe());
+
+document.getElementById('re-opslaan-nieuw-btn').addEventListener('click', async () => {
+  const melding = document.getElementById('re-melding');
+  const basis = leesBasisgegevens();
+
+  if (!basis.naam) {
+    melding.textContent = 'Name is required.';
+    melding.className = 're-melding fout';
+    return;
+  }
+
+  melding.textContent = 'Saving…';
+  melding.className = 're-melding';
+
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  const gebruikerId = session?.user?.id ?? null;
+
+  const { data: nieuwRecept, error: receptErr } = await supabaseClient
+    .from('recipes')
+    .insert({
+      ...basis,
+      versie_major: 1,
+      versie_minor: 0,
+      aangemaakt_door: gebruikerId,
+      gewijzigd_door: gebruikerId,
+    })
+    .select()
+    .single();
+
+  if (receptErr) {
+    melding.textContent = 'Could not create recipe: ' + receptErr.message;
+    melding.className = 're-melding fout';
+    return;
+  }
+
+  const nieuwId = nieuwRecept.id;
+  const fout = await schrijfGerelateerdeData(nieuwId);
+  if (fout) {
+    melding.textContent = 'Recipe created, but: ' + fout;
+    melding.className = 're-melding fout';
+    return;
+  }
+
+  await supabaseClient.from('recipe_revisies').insert({
+    recipe_id: nieuwId,
+    versie_major: 1,
+    versie_minor: 0,
+    datum: new Date().toISOString().slice(0, 10),
+    door: huidigeGebruiker.naam,
+    wijziging: 'Initial version',
+    gebruiker_id: gebruikerId,
+  });
+
+  melding.textContent = 'Recipe created! Redirecting…';
+  melding.className = 're-melding ok';
+  setTimeout(() => { window.location.href = 'receptoverzicht.html'; }, 1000);
+});
+
+document.getElementById('re-opslaan-klein-btn').addEventListener('click', async () => {
+  await slaBestaandReceptOp('klein');
+});
+
+document.getElementById('re-opslaan-groot-btn').addEventListener('click', async () => {
+  await slaBestaandReceptOp('groot');
+});
+
+async function slaBestaandReceptOp(soort) {
+  const melding = document.getElementById('re-melding');
+  const basis = leesBasisgegevens();
+  const wijziging = document.getElementById('veld-wijziging').value.trim();
+
+  if (!basis.naam) {
+    melding.textContent = 'Name is required.';
+    melding.className = 're-melding fout';
+    return;
+  }
+  if (!wijziging) {
+    melding.textContent = 'Please describe what you changed.';
+    melding.className = 're-melding fout';
+    return;
+  }
+
+  melding.textContent = 'Saving…';
+  melding.className = 're-melding';
+
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  const gebruikerId = session?.user?.id ?? null;
+  const vandaag = new Date().toISOString().slice(0, 10);
+
+  if (soort === 'klein') {
+    const nieuweMinor = (bestaandRecept.versie_minor ?? 0) + 1;
+
+    const { error: updateErr } = await supabaseClient
+      .from('recipes')
+      .update({ ...basis, versie_minor: nieuweMinor, gewijzigd_door: gebruikerId })
+      .eq('id', bestaandRecept.id);
+
+    if (updateErr) {
+      melding.textContent = 'Save failed: ' + updateErr.message;
+      melding.className = 're-melding fout';
+      return;
+    }
+
+    const fout = await schrijfGerelateerdeData(bestaandRecept.id);
+    if (fout) {
+      melding.textContent = 'Recipe updated, but: ' + fout;
+      melding.className = 're-melding fout';
+      return;
+    }
+
+    await supabaseClient.from('recipe_revisies').insert({
+      recipe_id: bestaandRecept.id,
+      versie_major: bestaandRecept.versie_major,
+      versie_minor: nieuweMinor,
+      datum: vandaag,
+      door: huidigeGebruiker.naam,
+      wijziging,
+      gebruiker_id: gebruikerId,
+    });
+
+    melding.textContent = `Saved as v${bestaandRecept.versie_major}.${nieuweMinor}. Redirecting…`;
+    melding.className = 're-melding ok';
+    setTimeout(() => { window.location.href = 'receptoverzicht.html'; }, 1000);
+    return;
+  }
+
+  const { error: archiveerErr } = await supabaseClient
+    .from('recipes')
+    .update({ status: 'gearchiveerd', gewijzigd_door: gebruikerId })
+    .eq('id', bestaandRecept.id);
+
+  if (archiveerErr) {
+    melding.textContent = 'Could not archive current version: ' + archiveerErr.message;
+    melding.className = 're-melding fout';
+    return;
+  }
+
+  const nieuweMajor = (bestaandRecept.versie_major ?? 1) + 1;
+
+  const { data: nieuwRecept, error: receptErr } = await supabaseClient
+    .from('recipes')
+    .insert({
+      ...basis,
+      versie_major: nieuweMajor,
+      versie_minor: 0,
+      recipe_group_id: bestaandRecept.recipe_group_id,
+      aangemaakt_door: gebruikerId,
+      gewijzigd_door: gebruikerId,
+    })
+    .select()
+    .single();
+
+  if (receptErr) {
+    melding.textContent = 'Failed to create new version: ' + receptErr.message;
+    melding.className = 're-melding fout';
+    return;
+  }
+
+  const nieuwId = nieuwRecept.id;
+  const fout = await schrijfGerelateerdeData(nieuwId);
+  if (fout) {
+    melding.textContent = 'New version created, but: ' + fout;
+    melding.className = 're-melding fout';
+    return;
+  }
+
+  await supabaseClient.from('recipe_revisies').insert({
+    recipe_id: nieuwId,
+    versie_major: nieuweMajor,
+    versie_minor: 0,
+    datum: vandaag,
+    door: huidigeGebruiker.naam,
+    wijziging: `Major revision from v${bestaandRecept.versie_major}.${bestaandRecept.versie_minor}: ${wijziging}`,
+    gebruiker_id: gebruikerId,
+  });
+
+  melding.textContent = `Saved as new version v${nieuweMajor}.0. Redirecting…`;
+  melding.className = 're-melding ok';
+  setTimeout(() => { window.location.href = 'receptoverzicht.html'; }, 1000);
+}
+
+async function schrijfGerelateerdeData(recipeId) {
+  const specs = leesVeldenGrid(SPECS_FIELDS);
+  const ferm = leesVeldenGrid(FERM_FIELDS);
+  const water = leesVeldenGrid(WATER_FIELDS);
+  const kosten = leesVeldenGrid(KOSTEN_FIELDS);
+  const ingredientRegels = leesIngredientRegels();
+
+  const { error: specsErr } = await supabaseClient.from('recipe_specificaties').upsert({ recipe_id: recipeId, ...specs });
+  if (specsErr) return 'specifications: ' + specsErr.message;
+
+  const { error: fermErr } = await supabaseClient.from('recipe_fermentatie').upsert({ recipe_id: recipeId, ...ferm });
+  if (fermErr) return 'fermentation: ' + fermErr.message;
+
+  const { error: waterErr } = await supabaseClient.from('recipe_water').upsert({ recipe_id: recipeId, ...water });
+  if (waterErr) return 'water profile: ' + waterErr.message;
+
+  const { error: kostenErr } = await supabaseClient.from('recipe_kosten').upsert({ recipe_id: recipeId, ...kosten });
+  if (kostenErr) return 'costs: ' + kostenErr.message;
+
+  const { error: verwijderErr } = await supabaseClient.from('recipe_ingredients').delete().eq('recipe_id', recipeId);
+  if (verwijderErr) return 'ingredients (clearing old rows): ' + verwijderErr.message;
+
+  if (ingredientRegels.length > 0) {
+    const { error: insertErr } = await supabaseClient
+      .from('recipe_ingredients')
+      .insert(ingredientRegels.map(r => ({ ...r, recipe_id: recipeId })));
+    if (insertErr) return 'ingredients: ' + insertErr.message;
+  }
+
+  return null;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+document.addEventListener('DOMContentLoaded', initReceptInvoer);
+</script>
+
+</body>
+</html>

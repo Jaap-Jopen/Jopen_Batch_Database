@@ -197,6 +197,7 @@
     <div class="toolbar">
       <input id="search" placeholder="Search by name or beer style…">
       <div class="count" id="result-count"></div>
+      <a href="recept-invoer.html" class="back-link" id="new-recipe-link" style="display:none; margin-bottom:0; background: var(--hop-dark); color:#fff; padding:8px 14px; border-radius:4px;">+ New recipe</a>
     </div>
     <div id="list-container"><div class="loading">Loading recipes…</div></div>
   </div>
@@ -213,6 +214,7 @@
 // Supabase-client (supabaseClient) en auth komen nu uit config.js, gedeeld
 // door alle Jopen-app-pagina's. Zie config.js voor de credentials.
 let allRecipes = [];
+let huidigeGebruikerRol = null;
 
 const mainEl = document.getElementById('main');
 const connStatus = document.getElementById('conn-status');
@@ -225,7 +227,17 @@ function statusLabel(status) {
   return labels[status] || status || 'Unknown';
 }
 
+function magBewerken() {
+  return huidigeGebruikerRol === 'admin' || huidigeGebruikerRol === 'editor';
+}
+
 window.addEventListener('DOMContentLoaded', async () => {
+  const gebruiker = await getHuidigeGebruiker();
+  huidigeGebruikerRol = gebruiker ? gebruiker.rol : null;
+  if (magBewerken()) {
+    document.getElementById('new-recipe-link').style.display = 'inline-block';
+  }
+
   try {
     const { error } = await supabaseClient.from('recipes').select('id').limit(1);
     if (error) throw error;
@@ -243,7 +255,7 @@ async function loadRecipes() {
   const container = document.getElementById('list-container');
   const { data, error } = await supabaseClient
     .from('recipes')
-    .select('id, naam, bierstijl, locatie, status, huidige_versie')
+    .select('id, naam, bierstijl, locatie, status, versie_major, versie_minor, recipe_group_id')
     .order('naam');
   if (error) {
     container.innerHTML = `<div class="error">Error loading: ${error.message}</div>`;
@@ -265,7 +277,7 @@ function renderList(recipes) {
       <td>${escapeHtml(r.naam)}</td>
       <td>${escapeHtml(r.bierstijl || '—')}</td>
       <td>${escapeHtml(r.locatie || '—')}</td>
-      <td>v${r.huidige_versie ?? 1}</td>
+      <td>v${r.versie_major ?? 1}.${r.versie_minor ?? 0}</td>
       <td><span class="status-pill status-${r.status}">${statusLabel(r.status)}</span></td>
     </tr>`).join('');
   container.innerHTML = `
@@ -310,6 +322,16 @@ async function openDetail(id) {
   const w = water.data || {};
   const k = kosten.data || {};
   const ings = ingredients.data || [];
+
+  // Andere versies van hetzelfde recept (zelfde recipe_group_id), voor het
+  // "Previous versions"-lijstje onderaan de kaart.
+  const { data: overigeVersies } = await supabaseClient
+    .from('recipes')
+    .select('id, versie_major, versie_minor, status')
+    .eq('recipe_group_id', r.recipe_group_id)
+    .neq('id', id)
+    .order('versie_major', { ascending: false })
+    .order('versie_minor', { ascending: false });
 
   const specRows = [
     ['Original extract', s.origineel_extract, '°P'],
@@ -357,11 +379,26 @@ async function openDetail(id) {
       <td>${escapeHtml(i.tijdstip || '—')}</td>
     </tr>`).join('');
 
+  const vorigeVersiesHtml = (overigeVersies && overigeVersies.length > 0) ? `
+    <div class="section-title">Previous versions</div>
+    <table class="ing-table">
+      <thead><tr><th>Version</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        ${overigeVersies.map(v => `
+          <tr>
+            <td>v${v.versie_major}.${v.versie_minor}</td>
+            <td><span class="status-pill status-${v.status}">${statusLabel(v.status)}</span></td>
+            <td><a class="back-link" style="margin:0;" onclick="openDetail('${v.id}')">View &rarr;</a></td>
+          </tr>`).join('')}
+      </tbody>
+    </table>` : '';
+
   container.innerHTML = `
     <h2 class="recipe-title">${escapeHtml(r.naam)}</h2>
     <div class="recipe-meta">
       <b>${escapeHtml(r.bierstijl || 'unknown style')}</b> · ${escapeHtml(r.locatie || '—')} ·
-      version ${r.huidige_versie ?? 1} · <span class="status-pill status-${r.status}">${statusLabel(r.status)}</span>
+      version ${r.versie_major ?? 1}.${r.versie_minor ?? 0} · <span class="status-pill status-${r.status}">${statusLabel(r.status)}</span>
+      ${magBewerken() ? ` · <a class="back-link" style="margin:0;" href="recept-invoer.html?id=${r.id}">Edit &rarr;</a>` : ''}
     </div>
     <div class="grid-cards">
       ${cardHtml('Specifications', specRows)}
@@ -375,6 +412,7 @@ async function openDetail(id) {
         <thead><tr><th>Role</th><th>Name</th><th>Amount</th><th>Timing</th></tr></thead>
         <tbody>${ingRows}</tbody>
       </table>` : '<div class="empty">No ingredients found for this recipe.</div>'}
+    ${vorigeVersiesHtml}
   `;
 }
 
