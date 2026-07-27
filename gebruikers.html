@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jopen Brouwerij — Gebruikers</title>
+  <link rel="stylesheet" href="jopen-shared.css" />
+  <style>
+    table.gebruikers-tabel { width: 100%; border-collapse: collapse; background: #fff; margin-bottom: 32px; }
+    table.gebruikers-tabel th, table.gebruikers-tabel td { text-align: left; padding: 10px 14px; border-bottom: 1px solid #ddd; }
+    table.gebruikers-tabel th { font-size: 0.85em; color: #555; }
+    .rol-badge { font-size: 0.8em; padding: 2px 8px; border-radius: 10px; background: #eee; }
+    .rol-badge.admin { background: #e3f2e9; color: #1a5c3a; }
+    .actief-nee { color: #999; font-style: italic; }
+    .geen-toegang { padding: 40px 0; color: #555; }
+  </style>
+</head>
+<body>
+
+  <div id="jopen-nav"></div>
+
+  <main class="jopen-pagina">
+    <h1>Gebruikers</h1>
+    <p class="jopen-subtitel">Overzicht van collega's en hun rol, en nieuwe collega's uitnodigen.</p>
+
+    <div id="geen-toegang" class="geen-toegang" style="display:none;">
+      Dit scherm is alleen zichtbaar voor admins. Log in met een admin-account om gebruikers te beheren.
+    </div>
+
+    <div id="admin-inhoud" style="display:none;">
+      <div id="gebruikers-lijst"><div class="jopen-subtitel">Gebruikers laden…</div></div>
+
+      <h2 style="font-size:1.2em;">Nieuwe collega uitnodigen</h2>
+      <form class="jopen-form" id="invite-form" style="margin: 0 0 40px;">
+        <label for="invite-email">E-mailadres</label>
+        <input type="email" id="invite-email" required />
+
+        <label for="invite-naam">Naam</label>
+        <input type="text" id="invite-naam" required />
+
+        <label for="invite-rol">Rol</label>
+        <select id="invite-rol" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+          <option value="viewer">Viewer</option>
+          <option value="editor">Editor</option>
+          <option value="admin">Admin</option>
+        </select>
+
+        <button type="submit">Uitnodiging versturen</button>
+        <p id="invite-melding" class="jopen-form-melding"></p>
+      </form>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="nav.js"></script>
+  <script>
+    async function laadGebruikersLijst() {
+      const container = document.getElementById('gebruikers-lijst');
+      const { data, error } = await supabaseClient
+        .from('gebruikers')
+        .select('naam, rol, actief, aangemaakt_op')
+        .order('naam');
+
+      if (error) {
+        container.innerHTML = `<p class="jopen-form-melding fout">Kon gebruikers niet laden: ${error.message}</p>`;
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        container.innerHTML = `<p class="jopen-subtitel">Nog geen gebruikers.</p>`;
+        return;
+      }
+
+      const rijen = data.map(g => `
+        <tr>
+          <td>${g.naam}</td>
+          <td><span class="rol-badge ${g.rol}">${g.rol}</span></td>
+          <td>${g.actief ? 'Ja' : '<span class="actief-nee">Nee</span>'}</td>
+        </tr>`).join('');
+
+      container.innerHTML = `
+        <table class="gebruikers-tabel">
+          <thead><tr><th>Naam</th><th>Rol</th><th>Actief</th></tr></thead>
+          <tbody>${rijen}</tbody>
+        </table>`;
+    }
+
+    async function initGebruikersPagina() {
+      const gebruiker = await getHuidigeGebruiker();
+
+      if (!gebruiker || gebruiker.rol !== 'admin') {
+        document.getElementById('geen-toegang').style.display = 'block';
+        return;
+      }
+
+      document.getElementById('admin-inhoud').style.display = 'block';
+      laadGebruikersLijst();
+    }
+
+    document.getElementById('invite-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('invite-email').value.trim();
+      const naam = document.getElementById('invite-naam').value.trim();
+      const rol = document.getElementById('invite-rol').value;
+      const melding = document.getElementById('invite-melding');
+
+      melding.textContent = 'Bezig met uitnodigen…';
+      melding.className = 'jopen-form-melding';
+
+      // supabaseClient.functions.invoke() stuurt automatisch de Authorization-
+      // header van de huidige ingelogde gebruiker mee — geen handmatig token nodig.
+      const { data, error } = await supabaseClient.functions.invoke('invite-user', {
+        body: { email, naam, rol },
+      });
+
+      if (error) {
+        // supabase-js geeft bij een non-2xx status alleen een generieke melding
+        // ("Edge Function returned a non-2xx status code") in error.message.
+        // De echte foutmelding van onze functie zit in de response-body zelf
+        // (error.context is de ruwe fetch Response) — die proberen we hier
+        // uit te lezen zodat je niet steeds naar de Edge Function-logs hoeft.
+        let detail = error.message;
+        try {
+          const body = await error.context.json();
+          if (body?.error) detail = body.error;
+        } catch (_) {
+          // response was geen JSON, of context ontbrak — val terug op error.message
+        }
+        melding.textContent = 'Uitnodigen mislukt: ' + detail;
+        melding.className = 'jopen-form-melding fout';
+        return;
+      }
+      if (data?.error) {
+        melding.textContent = 'Uitnodigen mislukt: ' + data.error;
+        melding.className = 'jopen-form-melding fout';
+        return;
+      }
+
+      melding.textContent = `Uitnodiging verstuurd naar ${email}.`;
+      melding.className = 'jopen-form-melding ok';
+      document.getElementById('invite-form').reset();
+      laadGebruikersLijst();
+    });
+
+    document.addEventListener('DOMContentLoaded', initGebruikersPagina);
+  </script>
+</body>
+</html>

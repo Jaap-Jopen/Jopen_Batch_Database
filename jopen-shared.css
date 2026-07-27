@@ -1,0 +1,187 @@
+/* ============================================================================
+   jopen-shared.css — gedeelde, functionele basisstijl
+   Bewust sober: focus ligt nu op werkende functionaliteit, niet op vormgeving.
+   ============================================================================ */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #1f1f1f;
+  background: #f7f7f5;
+}
+
+a { color: #1a5c3a; }
+
+/* --- Navigatiebalk --- */
+
+.jopen-nav {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 20px;
+  background: #1a5c3a;
+  color: #ffffff;
+  flex-wrap: wrap;
+}
+
+.jopen-nav-merk {
+  font-weight: bold;
+  margin-right: 12px;
+}
+
+.jopen-nav-links {
+  display: flex;
+  gap: 16px;
+  flex: 1;
+}
+
+.jopen-nav-link {
+  color: #e8f0ea;
+  text-decoration: none;
+  padding: 4px 2px;
+}
+
+.jopen-nav-link:hover { text-decoration: underline; }
+
+.jopen-nav-link.actief {
+  color: #ffffff;
+  border-bottom: 2px solid #ffffff;
+}
+
+.jopen-nav-rechts {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.jopen-nav-gebruiker { font-size: 0.9em; }
+.jopen-nav-rol { opacity: 0.8; }
+
+.jopen-nav-uitloggen {
+  background: transparent;
+  border: 1px solid #ffffff;
+  color: #ffffff;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.jopen-nav-uitloggen:hover { background: rgba(255,255,255,0.15); }
+
+/* --- Algemene pagina-container --- */
+
+.jopen-pagina {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px 20px 60px;
+}
+
+.jopen-pagina h1 {
+  font-size: 1.6em;
+  margin-bottom: 4px;
+}
+
+.jopen-subtitel {
+  color: #555;
+  margin-top: 0;
+  margin-bottom: 24px;
+}
+
+/* --- Dashboard-tegels (index.html) --- */
+
+.jopen-tegels {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.jopen-tegel {
+  display: block;
+  padding: 20px;
+  background: #ffffff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  text-decoration: none;
+  color: #1f1f1f;
+}
+
+.jopen-tegel:hover {
+  border-color: #1a5c3a;
+}
+
+.jopen-tegel-titel {
+  font-weight: bold;
+  font-size: 1.1em;
+  margin-bottom: 4px;
+}
+
+.jopen-tegel-omschrijving {
+  color: #555;
+  font-size: 0.9em;
+  margin: 0;
+}
+
+.jopen-tegel-status {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 0.75em;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #eee;
+  color: #666;
+}
+
+.jopen-tegel-status.actief {
+  background: #e3f2e9;
+  color: #1a5c3a;
+}
+
+/* --- Simpel formulier (login.html e.a.) --- */
+
+.jopen-form {
+  max-width: 360px;
+  margin: 60px auto;
+  padding: 24px;
+  background: #ffffff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+
+.jopen-form label {
+  display: block;
+  margin-top: 12px;
+  margin-bottom: 4px;
+  font-size: 0.9em;
+}
+
+.jopen-form input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1em;
+}
+
+.jopen-form button {
+  margin-top: 20px;
+  width: 100%;
+  padding: 10px;
+  background: #1a5c3a;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  font-size: 1em;
+  cursor: pointer;
+}
+
+.jopen-form button:hover { background: #144a2f; }
+
+.jopen-form-melding {
+  margin-top: 12px;
+  font-size: 0.9em;
+}
+
+.jopen-form-melding.fout { color: #b3261e; }
+.jopen-form-melding.ok { color: #1a5c3a; }

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jopen Brouwerij — Wachtwoord instellen</title>
+  <link rel="stylesheet" href="jopen-shared.css" />
+</head>
+<body>
+
+  <div id="jopen-nav"></div>
+
+  <main class="jopen-pagina">
+    <div id="laden" class="jopen-subtitel">Uitnodiging controleren…</div>
+
+    <form class="jopen-form" id="wachtwoord-form" style="display:none;">
+      <h1 style="font-size:1.3em; margin-top:0;">Welkom bij Jopen Brouwerij</h1>
+      <p class="jopen-subtitel" style="margin-bottom:0;">Stel hieronder je wachtwoord in om in te loggen.</p>
+
+      <label for="wachtwoord">Nieuw wachtwoord</label>
+      <input type="password" id="wachtwoord" required minlength="8" autocomplete="new-password" />
+
+      <label for="wachtwoord-herhaal">Herhaal wachtwoord</label>
+      <input type="password" id="wachtwoord-herhaal" required minlength="8" autocomplete="new-password" />
+
+      <button type="submit">Wachtwoord instellen</button>
+      <p id="melding" class="jopen-form-melding"></p>
+    </form>
+
+    <div id="geen-uitnodiging" class="jopen-form-melding fout" style="display:none; max-width:360px; margin:60px auto; text-align:center;">
+      Geen (geldige) uitnodiging gevonden. Vraag een admin om een nieuwe uitnodiging te sturen via het Gebruikers-scherm.
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="nav.js"></script>
+  <script>
+    // supabase-js pikt het access_token/refresh_token uit de URL-hash (achter de #)
+    // automatisch op zodra de client aangemaakt wordt (detectSessionInUrl, staat
+    // standaard aan) en zet daarmee de sessie klaar. We wachten dat hier af.
+    async function initAcceptInvite() {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+
+      document.getElementById('laden').style.display = 'none';
+
+      if (!session) {
+        document.getElementById('geen-uitnodiging').style.display = 'block';
+        return;
+      }
+
+      document.getElementById('wachtwoord-form').style.display = 'block';
+    }
+
+    document.getElementById('wachtwoord-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const wachtwoord = document.getElementById('wachtwoord').value;
+      const herhaal = document.getElementById('wachtwoord-herhaal').value;
+      const melding = document.getElementById('melding');
+
+      if (wachtwoord !== herhaal) {
+        melding.textContent = 'De wachtwoorden komen niet overeen.';
+        melding.className = 'jopen-form-melding fout';
+        return;
+      }
+
+      melding.textContent = 'Bezig met opslaan…';
+      melding.className = 'jopen-form-melding';
+
+      const { error } = await supabaseClient.auth.updateUser({ password: wachtwoord });
+
+      if (error) {
+        melding.textContent = 'Kon wachtwoord niet instellen: ' + error.message;
+        melding.className = 'jopen-form-melding fout';
+        return;
+      }
+
+      melding.textContent = 'Wachtwoord ingesteld! Je wordt doorgestuurd…';
+      melding.className = 'jopen-form-melding ok';
+      setTimeout(() => { window.location.href = 'index.html'; }, 1200);
+    });
+
+    document.addEventListener('DOMContentLoaded', initAcceptInvite);
+  </script>
+</body>
+</html>

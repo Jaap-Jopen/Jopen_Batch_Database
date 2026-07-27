@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<title>Jopen — Receptoverzicht</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="jopen-shared.css">
+<style>
+  :root {
+    --ink: #1c2b26;
+    --paper: #f6f4ee;
+    --line: #d8d2c4;
+    --hop: #4c6b4f;
+    --hop-dark: #33473a;
+    --amber: #b4772c;
+    --mono: "IBM Plex Mono", "Courier New", monospace;
+    --serif: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    min-height: 100vh;
+  }
+  header {
+    padding: 28px 32px 20px;
+    border-bottom: 3px solid var(--hop-dark);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 28px;
+    letter-spacing: 0.02em;
+  }
+  header h1 span { color: var(--hop); }
+  header .sub {
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #6b6355;
+  }
+  #config {
+    max-width: 640px;
+    margin: 24px auto;
+    padding: 20px 24px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+  }
+  #config label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6b6355;
+    margin-top: 12px;
+  }
+  #config input {
+    width: 100%;
+    padding: 9px 10px;
+    margin-top: 4px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+  #config button {
+    margin-top: 16px;
+    background: var(--hop-dark);
+    color: #fff;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+  }
+  #config button:hover { background: var(--hop); }
+  #config .hint { font-size: 12px; color: #7a7266; margin-top: 10px; line-height: 1.5; }
+
+  main { display: none; padding: 24px 32px 60px; max-width: 1100px; margin: 0 auto; }
+  main.active { display: block; }
+
+  .toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
+  #search {
+    flex: 1; min-width: 220px;
+    padding: 10px 14px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    font-family: var(--serif);
+    font-size: 15px;
+    background: #fff;
+  }
+  .count { font-family: var(--mono); font-size: 12px; color: #7a7266; white-space: nowrap; }
+
+  table { width: 100%; border-collapse: collapse; background: #fff; }
+  thead th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6b6355;
+    padding: 10px 14px;
+    border-bottom: 2px solid var(--hop-dark);
+  }
+  tbody td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+    font-size: 15px;
+  }
+  tbody tr { cursor: pointer; transition: background 0.12s; }
+  tbody tr:hover { background: #eef0e6; }
+  .status-pill {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 3px 9px;
+    border-radius: 20px;
+    display: inline-block;
+  }
+  .status-actief { background: #e1ead9; color: var(--hop-dark); }
+  .status-concept { background: #f3e3c9; color: #8a5a1e; }
+  .status-gearchiveerd { background: #e6e2d8; color: #7a7266; }
+
+  #detail-view { display: none; }
+  #detail-view.active { display: block; }
+  .back-link {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--hop-dark);
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    margin-bottom: 18px;
+  }
+  .back-link:hover { text-decoration: underline; }
+
+  .recipe-title { font-size: 32px; margin: 0 0 4px; }
+  .recipe-meta { font-family: var(--mono); font-size: 13px; color: #6b6355; margin-bottom: 24px; }
+  .recipe-meta b { color: var(--ink); }
+
+  .grid-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 14px; margin-bottom: 28px; }
+  .card {
+    background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 16px 18px;
+  }
+  .card h3 {
+    margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--hop-dark); font-family: var(--mono); border-bottom: 1px solid var(--line); padding-bottom: 8px;
+  }
+  .kv { display: flex; justify-content: space-between; font-size: 14px; padding: 4px 0; }
+  .kv span:first-child { color: #6b6355; }
+  .kv span:last-child { font-family: var(--mono); }
+
+  .section-title {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--hop-dark);
+    font-family: var(--mono); margin: 30px 0 10px; border-bottom: 2px solid var(--hop-dark); padding-bottom: 6px;
+  }
+  .ing-table { width: 100%; border-collapse: collapse; background: #fff; margin-bottom: 10px; }
+  .ing-table th {
+    text-align: left; font-family: var(--mono); font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.06em; color: #6b6355; padding: 8px 12px; border-bottom: 1px solid var(--line);
+  }
+  .ing-table td { padding: 8px 12px; border-bottom: 1px solid #ece8dc; font-size: 14px; }
+  .rol-tag {
+    font-family: var(--mono); font-size: 10px; text-transform: uppercase;
+    color: var(--amber); letter-spacing: 0.04em;
+  }
+
+  .empty, .loading, .error {
+    text-align: center; padding: 60px 20px; font-family: var(--mono); font-size: 13px; color: #7a7266;
+  }
+  .error { color: #a33f2c; }
+</style>
+</head>
+<body>
+
+<div id="jopen-nav"></div>
+
+<header>
+  <h1>Jopen<span>.</span>brouwerij</h1>
+  <div class="sub" id="conn-status">niet verbonden</div>
+</header>
+
+<main id="main">
+  <div id="list-view">
+    <div class="toolbar">
+      <input id="search" placeholder="Zoek op naam of bierstijl…">
+      <div class="count" id="result-count"></div>
+    </div>
+    <div id="list-container"><div class="loading">Recepten laden…</div></div>
+  </div>
+
+  <div id="detail-view">
+    <a class="back-link" id="back-btn">&larr; Terug naar overzicht</a>
+    <div id="detail-container"></div>
+  </div>
+</main>
+
+<script src="config.js"></script>
+<script src="nav.js"></script>
+<script>
+// Supabase-client (supabaseClient) en auth komen nu uit config.js, gedeeld
+// door alle Jopen-app-pagina's. Zie config.js voor de credentials.
+let allRecipes = [];
+
+const mainEl = document.getElementById('main');
+const connStatus = document.getElementById('conn-status');
+
+window.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const { error } = await supabaseClient.from('recipes').select('id').limit(1);
+    if (error) throw error;
+    mainEl.classList.add('active');
+    connStatus.textContent = 'verbonden';
+    loadRecipes();
+  } catch (e) {
+    connStatus.textContent = 'verbinden mislukt';
+    document.getElementById('list-container').innerHTML =
+      `<div class="error">Kon niet verbinden met Supabase: ${e.message || e}</div>`;
+  }
+});
+
+async function loadRecipes() {
+  const container = document.getElementById('list-container');
+  const { data, error } = await supabaseClient
+    .from('recipes')
+    .select('id, naam, bierstijl, locatie, status, huidige_versie')
+    .order('naam');
+  if (error) {
+    container.innerHTML = `<div class="error">Fout bij laden: ${error.message}</div>`;
+    return;
+  }
+  allRecipes = data || [];
+  renderList(allRecipes);
+}
+
+function renderList(recipes) {
+  const container = document.getElementById('list-container');
+  document.getElementById('result-count').textContent = `${recipes.length} recept${recipes.length===1?'':'en'}`;
+  if (recipes.length === 0) {
+    container.innerHTML = `<div class="empty">Geen recepten gevonden.</div>`;
+    return;
+  }
+  const rows = recipes.map(r => `
+    <tr data-id="${r.id}">
+      <td>${escapeHtml(r.naam)}</td>
+      <td>${escapeHtml(r.bierstijl || '—')}</td>
+      <td>${escapeHtml(r.locatie || '—')}</td>
+      <td>v${r.huidige_versie ?? 1}</td>
+      <td><span class="status-pill status-${r.status}">${r.status}</span></td>
+    </tr>`).join('');
+  container.innerHTML = `
+    <table>
+      <thead><tr><th>Naam</th><th>Bierstijl</th><th>Locatie</th><th>Versie</th><th>Status</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  container.querySelectorAll('tbody tr').forEach(tr => {
+    tr.addEventListener('click', () => openDetail(tr.dataset.id));
+  });
+}
+
+document.getElementById('search').addEventListener('input', (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  const filtered = allRecipes.filter(r =>
+    (r.naam||'').toLowerCase().includes(q) || (r.bierstijl||'').toLowerCase().includes(q));
+  renderList(filtered);
+});
+
+async function openDetail(id) {
+  document.getElementById('list-view').style.display = 'none';
+  document.getElementById('detail-view').classList.add('active');
+  const container = document.getElementById('detail-container');
+  container.innerHTML = `<div class="loading">Recept laden…</div>`;
+
+  const [recipe, specs, ferm, water, kosten, ingredients] = await Promise.all([
+    supabaseClient.from('recipes').select('*').eq('id', id).single(),
+    supabaseClient.from('recipe_specificaties').select('*').eq('recipe_id', id).maybeSingle(),
+    supabaseClient.from('recipe_fermentatie').select('*').eq('recipe_id', id).maybeSingle(),
+    supabaseClient.from('recipe_water').select('*').eq('recipe_id', id).maybeSingle(),
+    supabaseClient.from('recipe_kosten').select('*').eq('recipe_id', id).maybeSingle(),
+    supabaseClient.from('recipe_ingredients').select('rol, hoeveelheid, eenheid, tijdstip, volgorde, ingredients(naam, categorie)').eq('recipe_id', id).order('rol').order('volgorde'),
+  ]);
+
+  if (recipe.error) {
+    container.innerHTML = `<div class="error">Fout bij laden: ${recipe.error.message}</div>`;
+    return;
+  }
+  const r = recipe.data;
+  const s = specs.data || {};
+  const f = ferm.data || {};
+  const w = water.data || {};
+  const k = kosten.data || {};
+  const ings = ingredients.data || [];
+
+  const specRows = [
+    ['Origineel extract', s.origineel_extract, '°P'],
+    ['Rest extract', s.rest_extract, '°P'],
+    ['Alcohol', s.alcohol, '% v/v'],
+    ['Bitterheid', s.bitterheid, 'EBU'],
+    ['Kleur', s.kleur, 'EBC'],
+    ['pH', s.ph, ''],
+  ].filter(([,v]) => v !== null && v !== undefined);
+
+  const fermRows = [
+    ['Pitching temp', f.pitching_temp, '°C'],
+    ['Main ferm temp', f.main_ferm_temp, '°C'],
+    ['Vergistingstijd', f.vergistingstijd, 'dagen'],
+    ['Lagertijd', f.lagertijd, 'dagen'],
+    ['Bier risico', f.bier_risico, ''],
+    ['Bier status', f.bier_status, ''],
+  ].filter(([,v]) => v !== null && v !== undefined);
+
+  const waterRows = [
+    ['Ca', w.ca, 'ppm'], ['Mg', w.mg, 'ppm'], ['Na', w.na, 'ppm'],
+    ['Cl', w.cl, 'ppm'], ['SO4', w.so4, 'ppm'], ['Alkalinity', w.alkalinity, ''],
+  ].filter(([,v]) => v !== null && v !== undefined);
+
+  const kostenRows = [
+    ['Kosten grondstoffen/HL', k.cost_grondstoffen_hl, '€'],
+    ['Bierverlies', k.bierverlies_pct, '%'],
+  ].filter(([,v]) => v !== null && v !== undefined);
+
+  function cardHtml(title, rows, unitFirst=false) {
+    if (rows.length === 0) return '';
+    return `<div class="card"><h3>${title}</h3>${rows.map(([label,val,unit]) =>
+      `<div class="kv"><span>${label}</span><span>${escapeHtml(String(val))}${unit? ' '+unit:''}</span></div>`).join('')}</div>`;
+  }
+
+  const rolLabels = {
+    hoofdmout: 'Mout', hopgift_kook: 'Hop (kook)', dry_hop: 'Dry hop',
+    toegift_brouwerij: 'Toegift brouwerij', toegift_kelder: 'Toegift kelder', gist: 'Gist'
+  };
+  const ingRows = ings.map(i => `
+    <tr>
+      <td><span class="rol-tag">${rolLabels[i.rol]||i.rol}</span></td>
+      <td>${escapeHtml(i.ingredients?.naam || '—')}</td>
+      <td>${i.hoeveelheid ?? '—'} ${i.eenheid || ''}</td>
+      <td>${escapeHtml(i.tijdstip || '—')}</td>
+    </tr>`).join('');
+
+  container.innerHTML = `
+    <h2 class="recipe-title">${escapeHtml(r.naam)}</h2>
+    <div class="recipe-meta">
+      <b>${escapeHtml(r.bierstijl || 'onbekende stijl')}</b> · ${escapeHtml(r.locatie || '—')} ·
+      versie ${r.huidige_versie ?? 1} · <span class="status-pill status-${r.status}">${r.status}</span>
+    </div>
+    <div class="grid-cards">
+      ${cardHtml('Specificaties', specRows)}
+      ${cardHtml('Fermentatie', fermRows)}
+      ${cardHtml('Waterprofiel', waterRows)}
+      ${cardHtml('Kosten', kostenRows)}
+    </div>
+    <div class="section-title">Ingrediënten (${ings.length})</div>
+    ${ings.length ? `
+      <table class="ing-table">
+        <thead><tr><th>Rol</th><th>Naam</th><th>Hoeveelheid</th><th>Moment</th></tr></thead>
+        <tbody>${ingRows}</tbody>
+      </table>` : '<div class="empty">Geen ingrediënten gevonden voor dit recept.</div>'}
+  `;
+}
+
+document.getElementById('back-btn').addEventListener('click', () => {
+  document.getElementById('detail-view').classList.remove('active');
+  document.getElementById('list-view').style.display = 'block';
+});
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+</script>
+
+</body>
+</html>
