@@ -1049,7 +1049,7 @@ async function laadBestaandRecept(id) {
     supabaseClient.from('recipe_comments').select('*').eq('recipe_id', id).maybeSingle(),
     supabaseClient.from('recipe_kosten').select('*').eq('recipe_id', id).maybeSingle(),
     supabaseClient.from('recipe_ingredients').select('*').eq('recipe_id', id).order('rol').order('volgorde'),
-    supabaseClient.from('recipe_revisies').select('*').eq('recipe_id', id).order('id', { ascending: false }),
+    supabaseClient.from('recipe_revisies').select('*').eq('recipe_id', id).order('versie_major', { ascending: false }).order('versie_minor', { ascending: false }).order('id', { ascending: false }),
   ]);
 
   if (recipe.error || !recipe.data) {
