@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jopen — Ingrediënten</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="jopen-shared.css">
+<style>
+  /* Zelfde visuele taal als receptoverzicht.html, los gehouden van jopen-shared.css
+     zodat dit scherm zijn eigen leesbaarheid heeft zonder die andere pagina te raken. */
+  :root {
+    --ink: #1c2b26;
+    --paper: #f6f4ee;
+    --line: #d8d2c4;
+    --hop: #4c6b4f;
+    --hop-dark: #33473a;
+    --amber: #b4772c;
+    --mono: "IBM Plex Mono", "Courier New", monospace;
+    --serif: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  }
+  .ing-main { font-family: var(--serif); color: var(--ink); background: var(--paper); padding: 24px 32px 60px; }
+  .ing-toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
+  .ing-toolbar input, .ing-toolbar select {
+    padding: 10px 14px; border: 1px solid var(--line); border-radius: 4px;
+    font-family: var(--serif); font-size: 15px; background: #fff;
+  }
+  #ing-search { flex: 1; min-width: 220px; }
+  .ing-count { font-family: var(--mono); font-size: 12px; color: #7a7266; white-space: nowrap; }
+
+  table.ing-tabel { width: 100%; border-collapse: collapse; background: #fff; }
+  table.ing-tabel thead th {
+    text-align: left; font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.08em; color: #6b6355; padding: 10px 14px; border-bottom: 2px solid var(--hop-dark);
+  }
+  table.ing-tabel tbody td { padding: 12px 14px; border-bottom: 1px solid var(--line); font-size: 15px; }
+  table.ing-tabel tbody tr { cursor: pointer; }
+  table.ing-tabel tbody tr:hover { background: #eef0e6; }
+
+  .status-pill {
+    font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 3px 9px; border-radius: 20px; display: inline-block;
+  }
+  .status-actief { background: #e1ead9; color: var(--hop-dark); }
+  .status-inactief, .status-uitgefaseerd { background: #e6e2d8; color: #7a7266; }
+
+  #ing-detail { display: none; }
+  #ing-detail.actief { display: block; }
+  .ing-back {
+    font-family: var(--mono); font-size: 12px; color: var(--hop-dark); cursor: pointer;
+    display: inline-block; margin-bottom: 18px; text-decoration: none;
+  }
+  .ing-back:hover { text-decoration: underline; }
+
+  .ing-titel { font-size: 32px; margin: 0 0 4px; }
+  .ing-meta { font-family: var(--mono); font-size: 13px; color: #6b6355; margin-bottom: 24px; }
+
+  .ing-card { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 20px 24px; max-width: 480px; }
+  .ing-kv { display: flex; justify-content: space-between; font-size: 14px; padding: 6px 0; border-bottom: 1px solid #ece8dc; }
+  .ing-kv:last-child { border-bottom: none; }
+  .ing-kv span:first-child { color: #6b6355; }
+  .ing-kv span:last-child { font-family: var(--mono); }
+
+  .ing-bewerk-btn, .ing-opslaan-btn {
+    margin-top: 18px; background: var(--hop-dark); color: #fff; border: none; padding: 10px 18px;
+    border-radius: 4px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; cursor: pointer;
+  }
+  .ing-bewerk-btn:hover, .ing-opslaan-btn:hover { background: var(--hop); }
+  .ing-annuleer-btn {
+    margin-top: 18px; margin-left: 10px; background: transparent; color: #6b6355; border: 1px solid var(--line);
+    padding: 10px 18px; border-radius: 4px; font-family: var(--mono); font-size: 12px; cursor: pointer;
+  }
+
+  .ing-edit-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; gap: 10px; }
+  .ing-edit-row label { color: #6b6355; font-size: 14px; }
+  .ing-edit-row input, .ing-edit-row select {
+    font-family: var(--mono); font-size: 14px; padding: 5px 8px; border: 1px solid var(--line);
+    border-radius: 4px; width: 160px; text-align: right;
+  }
+
+  .ing-melding { margin-top: 12px; font-size: 13px; }
+  .ing-melding.fout { color: #a33f2c; }
+  .ing-melding.ok { color: var(--hop-dark); }
+
+  .ing-empty, .ing-loading, .ing-error {
+    text-align: center; padding: 60px 20px; font-family: var(--mono); font-size: 13px; color: #7a7266;
+  }
+  .ing-error { color: #a33f2c; }
+</style>
+</head>
+<body>
+
+<div id="jopen-nav"></div>
+
+<main class="ing-main">
+  <div id="ing-list-view">
+    <h1 class="ing-titel" style="font-size:28px;">Ingrediënten</h1>
+    <div class="ing-toolbar">
+      <input id="ing-search" placeholder="Zoek op naam of leverancier…">
+      <select id="ing-filter-categorie"><option value="">Alle categorieën</option></select>
+      <select id="ing-filter-status"><option value="">Alle statussen</option></select>
+      <div class="ing-count" id="ing-result-count"></div>
+    </div>
+    <div id="ing-list-container"><div class="ing-loading">Ingrediënten laden…</div></div>
+  </div>
+
+  <div id="ing-detail">
+    <a class="ing-back" id="ing-back-btn">&larr; Terug naar overzicht</a>
+    <div id="ing-detail-container"></div>
+  </div>
+</main>
+
+<script src="config.js"></script>
+<script src="nav.js"></script>
+<script>
+let alleIngredienten = [];
+let huidigeGebruikerRol = null; // wordt gevuld met 'admin' | 'editor' | 'viewer' | null (niet ingelogd)
+
+async function initIngredientenPagina() {
+  const gebruiker = await getHuidigeGebruiker();
+  huidigeGebruikerRol = gebruiker ? gebruiker.rol : null;
+  laadIngredienten();
+}
+
+async function laadIngredienten() {
+  const container = document.getElementById('ing-list-container');
+  const { data, error } = await supabaseClient
+    .from('ingredients')
+    .select('id, naam, categorie, eenheid, prijs, extract_pct, alpha_pct, gistfactor, leverancier, status')
+    .order('naam');
+
+  if (error) {
+    container.innerHTML = `<div class="ing-error">Fout bij laden: ${error.message}</div>`;
+    return;
+  }
+
+  alleIngredienten = data || [];
+  vulFilters(alleIngredienten);
+  renderIngLijst(alleIngredienten);
+}
+
+function vulFilters(ingredienten) {
+  const categorieen = [...new Set(ingredienten.map(i => i.categorie).filter(Boolean))].sort();
+  const statussen = [...new Set(ingredienten.map(i => i.status).filter(Boolean))].sort();
+
+  const catSelect = document.getElementById('ing-filter-categorie');
+  categorieen.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c; opt.textContent = c;
+    catSelect.appendChild(opt);
+  });
+
+  const statusSelect = document.getElementById('ing-filter-status');
+  statussen.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s; opt.textContent = s;
+    statusSelect.appendChild(opt);
+  });
+}
+
+function huidigeFilters() {
+  return {
+    zoek: document.getElementById('ing-search').value.trim().toLowerCase(),
+    categorie: document.getElementById('ing-filter-categorie').value,
+    status: document.getElementById('ing-filter-status').value,
+  };
+}
+
+function pasFiltersToe() {
+  const { zoek, categorie, status } = huidigeFilters();
+  const gefilterd = alleIngredienten.filter(i => {
+    const matchtZoek = !zoek ||
+      (i.naam || '').toLowerCase().includes(zoek) ||
+      (i.leverancier || '').toLowerCase().includes(zoek);
+    const matchtCategorie = !categorie || i.categorie === categorie;
+    const matchtStatus = !status || i.status === status;
+    return matchtZoek && matchtCategorie && matchtStatus;
+  });
+  renderIngLijst(gefilterd);
+}
+
+document.getElementById('ing-search').addEventListener('input', pasFiltersToe);
+document.getElementById('ing-filter-categorie').addEventListener('change', pasFiltersToe);
+document.getElementById('ing-filter-status').addEventListener('change', pasFiltersToe);
+
+function renderIngLijst(ingredienten) {
+  const container = document.getElementById('ing-list-container');
+  document.getElementById('ing-result-count').textContent =
+    `${ingredienten.length} ingrediënt${ingredienten.length === 1 ? '' : 'en'}`;
+
+  if (ingredienten.length === 0) {
+    container.innerHTML = `<div class="ing-empty">Geen ingrediënten gevonden.</div>`;
+    return;
+  }
+
+  const rijen = ingredienten.map(i => `
+    <tr data-id="${i.id}">
+      <td>${escapeHtml(i.naam)}</td>
+      <td>${escapeHtml(i.categorie || '—')}</td>
+      <td>${escapeHtml(i.eenheid || '—')}</td>
+      <td>${escapeHtml(i.leverancier || '—')}</td>
+      <td><span class="status-pill status-${i.status || 'onbekend'}">${escapeHtml(i.status || 'onbekend')}</span></td>
+    </tr>`).join('');
+
+  container.innerHTML = `
+    <table class="ing-tabel">
+      <thead><tr><th>Naam</th><th>Categorie</th><th>Eenheid</th><th>Leverancier</th><th>Status</th></tr></thead>
+      <tbody>${rijen}</tbody>
+    </table>`;
+
+  container.querySelectorAll('tbody tr').forEach(tr => {
+    tr.addEventListener('click', () => toonDetail(tr.dataset.id));
+  });
+}
+
+function toonDetail(id) {
+  document.getElementById('ing-list-view').style.display = 'none';
+  document.getElementById('ing-detail').classList.add('actief');
+  renderDetailAlleen(id);
+}
+
+function renderDetailAlleen(id) {
+  const i = alleIngredienten.find(x => String(x.id) === String(id));
+  const container = document.getElementById('ing-detail-container');
+  if (!i) {
+    container.innerHTML = `<div class="ing-error">Ingrediënt niet gevonden.</div>`;
+    return;
+  }
+
+  const magBewerken = huidigeGebruikerRol === 'admin' || huidigeGebruikerRol === 'editor';
+
+  const rows = [
+    ['Categorie', i.categorie, ''],
+    ['Eenheid', i.eenheid, ''],
+    ['Prijs', i.prijs, '€'],
+    ['Extract %', i.extract_pct, '%'],
+    ['Alpha %', i.alpha_pct, '%'],
+    ['Gistfactor', i.gistfactor, ''],
+    ['Leverancier', i.leverancier, ''],
+    ['Status', i.status, ''],
+  ];
+
+  container.innerHTML = `
+    <h2 class="ing-titel">${escapeHtml(i.naam)}</h2>
+    <div class="ing-meta">${escapeHtml(i.categorie || 'onbekende categorie')}</div>
+    <div class="ing-card">
+      ${rows.map(([label, val, unit]) => `
+        <div class="ing-kv">
+          <span>${label}</span>
+          <span>${val !== null && val !== undefined && val !== '' ? escapeHtml(String(val)) + (unit ? ' ' + unit : '') : '—'}</span>
+        </div>`).join('')}
+      ${magBewerken ? `<button class="ing-bewerk-btn" id="ing-bewerk-btn">Bewerken</button>` : ''}
+    </div>
+  `;
+
+  if (magBewerken) {
+    document.getElementById('ing-bewerk-btn').addEventListener('click', () => renderDetailBewerken(i));
+  }
+}
+
+function renderDetailBewerken(i) {
+  const container = document.getElementById('ing-detail-container');
+
+  const veld = (label, key, unit = '', type = 'text') => `
+    <div class="ing-edit-row">
+      <label for="veld-${key}">${label}</label>
+      <input type="${type}" id="veld-${key}" value="${i[key] ?? ''}" ${unit ? `placeholder="${unit}"` : ''} />
+    </div>`;
+
+  container.innerHTML = `
+    <h2 class="ing-titel">${escapeHtml(i.naam)}</h2>
+    <div class="ing-meta">Bewerken</div>
+    <div class="ing-card">
+      ${veld('Eenheid', 'eenheid')}
+      ${veld('Prijs', 'prijs', '€', 'number')}
+      ${veld('Extract %', 'extract_pct', '%', 'number')}
+      ${veld('Alpha %', 'alpha_pct', '%', 'number')}
+      ${veld('Gistfactor', 'gistfactor', '', 'number')}
+      ${veld('Leverancier', 'leverancier')}
+      <div class="ing-edit-row">
+        <label for="veld-status">Status</label>
+        <select id="veld-status" style="width:160px;">
+          <option value="actief" ${i.status === 'actief' ? 'selected' : ''}>actief</option>
+          <option value="inactief" ${i.status === 'inactief' ? 'selected' : ''}>inactief</option>
+          <option value="uitgefaseerd" ${i.status === 'uitgefaseerd' ? 'selected' : ''}>uitgefaseerd</option>
+        </select>
+      </div>
+      <button class="ing-opslaan-btn" id="ing-opslaan-btn">Opslaan</button>
+      <button class="ing-annuleer-btn" id="ing-annuleer-btn">Annuleren</button>
+      <div id="ing-edit-melding" class="ing-melding"></div>
+    </div>
+  `;
+
+  document.getElementById('ing-annuleer-btn').addEventListener('click', () => renderDetailAlleen(i.id));
+  document.getElementById('ing-opslaan-btn').addEventListener('click', () => slaIngredientOp(i));
+}
+
+async function slaIngredientOp(i) {
+  const melding = document.getElementById('ing-edit-melding');
+  melding.textContent = 'Bezig met opslaan…';
+  melding.className = 'ing-melding';
+
+  const getal = (id) => {
+    const v = document.getElementById(id).value;
+    return v === '' ? null : Number(v);
+  };
+  const tekst = (id) => {
+    const v = document.getElementById(id).value.trim();
+    return v === '' ? null : v;
+  };
+
+  const { data: { session } } = await supabaseClient.auth.getSession();
+
+  const updateData = {
+    eenheid: tekst('veld-eenheid'),
+    prijs: getal('veld-prijs'),
+    extract_pct: getal('veld-extract_pct'),
+    alpha_pct: getal('veld-alpha_pct'),
+    gistfactor: getal('veld-gistfactor'),
+    leverancier: tekst('veld-leverancier'),
+    status: document.getElementById('veld-status').value,
+    gewijzigd_door: session?.user?.id ?? null,
+  };
+
+  const { error } = await supabaseClient
+    .from('ingredients')
+    .update(updateData)
+    .eq('id', i.id);
+
+  if (error) {
+    melding.textContent = 'Opslaan mislukt: ' + error.message;
+    melding.className = 'ing-melding fout';
+    return;
+  }
+
+  melding.textContent = 'Opgeslagen.';
+  melding.className = 'ing-melding ok';
+
+  // Lokale kopie + lijst bijwerken zodat het overzicht meteen klopt
+  Object.assign(i, updateData);
+  setTimeout(() => renderDetailAlleen(i.id), 600);
+}
+
+document.getElementById('ing-back-btn').addEventListener('click', () => {
+  document.getElementById('ing-detail').classList.remove('actief');
+  document.getElementById('ing-list-view').style.display = 'block';
+});
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+document.addEventListener('DOMContentLoaded', initIngredientenPagina);
+</script>
+
+</body>
+</html>
