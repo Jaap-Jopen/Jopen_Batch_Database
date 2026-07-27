@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jopen — Database Status</title>
+<link rel="stylesheet" href="jopen-shared.css">
+<style>
+  :root {
+    --orange-accent: #b26a00;
+    --grey-text: #6b6b6b;
+  }
+  main.status-main {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+  #error-box {
+    display: none;
+    background: #fdecea;
+    border: 1px solid #e0a39b;
+    color: #a33f2c;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 0.9em;
+  }
+  .status-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .status-topbar h1 { font-size: 1.3em; margin: 0; }
+  #conn-status { font-size: 0.85em; color: var(--grey-text); }
+  #refresh-btn {
+    background: var(--jopen-rood, #E0001D);
+    color: white;
+    border: none;
+    padding: 7px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #refresh-btn:disabled { opacity: 0.6; cursor: default; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .card {
+    background: white;
+    border-radius: 10px;
+    padding: 18px 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .card h3 {
+    margin: 0 0 6px 0;
+    font-size: 0.8em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--grey-text);
+  }
+  .card .big { font-size: 2em; font-weight: 700; line-height: 1.1; }
+  .card .sub { font-size: 0.85em; color: var(--grey-text); margin-top: 6px; }
+  .card.gap .big { color: var(--orange-accent); }
+  section.block {
+    background: white;
+    border-radius: 10px;
+    padding: 20px 22px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  section.block h2 { font-size: 1em; margin: 0 0 14px 0; color: var(--jopen-rood, #E0001D); }
+  table.status-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+  table.status-table th, table.status-table td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #eee; }
+  table.status-table th { color: var(--grey-text); font-weight: 600; font-size: 0.85em; }
+  .skeleton { color: #bbb; }
+  .footnote { font-size: 0.8em; color: var(--grey-text); margin-top: -10px; margin-bottom: 24px; }
+  #access-check { max-width: 500px; margin: 80px auto; text-align: center; color: var(--grey-text); }
+</style>
+</head>
+<body>
+
+<div id="jopen-nav"></div>
+
+<div id="access-check">Checking access...</div>
+
+<main class="status-main" id="status-main" style="display:none;">
+  <div class="status-topbar">
+    <h1>Database Status</h1>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span id="conn-status">loading...</span>
+      <button id="refresh-btn">Refresh</button>
+    </div>
+  </div>
+
+  <div id="error-box"></div>
+
+  <div class="grid">
+    <div class="card" id="card-ingredients">
+      <h3>Ingredients</h3>
+      <div class="big skeleton">—</div>
+      <div class="sub"></div>
+    </div>
+    <div class="card gap" id="card-unit">
+      <h3>Missing unit</h3>
+      <div class="big skeleton">—</div>
+      <div class="sub">known gap, see summary</div>
+    </div>
+    <div class="card" id="card-recipes">
+      <h3>Recipes</h3>
+      <div class="big skeleton">—</div>
+      <div class="sub"></div>
+    </div>
+    <div class="card" id="card-batches">
+      <h3>Batches</h3>
+      <div class="big skeleton">—</div>
+      <div class="sub"></div>
+    </div>
+    <div class="card" id="card-users">
+      <h3>Users</h3>
+      <div class="big skeleton">—</div>
+      <div class="sub"></div>
+    </div>
+  </div>
+
+  <section class="block">
+    <h2>Recipes — status breakdown</h2>
+    <table class="status-table" id="table-recipe-status"><tbody><tr><td class="skeleton">loading...</td></tr></tbody></table>
+  </section>
+
+  <section class="block">
+    <h2>Users — roles</h2>
+    <table class="status-table" id="table-user-roles"><tbody><tr><td class="skeleton">loading...</td></tr></tbody></table>
+  </section>
+
+  <section class="block">
+    <h2>Latest batch numbers</h2>
+    <table class="status-table" id="table-batches"><tbody><tr><td class="skeleton">loading...</td></tr></tbody></table>
+  </section>
+
+  <p class="footnote">
+    This screen reads live through your logged-in session and counts/groups client-side — so it only shows
+    what the current RLS policies allow. For RLS status itself, column checks (versie_major/versie_minor,
+    aangemaakt_door, etc.) and policy details, run <code>status_overzicht.sql</code> in the Supabase SQL Editor.
+  </p>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="nav.js"></script>
+<script>
+  const accessCheck = document.getElementById('access-check');
+  const statusMain = document.getElementById('status-main');
+  const connStatus = document.getElementById('conn-status');
+  const errorBox = document.getElementById('error-box');
+  const refreshBtn = document.getElementById('refresh-btn');
+
+  function showError(msg) {
+    errorBox.style.display = 'block';
+    errorBox.textContent = msg;
+  }
+  function clearError() {
+    errorBox.style.display = 'none';
+    errorBox.textContent = '';
+  }
+
+  function setCard(id, big, sub) {
+    const card = document.getElementById(id);
+    card.querySelector('.big').textContent = big;
+    card.querySelector('.big').classList.remove('skeleton');
+    if (sub !== undefined) card.querySelector('.sub').textContent = sub;
+  }
+
+  function renderTable(tableId, rows, headers) {
+    const table = document.getElementById(tableId);
+    if (!rows.length) {
+      table.innerHTML = '<tbody><tr><td>no data</td></tr></tbody>';
+      return;
+    }
+    let html = '<thead><tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>';
+    for (const row of rows) {
+      html += '<tr>' + row.map(v => `<td>${v}</td>`).join('') + '</tr>';
+    }
+    html += '</tbody>';
+    table.innerHTML = html;
+  }
+
+  async function loadAll() {
+    refreshBtn.disabled = true;
+    connStatus.textContent = 'loading...';
+    clearError();
+
+    try {
+      const { count: ingrTotal, error: e1 } = await supabaseClient
+        .from('ingredients').select('*', { count: 'exact', head: true });
+      if (e1) throw e1;
+
+      const { count: ingrFilled, error: e2 } = await supabaseClient
+        .from('ingredients').select('*', { count: 'exact', head: true })
+        .not('eenheid', 'is', null).neq('eenheid', '');
+      if (e2) throw e2;
+
+      const missing = (ingrTotal ?? 0) - (ingrFilled ?? 0);
+      setCard('card-ingredients', ingrTotal ?? '—', 'total raw materials');
+      setCard('card-unit', missing, `of ${ingrTotal ?? '?'} ingredients`);
+
+      const { count: recipeTotal, error: e3 } = await supabaseClient
+        .from('recipes').select('*', { count: 'exact', head: true });
+      if (e3) throw e3;
+
+      const { data: recipeStatuses, error: e4 } = await supabaseClient
+        .from('recipes').select('status');
+      if (e4) throw e4;
+
+      const statusCounts = {};
+      for (const r of recipeStatuses) {
+        const key = r.status || '(empty)';
+        statusCounts[key] = (statusCounts[key] || 0) + 1;
+      }
+      setCard('card-recipes', recipeTotal ?? '—', 'total recipes (all versions)');
+      renderTable(
+        'table-recipe-status',
+        Object.entries(statusCounts).sort((a,b) => b[1]-a[1]).map(([status, count]) => [status, count]),
+        ['Status', 'Count']
+      );
+
+      const { count: batchTotal, error: e5 } = await supabaseClient
+        .from('batches').select('*', { count: 'exact', head: true });
+      if (e5) throw e5;
+
+      const { data: latestBatches, error: e6 } = await supabaseClient
+        .from('batches').select('batchnummer').order('batchnummer', { ascending: false }).limit(5);
+      if (e6) throw e6;
+
+      setCard('card-batches', batchTotal ?? '—', latestBatches?.[0] ? `latest: ${latestBatches[0].batchnummer}` : '');
+      renderTable(
+        'table-batches',
+        (latestBatches || []).map(b => [b.batchnummer]),
+        ['Batch number']
+      );
+
+      const { count: userTotal, error: e7 } = await supabaseClient
+        .from('gebruikers').select('*', { count: 'exact', head: true });
+      if (e7) throw e7;
+
+      const { data: userRoles, error: e8 } = await supabaseClient
+        .from('gebruikers').select('rol');
+      if (e8) throw e8;
+
+      const roleCounts = {};
+      for (const g of userRoles) {
+        const key = g.rol || '(empty)';
+        roleCounts[key] = (roleCounts[key] || 0) + 1;
+      }
+      setCard('card-users', userTotal ?? '—', 'total accounts');
+      renderTable(
+        'table-user-roles',
+        Object.entries(roleCounts).sort((a,b) => b[1]-a[1]).map(([rol, count]) => [rol, count]),
+        ['Role', 'Count']
+      );
+
+      connStatus.textContent = 'updated ' + new Date().toLocaleTimeString('en-GB');
+    } catch (err) {
+      connStatus.textContent = 'failed to load';
+      showError(
+        'Could not load all data: ' + (err.message || err) +
+        '. An RLS policy may be blocking this, or a table/column name has changed.'
+      );
+    } finally {
+      refreshBtn.disabled = false;
+    }
+  }
+
+  refreshBtn.addEventListener('click', loadAll);
+
+  // -- Access control: admins only --
+  window.addEventListener('DOMContentLoaded', async () => {
+    let user = null;
+    try {
+      user = await getHuidigeGebruiker();
+    } catch (e) {
+      user = null;
+    }
+
+    if (!user || user.rol !== 'admin') {
+      accessCheck.textContent = 'Access denied — this page is for admins only. Redirecting...';
+      setTimeout(() => { window.location.href = 'index.html'; }, 1500);
+      return;
+    }
+
+    accessCheck.style.display = 'none';
+    statusMain.style.display = 'block';
+    loadAll();
+  });
+</script>
+</body>
+</html>

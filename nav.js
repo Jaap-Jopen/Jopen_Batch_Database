@@ -15,6 +15,7 @@ const JOPEN_MODULES = [
   { naam: 'Ingredients', href: 'ingredienten.html' },
   { naam: 'Users', href: 'gebruikers.html', adminOnly: true },
   { naam: 'Settings', href: 'settings.html', adminOnly: true },
+  { naam: 'Status', href: 'status.html', adminOnly: true },
 ];
 
 function renderNav(huidigeGebruiker) {
