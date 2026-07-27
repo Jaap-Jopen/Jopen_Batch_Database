@@ -1,7 +1,14 @@
 /* ============================================================================
    jopen-shared.css — gedeelde, functionele basisstijl
    Bewust sober: focus ligt nu op werkende functionaliteit, niet op vormgeving.
+   Kleuren gebaseerd op het Jopen-logo (rood #E0001D).
    ============================================================================ */
+
+:root {
+  --jopen-red: #E0001D;
+  --jopen-red-dark: #A80016;
+  --jopen-red-tint: #FBE4E6;
+}
 
 * { box-sizing: border-box; }
 
@@ -12,7 +19,7 @@ body {
   background: #f7f7f5;
 }
 
-a { color: #1a5c3a; }
+a { color: var(--jopen-red); }
 
 /* --- Navigatiebalk --- */
 
@@ -20,8 +27,8 @@ a { color: #1a5c3a; }
   display: flex;
   align-items: center;
   gap: 24px;
-  padding: 12px 20px;
-  background: #1a5c3a;
+  padding: 10px 20px;
+  background: var(--jopen-red);
   color: #ffffff;
   flex-wrap: wrap;
 }
@@ -29,6 +36,15 @@ a { color: #1a5c3a; }
 .jopen-nav-merk {
   font-weight: bold;
   margin-right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.jopen-nav-logo {
+  height: 32px;
+  width: 32px;
+  display: block;
 }
 
 .jopen-nav-links {
@@ -38,7 +54,7 @@ a { color: #1a5c3a; }
 }
 
 .jopen-nav-link {
-  color: #e8f0ea;
+  color: #fce3e5;
   text-decoration: none;
   padding: 4px 2px;
 }
@@ -108,7 +124,7 @@ a { color: #1a5c3a; }
 }
 
 .jopen-tegel:hover {
-  border-color: #1a5c3a;
+  border-color: var(--jopen-red);
 }
 
 .jopen-tegel-titel {
@@ -134,8 +150,8 @@ a { color: #1a5c3a; }
 }
 
 .jopen-tegel-status.actief {
-  background: #e3f2e9;
-  color: #1a5c3a;
+  background: var(--jopen-red-tint);
+  color: var(--jopen-red-dark);
 }
 
 /* --- Simpel formulier (login.html e.a.) --- */
@@ -168,7 +184,7 @@ a { color: #1a5c3a; }
   margin-top: 20px;
   width: 100%;
   padding: 10px;
-  background: #1a5c3a;
+  background: var(--jopen-red);
   color: #ffffff;
   border: none;
   border-radius: 4px;
@@ -176,7 +192,7 @@ a { color: #1a5c3a; }
   cursor: pointer;
 }
 
-.jopen-form button:hover { background: #144a2f; }
+.jopen-form button:hover { background: var(--jopen-red-dark); }
 
 .jopen-form-melding {
   margin-top: 12px;
@@ -184,4 +200,4 @@ a { color: #1a5c3a; }
 }
 
 .jopen-form-melding.fout { color: #b3261e; }
-.jopen-form-melding.ok { color: #1a5c3a; }
+.jopen-form-melding.ok { color: var(--jopen-red-dark); }
