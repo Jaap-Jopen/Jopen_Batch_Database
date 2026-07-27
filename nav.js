@@ -13,8 +13,8 @@ const JOPEN_MODULES = [
   { naam: 'Home', href: 'index.html' },
   { naam: 'Recipes', href: 'receptoverzicht.html' },
   { naam: 'Ingredients', href: 'ingredienten.html' },
-  { naam: 'Users', href: 'gebruikers.html' },
-  { naam: 'Settings', href: 'settings.html' },
+  { naam: 'Users', href: 'gebruikers.html', adminOnly: true },
+  { naam: 'Settings', href: 'settings.html', adminOnly: true },
 ];
 
 function renderNav(huidigeGebruiker) {
@@ -22,11 +22,14 @@ function renderNav(huidigeGebruiker) {
   if (!container) return;
 
   const huidigePagina = window.location.pathname.split('/').pop();
+  const isAdmin = huidigeGebruiker?.rol === 'admin';
 
-  const links = JOPEN_MODULES.map(m => {
-    const isActief = m.href === huidigePagina;
-    return `<a href="${m.href}" class="jopen-nav-link${isActief ? ' actief' : ''}">${m.naam}</a>`;
-  }).join('');
+  const links = JOPEN_MODULES
+    .filter(m => !m.adminOnly || isAdmin)
+    .map(m => {
+      const isActief = m.href === huidigePagina;
+      return `<a href="${m.href}" class="jopen-nav-link${isActief ? ' actief' : ''}">${m.naam}</a>`;
+    }).join('');
 
   const rechterkant = huidigeGebruiker
     ? `<span class="jopen-nav-gebruiker">${huidigeGebruiker.naam} <span class="jopen-nav-rol">(${huidigeGebruiker.rol})</span></span>
