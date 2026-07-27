@@ -14,6 +14,7 @@ const JOPEN_MODULES = [
   { naam: 'Recepten', href: 'receptoverzicht.html' },
   { naam: 'Ingrediënten', href: 'ingredienten.html' },
   { naam: 'Gebruikers', href: 'gebruikers.html' },
+  { naam: 'Settings', href: 'settings.html' },
 ];
 
 function renderNav(huidigeGebruiker) {

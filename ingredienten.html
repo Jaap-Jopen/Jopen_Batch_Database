@@ -117,6 +117,7 @@
 <script src="nav.js"></script>
 <script>
 let alleIngredienten = [];
+let alleCategorieen = [];
 let huidigeGebruikerRol = null; // wordt gevuld met 'admin' | 'editor' | 'viewer' | null (niet ingelogd)
 
 async function initIngredientenPagina() {
@@ -127,6 +128,12 @@ async function initIngredientenPagina() {
     document.getElementById('ing-nieuw-btn').style.display = 'inline-block';
   }
 
+  const { data: categorieData, error: categorieError } = await supabaseClient
+    .from('ingredient_categories')
+    .select('id, name, uses_alpha_pct, uses_extract_pct, uses_gistfactor')
+    .order('sort_order');
+  if (!categorieError) alleCategorieen = categorieData || [];
+
   laadIngredienten();
 }
 
@@ -136,7 +143,7 @@ async function laadIngredienten() {
   const container = document.getElementById('ing-list-container');
   const { data, error } = await supabaseClient
     .from('ingredients')
-    .select('id, naam, categorie, eenheid, prijs, extract_pct, alpha_pct, gistfactor, leverancier, status')
+    .select('id, naam, categorie, category_id, eenheid, prijs, extract_pct, alpha_pct, gistfactor, leverancier, status, ingredient_categories(name, uses_alpha_pct, uses_extract_pct, uses_gistfactor)')
     .order('naam');
 
   if (error) {
@@ -150,15 +157,14 @@ async function laadIngredienten() {
 }
 
 function vulFilters(ingredienten) {
-  const categorieen = [...new Set(ingredienten.map(i => i.categorie).filter(Boolean))].sort();
   const statussen = [...new Set(ingredienten.map(i => i.status).filter(Boolean))].sort();
 
   const catSelect = document.getElementById('ing-filter-categorie');
   const huidigeCat = catSelect.value;
   catSelect.innerHTML = '<option value="">Alle categorieën</option>';
-  categorieen.forEach(c => {
+  alleCategorieen.forEach(c => {
     const opt = document.createElement('option');
-    opt.value = c; opt.textContent = c;
+    opt.value = c.id; opt.textContent = c.name;
     catSelect.appendChild(opt);
   });
   catSelect.value = huidigeCat;
@@ -188,7 +194,7 @@ function pasFiltersToe() {
     const matchtZoek = !zoek ||
       (i.naam || '').toLowerCase().includes(zoek) ||
       (i.leverancier || '').toLowerCase().includes(zoek);
-    const matchtCategorie = !categorie || i.categorie === categorie;
+    const matchtCategorie = !categorie || String(i.category_id) === categorie;
     const matchtStatus = !status || i.status === status;
     return matchtZoek && matchtCategorie && matchtStatus;
   });
@@ -212,7 +218,7 @@ function renderIngLijst(ingredienten) {
   const rijen = ingredienten.map(i => `
     <tr data-id="${i.id}">
       <td>${escapeHtml(i.naam)}</td>
-      <td>${escapeHtml(i.categorie || '—')}</td>
+      <td>${escapeHtml(i.ingredient_categories?.name || i.categorie || '—')}</td>
       <td>${escapeHtml(i.eenheid || '—')}</td>
       <td>${escapeHtml(i.leverancier || '—')}</td>
       <td><span class="status-pill status-${i.status || 'onbekend'}">${escapeHtml(i.status || 'onbekend')}</span></td>
@@ -244,21 +250,25 @@ function renderDetailAlleen(id) {
   }
 
   const magBewerken = huidigeGebruikerRol === 'admin' || huidigeGebruikerRol === 'editor';
+  const cat = i.ingredient_categories || null;
+  const categorieNaam = cat?.name || i.categorie || 'onbekende categorie';
 
   const rows = [
-    ['Categorie', i.categorie, ''],
+    ['Categorie', categorieNaam, ''],
     ['Eenheid', i.eenheid, ''],
     ['Prijs', i.prijs, '€'],
-    ['Extract %', i.extract_pct, '%'],
-    ['Alpha %', i.alpha_pct, '%'],
-    ['Gistfactor', i.gistfactor, ''],
-    ['Leverancier', i.leverancier, ''],
-    ['Status', i.status, ''],
   ];
+  // Alleen tonen wat relevant is voor deze categorie (bij oude, nog niet
+  // gemapte ingrediënten zonder category_id: alles tonen, we weten het niet).
+  if (!cat || cat.uses_extract_pct) rows.push(['Extract %', i.extract_pct, '%']);
+  if (!cat || cat.uses_alpha_pct) rows.push(['Alpha %', i.alpha_pct, '%']);
+  if (!cat || cat.uses_gistfactor) rows.push(['Gistfactor', i.gistfactor, '']);
+  rows.push(['Leverancier', i.leverancier, '']);
+  rows.push(['Status', i.status, '']);
 
   container.innerHTML = `
     <h2 class="ing-titel">${escapeHtml(i.naam)}</h2>
-    <div class="ing-meta">${escapeHtml(i.categorie || 'onbekende categorie')}</div>
+    <div class="ing-meta">${escapeHtml(categorieNaam)}</div>
     <div class="ing-card">
       ${rows.map(([label, val, unit]) => `
         <div class="ing-kv">
@@ -283,15 +293,26 @@ function renderDetailBewerken(i) {
       <input type="${type}" id="veld-${key}" value="${i[key] ?? ''}" ${unit ? `placeholder="${unit}"` : ''} />
     </div>`;
 
+  const categorieOpties = alleCategorieen.map(c =>
+    `<option value="${c.id}" ${String(i.category_id) === String(c.id) ? 'selected' : ''}>${escapeHtml(c.name)}</option>`
+  ).join('');
+
   container.innerHTML = `
     <h2 class="ing-titel">${escapeHtml(i.naam)}</h2>
     <div class="ing-meta">Bewerken</div>
     <div class="ing-card">
+      <div class="ing-edit-row">
+        <label for="veld-category_id">Categorie</label>
+        <select id="veld-category_id" style="width:160px;">
+          <option value="">— kies —</option>
+          ${categorieOpties}
+        </select>
+      </div>
       ${veld('Eenheid', 'eenheid')}
       ${veld('Prijs', 'prijs', '€', 'number')}
-      ${veld('Extract %', 'extract_pct', '%', 'number')}
-      ${veld('Alpha %', 'alpha_pct', '%', 'number')}
-      ${veld('Gistfactor', 'gistfactor', '', 'number')}
+      <div id="veld-extract_pct-rij">${veld('Extract %', 'extract_pct', '%', 'number')}</div>
+      <div id="veld-alpha_pct-rij">${veld('Alpha %', 'alpha_pct', '%', 'number')}</div>
+      <div id="veld-gistfactor-rij">${veld('Gistfactor', 'gistfactor', '', 'number')}</div>
       ${veld('Leverancier', 'leverancier')}
       <div class="ing-edit-row">
         <label for="veld-status">Status</label>
@@ -306,6 +327,16 @@ function renderDetailBewerken(i) {
       <div id="ing-edit-melding" class="ing-melding"></div>
     </div>
   `;
+
+  const categorieSelect = document.getElementById('veld-category_id');
+  const pasVeldZichtbaarheidToe = () => {
+    const gekozen = alleCategorieen.find(c => String(c.id) === categorieSelect.value);
+    document.getElementById('veld-extract_pct-rij').style.display = (!gekozen || gekozen.uses_extract_pct) ? 'flex' : 'none';
+    document.getElementById('veld-alpha_pct-rij').style.display = (!gekozen || gekozen.uses_alpha_pct) ? 'flex' : 'none';
+    document.getElementById('veld-gistfactor-rij').style.display = (!gekozen || gekozen.uses_gistfactor) ? 'flex' : 'none';
+  };
+  categorieSelect.addEventListener('change', pasVeldZichtbaarheidToe);
+  pasVeldZichtbaarheidToe();
 
   document.getElementById('ing-annuleer-btn').addEventListener('click', () => renderDetailAlleen(i.id));
   document.getElementById('ing-opslaan-btn').addEventListener('click', () => slaIngredientOp(i));
@@ -327,12 +358,19 @@ async function slaIngredientOp(i) {
 
   const { data: { session } } = await supabaseClient.auth.getSession();
 
+  const categoryIdVeld = document.getElementById('veld-category_id').value;
+  const gekozenCategorie = alleCategorieen.find(c => String(c.id) === categoryIdVeld);
+
   const updateData = {
+    category_id: categoryIdVeld ? Number(categoryIdVeld) : null,
     eenheid: tekst('veld-eenheid'),
     prijs: getal('veld-prijs'),
-    extract_pct: getal('veld-extract_pct'),
-    alpha_pct: getal('veld-alpha_pct'),
-    gistfactor: getal('veld-gistfactor'),
+    // Alleen het veld meesturen als het bij de gekozen categorie hoort;
+    // anders expliciet leegmaken zodat er geen niet-relevante waarde blijft
+    // hangen (bijv. een alpha % op een moutsoort).
+    extract_pct: (!gekozenCategorie || gekozenCategorie.uses_extract_pct) ? getal('veld-extract_pct') : null,
+    alpha_pct: (!gekozenCategorie || gekozenCategorie.uses_alpha_pct) ? getal('veld-alpha_pct') : null,
+    gistfactor: (!gekozenCategorie || gekozenCategorie.uses_gistfactor) ? getal('veld-gistfactor') : null,
     leverancier: tekst('veld-leverancier'),
     status: document.getElementById('veld-status').value,
     gewijzigd_door: session?.user?.id ?? null,
@@ -369,6 +407,8 @@ function toonNieuwFormulier() {
       <input type="${type}" id="${id}" ${unit ? `placeholder="${unit}"` : ''} />
     </div>`;
 
+  const categorieOpties = alleCategorieen.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+
   container.innerHTML = `
     <h2 class="ing-titel">Nieuw ingrediënt</h2>
     <div class="ing-meta">Verplichte velden: naam en categorie</div>
@@ -378,14 +418,17 @@ function toonNieuwFormulier() {
         <input type="text" id="nieuw-naam" required />
       </div>
       <div class="ing-edit-row">
-        <label for="nieuw-categorie">Categorie *</label>
-        <input type="text" id="nieuw-categorie" required />
+        <label for="nieuw-category_id">Categorie *</label>
+        <select id="nieuw-category_id" style="width:160px;" required>
+          <option value="">— kies —</option>
+          ${categorieOpties}
+        </select>
       </div>
       ${veld('Eenheid', 'nieuw-eenheid')}
       ${veld('Prijs', 'nieuw-prijs', '€', 'number')}
-      ${veld('Extract %', 'nieuw-extract_pct', '%', 'number')}
-      ${veld('Alpha %', 'nieuw-alpha_pct', '%', 'number')}
-      ${veld('Gistfactor', 'nieuw-gistfactor', '', 'number')}
+      <div id="nieuw-extract_pct-rij">${veld('Extract %', 'nieuw-extract_pct', '%', 'number')}</div>
+      <div id="nieuw-alpha_pct-rij">${veld('Alpha %', 'nieuw-alpha_pct', '%', 'number')}</div>
+      <div id="nieuw-gistfactor-rij">${veld('Gistfactor', 'nieuw-gistfactor', '', 'number')}</div>
       ${veld('Leverancier', 'nieuw-leverancier')}
       <div class="ing-edit-row">
         <label for="nieuw-status">Status</label>
@@ -401,6 +444,16 @@ function toonNieuwFormulier() {
     </div>
   `;
 
+  const categorieSelect = document.getElementById('nieuw-category_id');
+  const pasVeldZichtbaarheidToe = () => {
+    const gekozen = alleCategorieen.find(c => String(c.id) === categorieSelect.value);
+    document.getElementById('nieuw-extract_pct-rij').style.display = gekozen?.uses_extract_pct ? 'flex' : 'none';
+    document.getElementById('nieuw-alpha_pct-rij').style.display = gekozen?.uses_alpha_pct ? 'flex' : 'none';
+    document.getElementById('nieuw-gistfactor-rij').style.display = gekozen?.uses_gistfactor ? 'flex' : 'none';
+  };
+  categorieSelect.addEventListener('change', pasVeldZichtbaarheidToe);
+  pasVeldZichtbaarheidToe(); // niets zichtbaar tot een categorie gekozen is
+
   document.getElementById('nieuw-annuleer-btn').addEventListener('click', () => {
     document.getElementById('ing-detail').classList.remove('actief');
     document.getElementById('ing-list-view').style.display = 'block';
@@ -411,13 +464,15 @@ function toonNieuwFormulier() {
 async function slaNieuwIngredientOp() {
   const melding = document.getElementById('nieuw-melding');
   const naam = document.getElementById('nieuw-naam').value.trim();
-  const categorie = document.getElementById('nieuw-categorie').value.trim();
+  const categoryIdVeld = document.getElementById('nieuw-category_id').value;
 
-  if (!naam || !categorie) {
+  if (!naam || !categoryIdVeld) {
     melding.textContent = 'Naam en categorie zijn verplicht.';
     melding.className = 'ing-melding fout';
     return;
   }
+
+  const gekozenCategorie = alleCategorieen.find(c => String(c.id) === categoryIdVeld);
 
   const getal = (id) => {
     const v = document.getElementById(id).value;
@@ -435,12 +490,12 @@ async function slaNieuwIngredientOp() {
 
   const nieuw = {
     naam,
-    categorie,
+    category_id: Number(categoryIdVeld),
     eenheid: tekst('nieuw-eenheid'),
     prijs: getal('nieuw-prijs'),
-    extract_pct: getal('nieuw-extract_pct'),
-    alpha_pct: getal('nieuw-alpha_pct'),
-    gistfactor: getal('nieuw-gistfactor'),
+    extract_pct: gekozenCategorie?.uses_extract_pct ? getal('nieuw-extract_pct') : null,
+    alpha_pct: gekozenCategorie?.uses_alpha_pct ? getal('nieuw-alpha_pct') : null,
+    gistfactor: gekozenCategorie?.uses_gistfactor ? getal('nieuw-gistfactor') : null,
     leverancier: tekst('nieuw-leverancier'),
     status: document.getElementById('nieuw-status').value,
     aangemaakt_door: session?.user?.id ?? null,
@@ -450,7 +505,7 @@ async function slaNieuwIngredientOp() {
   const { data, error } = await supabaseClient
     .from('ingredients')
     .insert(nieuw)
-    .select()
+    .select('id, naam, categorie, category_id, eenheid, prijs, extract_pct, alpha_pct, gistfactor, leverancier, status, ingredient_categories(name, uses_alpha_pct, uses_extract_pct, uses_gistfactor)')
     .single();
 
   if (error) {

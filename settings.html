@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jopen Brouwerij — Settings</title>
+  <link rel="stylesheet" href="jopen-shared.css" />
+  <style>
+    .settings-section { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 20px 24px; margin-bottom: 28px; max-width: 700px; }
+    .settings-section h2 { font-size: 1.1em; margin-top: 0; }
+    .settings-section p.uitleg { color: #555; font-size: 0.9em; margin-top: -8px; }
+    table.cat-tabel { width: 100%; border-collapse: collapse; margin: 16px 0; }
+    table.cat-tabel th, table.cat-tabel td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 0.9em; }
+    table.cat-tabel td.cat-check { text-align: center; }
+    table.cat-tabel input[type="checkbox"] { transform: scale(1.2); cursor: pointer; }
+    table.cat-tabel input[type="text"] { width: 100%; border: 1px solid #ccc; border-radius: 4px; padding: 4px 6px; }
+    .cat-nieuw-rij input[type="text"] { min-width: 140px; }
+    .geen-toegang { padding: 40px 0; color: #555; }
+  </style>
+</head>
+<body>
+
+  <div id="jopen-nav"></div>
+
+  <main class="jopen-pagina">
+    <h1>Settings</h1>
+    <p class="jopen-subtitel">Achtergrond-instellingen die de rest van de app gebruikt. Alleen voor admins.</p>
+
+    <div id="geen-toegang" class="geen-toegang" style="display:none;">
+      Dit scherm is alleen zichtbaar voor admins.
+    </div>
+
+    <div id="admin-inhoud" style="display:none;">
+
+      <!-- Sectie 1: ingredient-categorieën. Toekomstige instellingen komen
+           hieronder als eigen .settings-section-blok, zelfde patroon. -->
+      <div class="settings-section">
+        <h2>Ingredient categories</h2>
+        <p class="uitleg">Vaste lijst waaruit gekozen wordt bij een nieuw ingrediënt. Per categorie bepaal je welke velden relevant zijn.</p>
+
+        <div id="cat-lijst"><p class="jopen-subtitel">Laden…</p></div>
+
+        <table class="cat-tabel">
+          <tbody>
+            <tr class="cat-nieuw-rij">
+              <td><input type="text" id="cat-nieuw-naam" placeholder="Nieuwe categorienaam…" /></td>
+              <td class="cat-check"><input type="checkbox" id="cat-nieuw-alpha" title="Alpha %" /></td>
+              <td class="cat-check"><input type="checkbox" id="cat-nieuw-extract" title="Extract %" /></td>
+              <td class="cat-check"><input type="checkbox" id="cat-nieuw-gistfactor" title="Gistfactor" /></td>
+              <td><button id="cat-toevoegen-btn">Toevoegen</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <p id="cat-melding" class="jopen-form-melding"></p>
+      </div>
+
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="nav.js"></script>
+  <script>
+    let alleCategorieen = [];
+
+    async function initSettingsPagina() {
+      const gebruiker = await getHuidigeGebruiker();
+      if (!gebruiker || gebruiker.rol !== 'admin') {
+        document.getElementById('geen-toegang').style.display = 'block';
+        return;
+      }
+      document.getElementById('admin-inhoud').style.display = 'block';
+      laadCategorieen();
+    }
+
+    async function laadCategorieen() {
+      const container = document.getElementById('cat-lijst');
+      const { data, error } = await supabaseClient
+        .from('ingredient_categories')
+        .select('id, name, uses_alpha_pct, uses_extract_pct, uses_gistfactor, sort_order')
+        .order('sort_order');
+
+      if (error) {
+        container.innerHTML = `<p class="jopen-form-melding fout">Kon categorieën niet laden: ${error.message}</p>`;
+        return;
+      }
+
+      alleCategorieen = data || [];
+      renderCategorieen();
+    }
+
+    function renderCategorieen() {
+      const container = document.getElementById('cat-lijst');
+
+      const rijen = alleCategorieen.map(c => `
+        <tr data-id="${c.id}">
+          <td><input type="text" class="cat-naam-veld" value="${c.name}" /></td>
+          <td class="cat-check"><input type="checkbox" class="cat-alpha-veld" ${c.uses_alpha_pct ? 'checked' : ''} title="Alpha %" /></td>
+          <td class="cat-check"><input type="checkbox" class="cat-extract-veld" ${c.uses_extract_pct ? 'checked' : ''} title="Extract %" /></td>
+          <td class="cat-check"><input type="checkbox" class="cat-gistfactor-veld" ${c.uses_gistfactor ? 'checked' : ''} title="Gistfactor" /></td>
+          <td><button class="cat-opslaan-rij-btn">Opslaan</button></td>
+        </tr>`).join('');
+
+      container.innerHTML = `
+        <table class="cat-tabel">
+          <thead>
+            <tr><th>Naam</th><th>Alpha %</th><th>Extract %</th><th>Gistfactor</th><th></th></tr>
+          </thead>
+          <tbody>${rijen}</tbody>
+        </table>`;
+
+      container.querySelectorAll('tr[data-id]').forEach(tr => {
+        tr.querySelector('.cat-opslaan-rij-btn').addEventListener('click', () => slaCategorieOp(tr));
+      });
+    }
+
+    async function slaCategorieOp(tr) {
+      const id = tr.dataset.id;
+      const melding = document.getElementById('cat-melding');
+
+      const updateData = {
+        name: tr.querySelector('.cat-naam-veld').value.trim(),
+        uses_alpha_pct: tr.querySelector('.cat-alpha-veld').checked,
+        uses_extract_pct: tr.querySelector('.cat-extract-veld').checked,
+        uses_gistfactor: tr.querySelector('.cat-gistfactor-veld').checked,
+      };
+
+      const { error } = await supabaseClient
+        .from('ingredient_categories')
+        .update(updateData)
+        .eq('id', id);
+
+      if (error) {
+        melding.textContent = 'Opslaan mislukt: ' + error.message;
+        melding.className = 'jopen-form-melding fout';
+        return;
+      }
+      melding.textContent = 'Opgeslagen.';
+      melding.className = 'jopen-form-melding ok';
+      laadCategorieen();
+    }
+
+    document.getElementById('cat-toevoegen-btn').addEventListener('click', async () => {
+      const melding = document.getElementById('cat-melding');
+      const naam = document.getElementById('cat-nieuw-naam').value.trim();
+
+      if (!naam) {
+        melding.textContent = 'Vul een naam in voor de nieuwe categorie.';
+        melding.className = 'jopen-form-melding fout';
+        return;
+      }
+
+      const nieuw = {
+        name: naam,
+        uses_alpha_pct: document.getElementById('cat-nieuw-alpha').checked,
+        uses_extract_pct: document.getElementById('cat-nieuw-extract').checked,
+        uses_gistfactor: document.getElementById('cat-nieuw-gistfactor').checked,
+        sort_order: alleCategorieen.length + 1,
+      };
+
+      const { error } = await supabaseClient.from('ingredient_categories').insert(nieuw);
+
+      if (error) {
+        melding.textContent = 'Toevoegen mislukt: ' + error.message;
+        melding.className = 'jopen-form-melding fout';
+        return;
+      }
+
+      document.getElementById('cat-nieuw-naam').value = '';
+      document.getElementById('cat-nieuw-alpha').checked = false;
+      document.getElementById('cat-nieuw-extract').checked = false;
+      document.getElementById('cat-nieuw-gistfactor').checked = false;
+      melding.textContent = 'Categorie toegevoegd.';
+      melding.className = 'jopen-form-melding ok';
+      laadCategorieen();
+    });
+
+    document.addEventListener('DOMContentLoaded', initSettingsPagina);
+  </script>
+</body>
+</html>
