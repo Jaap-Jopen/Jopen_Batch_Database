@@ -182,19 +182,21 @@
   }
   .error { color: #a33f2c; }
 
-  .param-columns { column-count: 2; column-gap: 28px; background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 16px 20px; margin-bottom: 10px; }
+  .param-columns { column-count: 3; column-gap: 24px; background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 16px 20px; margin-bottom: 10px; }
   .param-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 5px 0; border-bottom: 1px solid #ece8dc; font-size: 14px; break-inside: avoid; }
   .param-row span:first-child { color: #6b6355; }
   .param-row span:last-child { font-family: var(--mono); }
-  .param-row .tol { color: #a89f8e; font-size: 12px; }
+  .param-row .tol { color: #a89f8e; font-size: 12px; margin-left: 4px; }
   .param-sub-heading {
     font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
     color: var(--amber); margin: 14px 0 4px; break-after: avoid-column;
   }
   .param-sub-heading:first-child { margin-top: 0; }
+  .param-sub-block { break-inside: avoid; }
   .full-span { column-span: all; margin-bottom: 10px; }
   .full-span .param-row { grid-template-columns: 140px 1fr; }
   .full-span .param-row span:last-child { white-space: normal; }
+  .param-columns-2 { column-count: 2; }
   .badge-row { display:inline-block; border:2px solid #d9534f; background:#fff3f0; border-radius:6px; padding:6px 12px; margin:4px 10px 4px 0; }
   .badge-row span:first-child { display:block; color:#a83a1a; font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; }
   .badge-row span:last-child { font-family: var(--mono); font-weight:600; }
@@ -509,7 +511,7 @@ async function openDetail(id) {
     return `<div class="param-columns">${rows.map(([label, val, unit, tol]) => `
       <div class="param-row">
         <span>${label}</span>
-        <span>${tol !== null && tol !== undefined && tol !== '' ? `<span class="tol">±${escapeHtml(String(tol))}</span> ` : ''}${escapeHtml(String(val))}${unit ? ' ' + unit : ''}</span>
+        <span>${escapeHtml(String(val))}${unit ? ' ' + unit : ''}${tol !== null && tol !== undefined && tol !== '' ? ` <span class="tol">±${escapeHtml(String(tol))}</span>` : ''}</span>
       </div>`).join('')}</div>`;
   }
 
@@ -532,7 +534,7 @@ async function openDetail(id) {
             <span>${escapeHtml(String(val))}${unit ? ' ' + unit : ''}</span>
           </div>`).join('')}
       `;
-      return sectie.titel === 'Comments' ? `<div class="full-span">${inner}</div>` : inner;
+      return sectie.titel === 'Comments' ? `<div class="full-span">${inner}</div>` : `<div class="param-sub-block">${inner}</div>`;
     }).join('')}</div>`;
   }
 
@@ -605,8 +607,11 @@ async function openDetail(id) {
       totalen[key].totaal += (i.hoeveelheid || 0);
     });
     const rows = Object.values(totalen).map(t => `
-      <tr><td>${escapeHtml(t.naam)}</td><td>${t.totaal}${t.eenheid ? ' ' + escapeHtml(t.eenheid) : ''}</td></tr>`).join('');
-    return `<table class="ing-table"><thead><tr><th>Hop / herb</th><th>Total amount</th></tr></thead><tbody>${rows}</tbody></table>`;
+      <div class="param-row">
+        <span>${escapeHtml(t.naam)}</span>
+        <span>${t.totaal}${t.eenheid ? ' ' + escapeHtml(t.eenheid) : ''}</span>
+      </div>`).join('');
+    return `<div class="param-columns param-columns-2">${rows}</div>`;
   }
 
   const vorigeVersiesHtml = (overigeVersies && overigeVersies.length > 0) ? `
@@ -630,8 +635,8 @@ async function openDetail(id) {
     ['Dry hop method (warm)', pt.dry_hop_methode_warm, ''],
     ['Dry hop comment (16°C)', pt.dry_hop_comment_16c, ''],
     ['Dry hop method (16°C)', pt.dry_hop_methode_16c, ''],
-    ['Dry hop 1 day', pt.dry_hop_1_dag, ''],
-    ['Dry hop 2 day', pt.dry_hop_2_dag, ''],
+    ['Dry hop 1 at day', pt.dry_hop_1_dag, ''],
+    ['Dry hop 2 at day', pt.dry_hop_2_dag, ''],
   ].filter(([,v]) => v !== null && v !== undefined && v !== '');
 
   const cellarNotesRows = [
