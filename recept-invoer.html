@@ -122,7 +122,7 @@
       </div>
 
       <div class="re-section">
-        <h2>Basic info</h2>
+        <h2>General</h2>
         <div class="re-grid">
           <div class="re-field wide">
             <label for="veld-naam">Name *</label>
@@ -141,12 +141,25 @@
             <input type="text" id="veld-locatie" />
           </div>
           <div class="re-field">
+            <label for="veld-brouwsel_hl">Brouwsel (hl)</label>
+            <input type="number" id="veld-brouwsel_hl" />
+          </div>
+          <div class="re-field">
             <label for="veld-status">Status</label>
             <select id="veld-status">
               <option value="concept">Draft</option>
               <option value="actief">Active</option>
               <option value="gearchiveerd">Archived</option>
             </select>
+          </div>
+        </div>
+        <div id="re-laatste-revisie" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
+          <div class="re-subkop">Latest revision</div>
+          <div class="re-grid">
+            <div><span style="font-family:var(--mono); font-size:11px; color:#6b6355;">Version</span><br><span id="re-lr-versie"></span></div>
+            <div><span style="font-family:var(--mono); font-size:11px; color:#6b6355;">Date</span><br><span id="re-lr-datum"></span></div>
+            <div><span style="font-family:var(--mono); font-size:11px; color:#6b6355;">By</span><br><span id="re-lr-door"></span></div>
+            <div class="re-field wide"><span style="font-family:var(--mono); font-size:11px; color:#6b6355;">Comment</span><br><span id="re-lr-wijziging"></span></div>
           </div>
         </div>
       </div>
@@ -178,7 +191,7 @@
       <div class="re-section">
         <h2>Hops and Herbs</h2>
         <table class="re-ing-table">
-          <thead><tr><th>Role</th><th>Ingredient</th><th>Amount</th><th>Unit</th><th>Timing</th><th>Order</th><th>Note</th><th></th></tr></thead>
+          <thead><tr><th>Role</th><th>Ingredient</th><th>Amount</th><th>Unit</th><th>Timing</th><th>Order</th><th>HDT</th><th>Note</th><th></th></tr></thead>
           <tbody id="re-ing-hop-tbody"></tbody>
         </table>
         <button type="button" class="re-btn secundair" data-tbody="re-ing-hop-tbody" data-roles="hopgift_kook,dry_hop" data-add-btn>+ Add hop/herb</button>
@@ -549,9 +562,18 @@ function voegIngredientRegelToe(tbodyId, rollenLijst, regel = {}) {
   tr.id = 'ing-rij-' + (ingredientRegelTeller++);
 
   const meerdereRollen = rollenLijst.length > 1;
+  const isHopSectie = tbodyId === 're-ing-hop-tbody';
   const rolKolomHtml = meerdereRollen
     ? `<td><select class="re-ing-rol">${rolOptiesVoor(rollenLijst, regel.rol || rollenLijst[0])}</select></td>`
     : '';
+  const hdtKolomHtml = isHopSectie ? `
+    <td>
+      <select class="re-ing-hdt">
+        <option value="" ${!regel.hdt ? 'selected' : ''}>—</option>
+        <option value="1" ${regel.hdt === 1 ? 'selected' : ''}>HDT 1</option>
+        <option value="2" ${regel.hdt === 2 ? 'selected' : ''}>HDT 2</option>
+      </select>
+    </td>` : '';
 
   tr.innerHTML = `
     ${rolKolomHtml}
@@ -560,11 +582,15 @@ function voegIngredientRegelToe(tbodyId, rollenLijst, regel = {}) {
     <td><input type="text" class="re-ing-eenheid" value="${regel.eenheid ?? ''}" /></td>
     <td><input type="text" class="re-ing-tijdstip" value="${regel.tijdstip ?? ''}" /></td>
     <td><input type="number" class="re-ing-volgorde" value="${regel.volgorde ?? ''}" style="width:60px;" /></td>
+    ${hdtKolomHtml}
     <td><input type="text" class="re-ing-notitie" value="${regel.notitie ?? ''}" /></td>
     <td><button type="button" class="re-verwijder-regel">&times;</button></td>
   `;
   if (!meerdereRollen) {
     tr.insertAdjacentHTML('afterbegin', `<input type="hidden" class="re-ing-rol" value="${rollenLijst[0]}" />`);
+  }
+  if (!isHopSectie) {
+    tr.insertAdjacentHTML('beforeend', `<input type="hidden" class="re-ing-hdt" value="" />`);
   }
 
   tbody.appendChild(tr);
@@ -582,15 +608,20 @@ document.querySelectorAll('[data-add-btn]').forEach(btn => {
 });
 
 function leesIngredientRegelsUit(tbodyId) {
-  return Array.from(document.querySelectorAll(`#${tbodyId} tr`)).map(tr => ({
-    rol: tr.querySelector('.re-ing-rol').value,
-    ingredient_id: Number(tr.querySelector('.re-ing-ingredient').value),
-    hoeveelheid: tr.querySelector('.re-ing-hoeveelheid').value === '' ? null : Number(tr.querySelector('.re-ing-hoeveelheid').value),
-    eenheid: tr.querySelector('.re-ing-eenheid').value.trim() || null,
-    tijdstip: tr.querySelector('.re-ing-tijdstip').value.trim() || null,
-    volgorde: tr.querySelector('.re-ing-volgorde').value === '' ? null : Number(tr.querySelector('.re-ing-volgorde').value),
-    notitie: tr.querySelector('.re-ing-notitie').value.trim() || null,
-  }));
+  return Array.from(document.querySelectorAll(`#${tbodyId} tr`)).map(tr => {
+    const hdtEl = tr.querySelector('.re-ing-hdt');
+    const hdtVal = hdtEl ? hdtEl.value : '';
+    return {
+      rol: tr.querySelector('.re-ing-rol').value,
+      ingredient_id: Number(tr.querySelector('.re-ing-ingredient').value),
+      hoeveelheid: tr.querySelector('.re-ing-hoeveelheid').value === '' ? null : Number(tr.querySelector('.re-ing-hoeveelheid').value),
+      eenheid: tr.querySelector('.re-ing-eenheid').value.trim() || null,
+      tijdstip: tr.querySelector('.re-ing-tijdstip').value.trim() || null,
+      volgorde: tr.querySelector('.re-ing-volgorde').value === '' ? null : Number(tr.querySelector('.re-ing-volgorde').value),
+      hdt: hdtVal === '' ? null : Number(hdtVal),
+      notitie: tr.querySelector('.re-ing-notitie').value.trim() || null,
+    };
+  });
 }
 
 const ALLE_ING_TBODY_IDS = [
@@ -631,11 +662,13 @@ function herberekenHopgewichten() {
 }
 
 function leesBasisgegevens() {
+  const brouwselVal = document.getElementById('veld-brouwsel_hl').value;
   return {
     naam: document.getElementById('veld-naam').value.trim(),
     short_name: document.getElementById('veld-short_name').value.trim() || null,
     bierstijl: document.getElementById('veld-bierstijl').value.trim() || null,
     locatie: document.getElementById('veld-locatie').value.trim() || null,
+    brouwsel_hl: brouwselVal === '' ? null : Number(brouwselVal),
     status: document.getElementById('veld-status').value,
   };
 }
@@ -749,6 +782,7 @@ document.getElementById('re-kopieer-btn').addEventListener('click', async () => 
   document.getElementById('veld-short_name').value = bron.short_name || '';
   document.getElementById('veld-bierstijl').value = bron.bierstijl || '';
   document.getElementById('veld-locatie').value = bron.locatie || '';
+  document.getElementById('veld-brouwsel_hl').value = bron.brouwsel_hl ?? '';
   document.getElementById('veld-status').value = 'concept';
 
   renderParamGrid('re-specs-grid', SPECS_FIELDS, specs.data || {});
@@ -801,6 +835,7 @@ async function laadBestaandRecept(id) {
   document.getElementById('veld-short_name').value = bestaandRecept.short_name || '';
   document.getElementById('veld-bierstijl').value = bestaandRecept.bierstijl || '';
   document.getElementById('veld-locatie').value = bestaandRecept.locatie || '';
+  document.getElementById('veld-brouwsel_hl').value = bestaandRecept.brouwsel_hl ?? '';
   document.getElementById('veld-status').value = bestaandRecept.status || 'concept';
 
   renderParamGrid('re-specs-grid', SPECS_FIELDS, specs.data || {});
@@ -831,6 +866,14 @@ async function laadBestaandRecept(id) {
             <td>${escapeHtml(rv.wijziging || '')}</td>
           </tr>`).join('')}</tbody>
       </table>`;
+
+    // Meest recente revisie ook als snel overzicht bovenaan in General tonen
+    const laatste = revisieData[0];
+    document.getElementById('re-lr-versie').textContent = `v${laatste.versie_major}.${laatste.versie_minor}`;
+    document.getElementById('re-lr-datum').textContent = laatste.datum || '—';
+    document.getElementById('re-lr-door').textContent = laatste.door || '—';
+    document.getElementById('re-lr-wijziging').textContent = laatste.wijziging || '—';
+    document.getElementById('re-laatste-revisie').style.display = 'block';
   }
 
   document.getElementById('re-versie-vak').style.display = 'block';

@@ -324,7 +324,7 @@ async function openDetail(id) {
     supabaseClient.from('recipe_processtappen').select('*').eq('recipe_id', id).maybeSingle(),
     supabaseClient.from('recipe_comments').select('*').eq('recipe_id', id).maybeSingle(),
     supabaseClient.from('recipe_kosten').select('*').eq('recipe_id', id).maybeSingle(),
-    supabaseClient.from('recipe_ingredients').select('rol, hoeveelheid, eenheid, tijdstip, volgorde, notitie, ingredients(naam, categorie)').eq('recipe_id', id).order('rol').order('volgorde'),
+    supabaseClient.from('recipe_ingredients').select('rol, hoeveelheid, eenheid, tijdstip, volgorde, hdt, notitie, ingredients(naam, categorie)').eq('recipe_id', id).order('rol').order('volgorde'),
     supabaseClient.from('recipe_revisies').select('*').eq('recipe_id', id).order('id', { ascending: false }),
   ]);
 
@@ -500,7 +500,7 @@ async function openDetail(id) {
     toegift_brouwerij: 'Brewhouse addition', toegift_kelder: 'Cellar addition', gist: 'Yeast'
   };
 
-  function ingTabelHtml(rollenFilter, kolomRol) {
+  function ingTabelHtml(rollenFilter, kolomRol, toonHdt = false) {
     const subset = ings.filter(i => rollenFilter.includes(i.rol));
     if (subset.length === 0) return '<div class="empty">None added.</div>';
     const rows = subset.map(i => `
@@ -509,11 +509,12 @@ async function openDetail(id) {
         <td>${escapeHtml(i.ingredients?.naam || '—')}</td>
         <td>${i.hoeveelheid ?? '—'} ${i.eenheid || ''}</td>
         <td>${escapeHtml(i.tijdstip || '—')}</td>
+        ${toonHdt ? `<td>${i.hdt ? 'HDT ' + i.hdt : '—'}</td>` : ''}
         <td>${escapeHtml(i.notitie || '—')}</td>
       </tr>`).join('');
     return `
       <table class="ing-table">
-        <thead><tr>${kolomRol ? '<th>Role</th>' : ''}<th>Name</th><th>Amount</th><th>Timing</th><th>Note</th></tr></thead>
+        <thead><tr>${kolomRol ? '<th>Role</th>' : ''}<th>Name</th><th>Amount</th><th>Timing</th>${toonHdt ? '<th>HDT</th>' : ''}<th>Note</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>`;
   }
@@ -547,6 +548,20 @@ async function openDetail(id) {
       </tbody>
     </table>` : '';
 
+  const laatsteRevisie = revisieData.length > 0 ? revisieData[0] : null;
+
+  const generalRows = [
+    ['Short name', r.short_name, ''],
+    ['Beer style', r.bierstijl, ''],
+    ['Brouwsel', r.brouwsel_hl, 'hl'],
+    ...(laatsteRevisie ? [
+      ['Revisienummer', `v${laatsteRevisie.versie_major}.${laatsteRevisie.versie_minor}`, ''],
+      ['Datum', laatsteRevisie.datum, ''],
+      ['Door', laatsteRevisie.door, ''],
+      ['Wijziging', laatsteRevisie.wijziging, ''],
+    ] : []),
+  ].filter(([,v]) => v !== null && v !== undefined && v !== '');
+
   const revisiesHtml = revisieData.length > 0 ? `
     <table class="ing-table">
       <thead><tr><th>Version</th><th>Date</th><th>By</th><th>Comment</th></tr></thead>
@@ -569,6 +584,9 @@ async function openDetail(id) {
       ${magBewerken() ? ` · <a class="back-link" style="margin:0;" href="recept-invoer.html?id=${r.id}">Edit &rarr;</a>` : ''}
     </div>
 
+    <div class="section-title">General</div>
+    ${paramColumnsHtml(generalRows) || '<div class="empty">None entered.</div>'}
+
     <div class="section-title">End product specifications</div>
     ${paramColumnsHtml(specRows) || '<div class="empty">None entered.</div>'}
 
@@ -582,7 +600,7 @@ async function openDetail(id) {
     ${ingTabelHtml(['hoofdmout'], false)}
 
     <div class="section-title">Hops and Herbs</div>
-    ${ingTabelHtml(['hopgift_kook', 'dry_hop'], true)}
+    ${ingTabelHtml(['hopgift_kook', 'dry_hop'], true, true)}
 
     <div class="section-title">Hops total weights</div>
     ${hopSomHtml()}
