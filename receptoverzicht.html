@@ -314,12 +314,16 @@ async function openDetail(id) {
   const container = document.getElementById('detail-container');
   container.innerHTML = `<div class="loading">Loading recipe…</div>`;
 
-  const [recipe, specs, ferm, brouw, water, ingredients, revisies] = await Promise.all([
+  const [recipe, specs, ferm, brouw, water, verpakking, processtappen, comments, kosten, ingredients, revisies] = await Promise.all([
     supabaseClient.from('recipes').select('*').eq('id', id).single(),
     supabaseClient.from('recipe_specificaties').select('*').eq('recipe_id', id).maybeSingle(),
     supabaseClient.from('recipe_fermentatie').select('*').eq('recipe_id', id).maybeSingle(),
     supabaseClient.from('recipe_brouwspecificaties').select('*').eq('recipe_id', id).maybeSingle(),
     supabaseClient.from('recipe_water').select('*').eq('recipe_id', id).maybeSingle(),
+    supabaseClient.from('recipe_verpakking').select('*').eq('recipe_id', id).maybeSingle(),
+    supabaseClient.from('recipe_processtappen').select('*').eq('recipe_id', id).maybeSingle(),
+    supabaseClient.from('recipe_comments').select('*').eq('recipe_id', id).maybeSingle(),
+    supabaseClient.from('recipe_kosten').select('*').eq('recipe_id', id).maybeSingle(),
     supabaseClient.from('recipe_ingredients').select('rol, hoeveelheid, eenheid, tijdstip, volgorde, notitie, ingredients(naam, categorie)').eq('recipe_id', id).order('rol').order('volgorde'),
     supabaseClient.from('recipe_revisies').select('*').eq('recipe_id', id).order('id', { ascending: false }),
   ]);
@@ -333,6 +337,10 @@ async function openDetail(id) {
   const f = ferm.data || {};
   const b = brouw.data || {};
   const w = water.data || {};
+  const vp = verpakking.data || {};
+  const pt = processtappen.data || {};
+  const cm = (comments.data && comments.data.comments) || [];
+  const ko = kosten.data || {};
   const ings = ingredients.data || [];
   const revisieData = revisies.data || [];
 
@@ -431,6 +439,38 @@ async function openDetail(id) {
     ['pH mash', w.ph_maische, ''], ['pH start boil', w.ph_start_koken, ''],
     ['pH end boil', w.ph_eind_koken, ''], ['Aeration', w.beluchting, 'l/h'],
   ].filter(([,v]) => v !== null && v !== undefined);
+
+  const verpakkingRows = [
+    ['EAN (bottle)', vp.ean_fles, ''],
+    ['Alc.', vp.alc_pct, '%'],
+    ['THT bottle', vp.tht_fles_maanden, 'months'],
+    ['THT keg', vp.tht_vat_maanden, 'months'],
+    ['THT can', vp.tht_blik_maanden, 'months'],
+    ['TPO spec', vp.tpo_spec, ''],
+    ['HSO spec', vp.hso_spec, ''],
+    ['DO spec', vp.do_spec, ''],
+    ['CO2 bottle/can spec', vp.co2_fles_can_spec, ''],
+    ['CO2 bottle/can tolerance', vp.co2_fles_can_tolerantie, ''],
+    ['CO2 keg spec', vp.co2_fust_spec, ''],
+    ['CO2 keg tolerance', vp.co2_fust_tolerantie, ''],
+    ['O2 keg spec', vp.zuurstof_fust_spec, ''],
+  ].filter(([,v]) => v !== null && v !== undefined);
+
+  const kostenRows = [
+    ['Cost CLR/kg extract', ko.cost_clr_per_kge, '€'],
+    ['Cost BH/kg extract', ko.cost_bh_per_kge, '€'],
+    ['Raw material cost/HL', ko.cost_grondstoffen_hl, '€'],
+    ['Beer loss', ko.bierverlies_pct, '%'],
+  ].filter(([,v]) => v !== null && v !== undefined);
+
+  const processtappenLabels = {
+    dry_hop_warm: 'Dry hop warm', dry_hop_cold: 'Dry hop cold', hopsteiner: 'Hopsteiner',
+    bevasil: 'Bevasil', nagardo: 'Nagardo', gluten_test: 'Gluten test', sample_to_lab: 'Sample to lab',
+    fuge_after_cooling: 'Fuge after cooling', cool_to_7c: 'Cool to 7°C', cool_to_0c: 'Cool to 0°C',
+    check_hbt_addition: 'Check HBT addition', keldersplitsing: 'Keldersplitsing',
+    cellar_add_1: 'Cellar add 1', cellar_add_2: 'Cellar add 2', cellar_add_3: 'Cellar add 3', cellar_add_4: 'Cellar add 4',
+  };
+  const processtappenActief = Object.entries(processtappenLabels).filter(([key]) => pt[key]).map(([,label]) => label);
 
   function paramColumnsHtml(rows) {
     if (rows.length === 0) return '';
@@ -558,6 +598,21 @@ async function openDetail(id) {
 
     <div class="section-title">Target water profile</div>
     ${paramColumnsHtml(waterRows) || '<div class="empty">None entered.</div>'}
+
+    <div class="section-title">Packaging</div>
+    ${paramColumnsHtml(verpakkingRows) || '<div class="empty">None entered.</div>'}
+    ${(vp.formaten && vp.formaten.length > 0) ? `<div class="ing-table" style="padding:10px 14px; background:#fff;">${vp.formaten.map(f => `<span class="rol-tag" style="margin-right:10px;">${escapeHtml(f)}</span>`).join('')}</div>` : ''}
+
+    <div class="section-title">Process steps</div>
+    ${processtappenActief.length > 0
+      ? `<div class="ing-table" style="padding:10px 14px; background:#fff;">${processtappenActief.map(l => `<span class="rol-tag" style="margin-right:10px;">${escapeHtml(l)}</span>`).join('')}</div>`
+      : '<div class="empty">None checked.</div>'}
+
+    <div class="section-title">Comments</div>
+    ${cm.length > 0 ? `<div class="ing-table" style="padding:10px 14px; background:#fff;">${cm.map(c => `<div class="kv"><span>${escapeHtml(c)}</span></div>`).join('')}</div>` : '<div class="empty">None entered.</div>'}
+
+    <div class="section-title">Costs</div>
+    ${paramColumnsHtml(kostenRows) || '<div class="empty">None entered.</div>'}
 
     <div class="section-title">Revision data</div>
     ${revisiesHtml}

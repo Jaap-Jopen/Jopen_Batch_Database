@@ -223,6 +223,32 @@
       </div>
 
       <div class="re-section">
+        <h2>Packaging</h2>
+        <div class="re-param-columns" id="re-verpakking-grid"></div>
+        <div class="re-subkop" style="margin-top:16px;">Formats</div>
+        <div id="re-formaten-checkboxen" class="re-grid"></div>
+      </div>
+
+      <div class="re-section">
+        <h2>Process steps</h2>
+        <div id="re-processtappen-checkboxen" class="re-grid"></div>
+      </div>
+
+      <div class="re-section">
+        <h2>Comments</h2>
+        <div class="re-grid">
+          <div class="re-field wide"><label for="veld-comment-1">Comment 1</label><input type="text" id="veld-comment-1" /></div>
+          <div class="re-field wide"><label for="veld-comment-2">Comment 2</label><input type="text" id="veld-comment-2" /></div>
+          <div class="re-field wide"><label for="veld-comment-3">Comment 3</label><input type="text" id="veld-comment-3" /></div>
+        </div>
+      </div>
+
+      <div class="re-section">
+        <h2>Costs</h2>
+        <div class="re-param-columns" id="re-kosten-grid"></div>
+      </div>
+
+      <div class="re-section">
         <h2>Revision data</h2>
         <div id="re-revisies-container"><div class="re-leeg">Revision history will appear here once the recipe has been saved.</div></div>
       </div>
@@ -364,6 +390,40 @@ const ROL_LABELS = {
   toegift_brouwerij: 'Brewhouse addition', toegift_kelder: 'Cellar addition', gist: 'Yeast',
 };
 
+const VERPAKKING_FIELDS = [
+  ['ean_fles', 'EAN (bottle)', '', 'text'],
+  ['alc_pct', 'Alc.', '%', 'number'],
+  ['tht_fles_maanden', 'THT bottle', 'months', 'number'],
+  ['tht_vat_maanden', 'THT keg', 'months', 'number'],
+  ['tht_blik_maanden', 'THT can', 'months', 'number'],
+  ['tpo_spec', 'TPO spec', '', 'number'],
+  ['hso_spec', 'HSO spec', '', 'number'],
+  ['do_spec', 'DO spec', '', 'number'],
+  ['co2_fles_can_spec', 'CO2 bottle/can spec', '', 'number'],
+  ['co2_fles_can_tolerantie', 'CO2 bottle/can tolerance', '', 'number'],
+  ['co2_fust_spec', 'CO2 keg spec', '', 'number'],
+  ['co2_fust_tolerantie', 'CO2 keg tolerance', '', 'number'],
+  ['zuurstof_fust_spec', 'O2 keg spec', '', 'number'],
+];
+const VERPAKKING_FORMATEN = ['12x33cl', '24x33cl', '6x75cl', '20L', '50L', '20L keykeg', '20L Polykeg', '12x33cl blik', '24x33cl blik', '6x4x33cl'];
+
+const PROCESSTAPPEN_FIELDS = [
+  ['dry_hop_warm', 'Dry hop warm'], ['dry_hop_cold', 'Dry hop cold'],
+  ['hopsteiner', 'Hopsteiner'], ['bevasil', 'Bevasil'], ['nagardo', 'Nagardo'],
+  ['gluten_test', 'Gluten test'], ['sample_to_lab', 'Sample to lab'],
+  ['fuge_after_cooling', 'Fuge after cooling'], ['cool_to_7c', 'Cool to 7°C'], ['cool_to_0c', 'Cool to 0°C'],
+  ['check_hbt_addition', 'Check HBT addition'], ['keldersplitsing', 'Keldersplitsing'],
+  ['cellar_add_1', 'Cellar add 1'], ['cellar_add_2', 'Cellar add 2'],
+  ['cellar_add_3', 'Cellar add 3'], ['cellar_add_4', 'Cellar add 4'],
+];
+
+const KOSTEN_FIELDS = [
+  ['cost_clr_per_kge', 'Cost CLR/kg extract', '€', 'number'],
+  ['cost_bh_per_kge', 'Cost BH/kg extract', '€', 'number'],
+  ['cost_grondstoffen_hl', 'Raw material cost/HL', '€', 'number'],
+  ['bierverlies_pct', 'Beer loss', '%', 'number'],
+];
+
 let huidigeGebruiker = null;
 let alleIngredientenLijst = [];
 let bestaandRecept = null;
@@ -390,6 +450,37 @@ function leesVeldenGrid(fields) {
     if (v === '') { result[key] = null; return; }
     result[key] = type === 'number' ? Number(v) : v;
   });
+  return result;
+}
+
+// Brouwparameters: zelfde compacte rij-stijl als renderVeldenGrid, maar dan
+// met subsectie-koppen (General/Milling/Mashing/...) ertussen, allemaal in
+// dezelfde twee-koloms flow.
+function renderFormatenCheckboxen(containerId, geselecteerd = []) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = VERPAKKING_FORMATEN.map(fmt => `
+    <label style="display:flex; align-items:center; gap:6px; font-family: var(--serif); font-size: 14px;">
+      <input type="checkbox" class="re-formaat-check" value="${fmt}" ${geselecteerd.includes(fmt) ? 'checked' : ''} />
+      ${fmt}
+    </label>`).join('');
+}
+
+function leesFormatenCheckboxen(containerId) {
+  return Array.from(document.querySelectorAll(`#${containerId} .re-formaat-check:checked`)).map(el => el.value);
+}
+
+function renderCheckboxGrid(containerId, fields, data) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = fields.map(([key, label]) => `
+    <label style="display:flex; align-items:center; gap:6px; font-family: var(--serif); font-size: 14px;">
+      <input type="checkbox" id="veld-${key}" ${data && data[key] ? 'checked' : ''} />
+      ${label}
+    </label>`).join('');
+}
+
+function leesCheckboxGrid(fields) {
+  const result = {};
+  fields.forEach(([key]) => { result[key] = document.getElementById('veld-' + key).checked; });
   return result;
 }
 
@@ -570,6 +661,10 @@ async function initReceptInvoer() {
   renderParamGrid('re-ferm-grid', FERM_FIELDS, null);
   renderBrouwSecties('re-brouw-grid', BROUW_SECTIES, null);
   renderVeldenGrid('re-water-grid', WATER_FIELDS, null);
+  renderVeldenGrid('re-verpakking-grid', VERPAKKING_FIELDS, null);
+  renderFormatenCheckboxen('re-formaten-checkboxen', []);
+  renderCheckboxGrid('re-processtappen-checkboxen', PROCESSTAPPEN_FIELDS, null);
+  renderVeldenGrid('re-kosten-grid', KOSTEN_FIELDS, null);
 
   const id = urlParam('id');
   if (id) {
@@ -629,12 +724,16 @@ document.getElementById('re-kopieer-btn').addEventListener('click', async () => 
   melding.textContent = 'Copying…';
   melding.className = 're-melding';
 
-  const [recipe, specs, ferm, brouw, water, ingredients] = await Promise.all([
+  const [recipe, specs, ferm, brouw, water, verpakking, processtappen, comments, kosten, ingredients] = await Promise.all([
     supabaseClient.from('recipes').select('*').eq('id', bronId).single(),
     supabaseClient.from('recipe_specificaties').select('*').eq('recipe_id', bronId).maybeSingle(),
     supabaseClient.from('recipe_fermentatie').select('*').eq('recipe_id', bronId).maybeSingle(),
     supabaseClient.from('recipe_brouwspecificaties').select('*').eq('recipe_id', bronId).maybeSingle(),
     supabaseClient.from('recipe_water').select('*').eq('recipe_id', bronId).maybeSingle(),
+    supabaseClient.from('recipe_verpakking').select('*').eq('recipe_id', bronId).maybeSingle(),
+    supabaseClient.from('recipe_processtappen').select('*').eq('recipe_id', bronId).maybeSingle(),
+    supabaseClient.from('recipe_comments').select('*').eq('recipe_id', bronId).maybeSingle(),
+    supabaseClient.from('recipe_kosten').select('*').eq('recipe_id', bronId).maybeSingle(),
     supabaseClient.from('recipe_ingredients').select('*').eq('recipe_id', bronId).order('rol').order('volgorde'),
   ]);
 
@@ -656,6 +755,14 @@ document.getElementById('re-kopieer-btn').addEventListener('click', async () => 
   renderParamGrid('re-ferm-grid', FERM_FIELDS, ferm.data || {});
   renderBrouwSecties('re-brouw-grid', BROUW_SECTIES, brouw.data || {});
   renderVeldenGrid('re-water-grid', WATER_FIELDS, water.data || {});
+  renderVeldenGrid('re-verpakking-grid', VERPAKKING_FIELDS, verpakking.data || {});
+  renderFormatenCheckboxen('re-formaten-checkboxen', (verpakking.data && verpakking.data.formaten) || []);
+  renderCheckboxGrid('re-processtappen-checkboxen', PROCESSTAPPEN_FIELDS, processtappen.data || {});
+  renderVeldenGrid('re-kosten-grid', KOSTEN_FIELDS, kosten.data || {});
+  const bronComments = (comments.data && comments.data.comments) || [];
+  document.getElementById('veld-comment-1').value = bronComments[0] || '';
+  document.getElementById('veld-comment-2').value = bronComments[1] || '';
+  document.getElementById('veld-comment-3').value = bronComments[2] || '';
 
   vulIngredientSectiesUit(ingredients.data || []);
 
@@ -664,12 +771,16 @@ document.getElementById('re-kopieer-btn').addEventListener('click', async () => 
 });
 
 async function laadBestaandRecept(id) {
-  const [recipe, specs, ferm, brouw, water, ingredients, revisies] = await Promise.all([
+  const [recipe, specs, ferm, brouw, water, verpakking, processtappen, comments, kosten, ingredients, revisies] = await Promise.all([
     supabaseClient.from('recipes').select('*').eq('id', id).single(),
     supabaseClient.from('recipe_specificaties').select('*').eq('recipe_id', id).maybeSingle(),
     supabaseClient.from('recipe_fermentatie').select('*').eq('recipe_id', id).maybeSingle(),
     supabaseClient.from('recipe_brouwspecificaties').select('*').eq('recipe_id', id).maybeSingle(),
     supabaseClient.from('recipe_water').select('*').eq('recipe_id', id).maybeSingle(),
+    supabaseClient.from('recipe_verpakking').select('*').eq('recipe_id', id).maybeSingle(),
+    supabaseClient.from('recipe_processtappen').select('*').eq('recipe_id', id).maybeSingle(),
+    supabaseClient.from('recipe_comments').select('*').eq('recipe_id', id).maybeSingle(),
+    supabaseClient.from('recipe_kosten').select('*').eq('recipe_id', id).maybeSingle(),
     supabaseClient.from('recipe_ingredients').select('*').eq('recipe_id', id).order('rol').order('volgorde'),
     supabaseClient.from('recipe_revisies').select('*').eq('recipe_id', id).order('id', { ascending: false }),
   ]);
@@ -696,6 +807,14 @@ async function laadBestaandRecept(id) {
   renderParamGrid('re-ferm-grid', FERM_FIELDS, ferm.data || {});
   renderBrouwSecties('re-brouw-grid', BROUW_SECTIES, brouw.data || {});
   renderVeldenGrid('re-water-grid', WATER_FIELDS, water.data || {});
+  renderVeldenGrid('re-verpakking-grid', VERPAKKING_FIELDS, verpakking.data || {});
+  renderFormatenCheckboxen('re-formaten-checkboxen', (verpakking.data && verpakking.data.formaten) || []);
+  renderCheckboxGrid('re-processtappen-checkboxen', PROCESSTAPPEN_FIELDS, processtappen.data || {});
+  renderVeldenGrid('re-kosten-grid', KOSTEN_FIELDS, kosten.data || {});
+  const bestaandeComments = (comments.data && comments.data.comments) || [];
+  document.getElementById('veld-comment-1').value = bestaandeComments[0] || '';
+  document.getElementById('veld-comment-2').value = bestaandeComments[1] || '';
+  document.getElementById('veld-comment-3').value = bestaandeComments[2] || '';
 
   vulIngredientSectiesUit(ingredients.data || []);
 
@@ -904,6 +1023,15 @@ async function schrijfGerelateerdeData(recipeId) {
   const ferm = leesParamGrid(FERM_FIELDS);
   const brouw = leesVeldenGrid(BROUW_FIELDS);
   const water = leesVeldenGrid(WATER_FIELDS);
+  const verpakking = leesVeldenGrid(VERPAKKING_FIELDS);
+  const formaten = leesFormatenCheckboxen('re-formaten-checkboxen');
+  const processtappen = leesCheckboxGrid(PROCESSTAPPEN_FIELDS);
+  const kosten = leesVeldenGrid(KOSTEN_FIELDS);
+  const comments = [
+    document.getElementById('veld-comment-1').value.trim(),
+    document.getElementById('veld-comment-2').value.trim(),
+    document.getElementById('veld-comment-3').value.trim(),
+  ].filter(c => c !== '');
   const ingredientRegels = leesAlleIngredientRegels();
 
   const { error: specsErr } = await supabaseClient.from('recipe_specificaties').upsert({ recipe_id: recipeId, ...specs });
@@ -917,6 +1045,18 @@ async function schrijfGerelateerdeData(recipeId) {
 
   const { error: waterErr } = await supabaseClient.from('recipe_water').upsert({ recipe_id: recipeId, ...water });
   if (waterErr) return 'target water profile: ' + waterErr.message;
+
+  const { error: verpakkingErr } = await supabaseClient.from('recipe_verpakking').upsert({ recipe_id: recipeId, ...verpakking, formaten });
+  if (verpakkingErr) return 'packaging: ' + verpakkingErr.message;
+
+  const { error: processtappenErr } = await supabaseClient.from('recipe_processtappen').upsert({ recipe_id: recipeId, ...processtappen });
+  if (processtappenErr) return 'process steps: ' + processtappenErr.message;
+
+  const { error: kostenErr } = await supabaseClient.from('recipe_kosten').upsert({ recipe_id: recipeId, ...kosten });
+  if (kostenErr) return 'costs: ' + kostenErr.message;
+
+  const { error: commentsErr } = await supabaseClient.from('recipe_comments').upsert({ recipe_id: recipeId, comments });
+  if (commentsErr) return 'comments: ' + commentsErr.message;
 
   const { error: verwijderErr } = await supabaseClient.from('recipe_ingredients').delete().eq('recipe_id', recipeId);
   if (verwijderErr) return 'ingredients (clearing old rows): ' + verwijderErr.message;
