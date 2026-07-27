@@ -192,6 +192,9 @@
     color: var(--amber); margin: 14px 0 4px; break-after: avoid-column;
   }
   .param-sub-heading:first-child { margin-top: 0; }
+  .full-span { column-span: all; margin-bottom: 10px; }
+  .full-span .param-row { grid-template-columns: 140px 1fr; }
+  .full-span .param-row span:last-child { white-space: normal; }
 </style>
 </head>
 <body>
@@ -489,14 +492,17 @@ async function openDetail(id) {
   // (General/Milling/Mashing/...) ertussen, in één doorlopende twee-koloms flow.
   function paramSectiesHtml(secties) {
     if (secties.length === 0) return '';
-    return `<div class="param-columns">${secties.map(sectie => `
-      <div class="param-sub-heading">${sectie.titel}</div>
-      ${sectie.rows.map(([label, val, unit]) => `
-        <div class="param-row">
-          <span>${label}</span>
-          <span>${escapeHtml(String(val))}${unit ? ' ' + unit : ''}</span>
-        </div>`).join('')}
-    `).join('')}</div>`;
+    return `<div class="param-columns">${secties.map(sectie => {
+      const inner = `
+        <div class="param-sub-heading">${sectie.titel}</div>
+        ${sectie.rows.map(([label, val, unit]) => `
+          <div class="param-row">
+            <span>${label}</span>
+            <span>${escapeHtml(String(val))}${unit ? ' ' + unit : ''}</span>
+          </div>`).join('')}
+      `;
+      return sectie.titel === 'Comments' ? `<div class="full-span">${inner}</div>` : inner;
+    }).join('')}</div>`;
   }
 
   const rolLabels = {

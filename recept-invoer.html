@@ -60,6 +60,13 @@
     color: var(--amber); margin: 14px 0 4px; break-after: avoid-column;
   }
   .re-subkop:first-child { margin-top: 0; }
+  .re-full-span { column-span: all; margin-top: 8px; }
+  .re-comment-row { margin-bottom: 10px; }
+  .re-comment-row label { display: block; font-family: var(--mono); font-size: 11px; color: #6b6355; margin-bottom: 4px; }
+  .re-comment-row input {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px;
+    font-family: var(--serif); font-size: 14px; background: #fff;
+  }
 
   table.re-ing-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
   table.re-ing-table th { text-align: left; font-family: var(--mono); font-size: 10px; text-transform: uppercase; color: #6b6355; padding: 6px 8px; border-bottom: 1px solid var(--line); }
@@ -501,18 +508,20 @@ function renderBrouwSecties(containerId, secties, data) {
         <input type="${type}" id="veld-${key}" value="${data && data[key] !== null && data[key] !== undefined ? data[key] : ''}" />
       </div>`).join('')}
   `).join('') + `
-    <div class="re-subkop">Comments</div>
-    <div class="re-field wide" style="margin-bottom:8px;">
-      <label for="veld-comment-1">Comment 1</label>
-      <input type="text" id="veld-comment-1" />
-    </div>
-    <div class="re-field wide" style="margin-bottom:8px;">
-      <label for="veld-comment-2">Comment 2</label>
-      <input type="text" id="veld-comment-2" />
-    </div>
-    <div class="re-field wide">
-      <label for="veld-comment-3">Comment 3</label>
-      <input type="text" id="veld-comment-3" />
+    <div class="re-full-span">
+      <div class="re-subkop">Comments</div>
+      <div class="re-comment-row">
+        <label for="veld-comment-1">Comment 1</label>
+        <input type="text" id="veld-comment-1" />
+      </div>
+      <div class="re-comment-row">
+        <label for="veld-comment-2">Comment 2</label>
+        <input type="text" id="veld-comment-2" />
+      </div>
+      <div class="re-comment-row">
+        <label for="veld-comment-3">Comment 3</label>
+        <input type="text" id="veld-comment-3" />
+      </div>
     </div>
   `;
 }
