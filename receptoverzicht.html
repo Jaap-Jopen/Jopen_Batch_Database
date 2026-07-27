@@ -187,6 +187,11 @@
   .param-row span:first-child { color: #6b6355; }
   .param-row span:last-child { font-family: var(--mono); }
   .param-row .tol { color: #a89f8e; font-size: 12px; }
+  .param-sub-heading {
+    font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--amber); margin: 14px 0 4px; break-after: avoid-column;
+  }
+  .param-sub-heading:first-child { margin-top: 0; }
 </style>
 </head>
 <body>
@@ -374,18 +379,50 @@ async function openDetail(id) {
     ['Beer status', f.bier_status, '', null],
   ].filter(([,v]) => v !== null && v !== undefined);
 
-  const brouwRows = [
-    ['Mash filter chambers', b.kamers_mashfilter, ''],
-    ['Roller mill', b.walsenmolen, ''],
-    ['Mash thickness', b.beslag_dikte, ''],
-    ['Boil volume', b.volume_kook, 'hl'],
-    ['Wort pre-cooler temp', b.wortvoorkoeler_temp, '°C'],
-    ['Final batch volume', b.eindvolume_brouwsel, 'hl'],
-    ['Desired evaporation', b.gewenste_verdamping, '%'],
-    ['Boil intensity', b.intensiteit_koken, 'KJ/min'],
-    ['Whirlpool rest', b.whirlpool_rust, 'min'],
-    ['Lauter factor', b.lauterfactor, ''],
-  ].filter(([,v]) => v !== null && v !== undefined);
+  const brouwSecties = [
+    { titel: 'General', rows: [
+      ['Recipe name (Software / Braukon no.)', b.recept_naam_software, ''],
+    ]},
+    { titel: 'Milling', rows: [
+      ['Roller mill', b.walsenmolen, ''],
+      ['Special bin dump', b.stort_special_bin_kg, 'kg'],
+      ['Special bin name (Software / Braukon)', b.naam_special_bin, ''],
+    ]},
+    { titel: 'Mashing', rows: [
+      ['Mash thickness', b.beslag_dikte, ''],
+      ['Mash-in temp', b.mash_inmaischen_temp, '°C'],
+      ['Mash-in time', b.mash_inmaischen_tijd, 'min'],
+      ['Step-up 1 temp', b.mash_verhogen1_temp, '°C'],
+      ['Step-up 1 time', b.mash_verhogen1_tijd, 'min'],
+      ['Step-up 2 temp', b.mash_verhogen2_temp, '°C'],
+      ['Step-up 2 time', b.mash_verhogen2_tijd, 'min'],
+      ['Step-up 3 temp', b.mash_verhogen3_temp, '°C'],
+      ['Step-up 3 time', b.mash_verhogen3_tijd, 'min'],
+      ['Step-up 4 temp', b.mash_verhogen4_temp, '°C'],
+      ['Step-up 4 time', b.mash_verhogen4_tijd, 'min'],
+      ['Mash-out temp', b.mash_uitmaischen_temp, '°C'],
+      ['Mash-out time', b.mash_uitmaischen_tijd, 'min'],
+    ]},
+    { titel: 'Filtration', rows: [
+      ['Mash filter chambers', b.kamers_mashfilter, ''],
+      ['Cumm. sparging volume', b.cumm_sparging_vol, 'hl'],
+    ]},
+    { titel: 'Boiling', rows: [
+      ['Expected extract at start of boil', b.verwacht_extract_begin_kook, '°P'],
+      ['Boil volume', b.volume_kook, 'hl'],
+      ['Boil intensity', b.intensiteit_koken, 'KJ/min'],
+      ['Desired evaporation', b.gewenste_verdamping, '%'],
+    ]},
+    { titel: 'Whirlpool', rows: [
+      ['Wort pre-cooler temp', b.wortvoorkoeler_temp, '°C'],
+      ['Whirlpool rest', b.whirlpool_rust, 'min'],
+    ]},
+    { titel: 'Cooling', rows: [
+      ['Water addition volume (back-cooling)', b.volume_water_additie_terugkoeling, 'hl'],
+      ['Final batch volume', b.eindvolume_brouwsel, 'hl'],
+    ]},
+  ].map(sectie => ({ ...sectie, rows: sectie.rows.filter(([,v]) => v !== null && v !== undefined) }))
+   .filter(sectie => sectie.rows.length > 0);
 
   const waterRows = [
     ['Ca', w.ca, 'ppm'], ['Mg', w.mg, 'ppm'], ['Na', w.na, 'ppm'],
@@ -395,15 +432,6 @@ async function openDetail(id) {
     ['pH end boil', w.ph_eind_koken, ''], ['Aeration', w.beluchting, 'l/h'],
   ].filter(([,v]) => v !== null && v !== undefined);
 
-  function cardHtml(title, rows) {
-    if (rows.length === 0) return '';
-    return `<div class="card"><h3>${title}</h3>${rows.map(([label,val,unit]) =>
-      `<div class="kv"><span>${label}</span><span>${escapeHtml(String(val))}${unit? ' '+unit:''}</span></div>`).join('')}</div>`;
-  }
-
-  // Zelfde als cardHtml, maar dan compact in twee kolommen en met een
-  // tolerantie-waarde (+/-) ernaast, voor End product specifications en
-  // Process parameters.
   function paramColumnsHtml(rows) {
     if (rows.length === 0) return '';
     return `<div class="param-columns">${rows.map(([label, val, unit, tol]) => `
@@ -411,6 +439,20 @@ async function openDetail(id) {
         <span>${label}</span>
         <span>${tol !== null && tol !== undefined && tol !== '' ? `<span class="tol">±${escapeHtml(String(tol))}</span> ` : ''}${escapeHtml(String(val))}${unit ? ' ' + unit : ''}</span>
       </div>`).join('')}</div>`;
+  }
+
+  // Voor brouwparameters: zelfde compacte tabel, maar met subsectie-koppen
+  // (General/Milling/Mashing/...) ertussen, in één doorlopende twee-koloms flow.
+  function paramSectiesHtml(secties) {
+    if (secties.length === 0) return '';
+    return `<div class="param-columns">${secties.map(sectie => `
+      <div class="param-sub-heading">${sectie.titel}</div>
+      ${sectie.rows.map(([label, val, unit]) => `
+        <div class="param-row">
+          <span>${label}</span>
+          <span>${escapeHtml(String(val))}${unit ? ' ' + unit : ''}</span>
+        </div>`).join('')}
+    `).join('')}</div>`;
   }
 
   const rolLabels = {
@@ -494,7 +536,7 @@ async function openDetail(id) {
     ${paramColumnsHtml(fermRows) || '<div class="empty">None entered.</div>'}
 
     <div class="section-title">Brewing parameters</div>
-    <div class="grid-cards">${cardHtml('', brouwRows) || '<div class="empty">None entered.</div>'}</div>
+    ${paramSectiesHtml(brouwSecties) || '<div class="empty">None entered.</div>'}
 
     <div class="section-title">Malt &amp; Grains</div>
     ${ingTabelHtml(['hoofdmout'], false)}
@@ -515,7 +557,7 @@ async function openDetail(id) {
     ${ingTabelHtml(['toegift_kelder'], false)}
 
     <div class="section-title">Target water profile</div>
-    <div class="grid-cards">${cardHtml('', waterRows) || '<div class="empty">None entered.</div>'}</div>
+    ${paramColumnsHtml(waterRows) || '<div class="empty">None entered.</div>'}
 
     <div class="section-title">Revision data</div>
     ${revisiesHtml}

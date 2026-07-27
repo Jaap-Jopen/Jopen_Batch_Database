@@ -46,6 +46,21 @@
   }
   .re-paramrow .re-tol-input { font-family: var(--mono); font-size: 12px; }
 
+  .re-paramrow-simple {
+    display: grid; grid-template-columns: 1fr 110px; gap: 8px; align-items: center;
+    padding: 5px 0; border-bottom: 1px solid #ece8dc; break-inside: avoid;
+  }
+  .re-paramrow-simple label { font-family: var(--mono); font-size: 11.5px; color: #6b6355; }
+  .re-paramrow-simple input {
+    padding: 5px 6px; border: 1px solid var(--line); border-radius: 4px;
+    font-family: var(--serif); font-size: 13px; background: #fff; width: 100%;
+  }
+  .re-subkop {
+    font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--amber); margin: 14px 0 4px; break-after: avoid-column;
+  }
+  .re-subkop:first-child { margin-top: 0; }
+
   table.re-ing-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
   table.re-ing-table th { text-align: left; font-family: var(--mono); font-size: 10px; text-transform: uppercase; color: #6b6355; padding: 6px 8px; border-bottom: 1px solid var(--line); }
   table.re-ing-table td { padding: 6px 8px; border-bottom: 1px solid #ece8dc; }
@@ -148,7 +163,7 @@
 
       <div class="re-section">
         <h2>Brewing parameters</h2>
-        <div class="re-grid" id="re-brouw-grid"></div>
+        <div class="re-param-columns" id="re-brouw-grid"></div>
       </div>
 
       <div class="re-section">
@@ -204,7 +219,7 @@
 
       <div class="re-section">
         <h2>Target water profile</h2>
-        <div class="re-grid" id="re-water-grid"></div>
+        <div class="re-param-columns" id="re-water-grid"></div>
       </div>
 
       <div class="re-section">
@@ -265,18 +280,71 @@ const FERM_FIELDS = [
   ['bier_risico', 'Beer risk', '', 'text'],
   ['bier_status', 'Beer status', '', 'text'],
 ];
-const BROUW_FIELDS = [
-  ['kamers_mashfilter', 'Mash filter chambers', '', 'number'],
-  ['walsenmolen', 'Roller mill', '', 'text'],
-  ['beslag_dikte', 'Mash thickness', '', 'number'],
-  ['volume_kook', 'Boil volume', 'hl', 'number'],
-  ['wortvoorkoeler_temp', 'Wort pre-cooler temp', '°C', 'number'],
-  ['eindvolume_brouwsel', 'Final batch volume', 'hl', 'number'],
-  ['gewenste_verdamping', 'Desired evaporation', '%', 'number'],
-  ['intensiteit_koken', 'Boil intensity', 'KJ/min', 'number'],
-  ['whirlpool_rust', 'Whirlpool rest', 'min', 'number'],
-  ['lauterfactor', 'Lauter factor', '', 'number'],
+const BROUW_SECTIES = [
+  {
+    titel: 'General',
+    velden: [
+      ['recept_naam_software', 'Recipe name (Software / Braukon no.)', '', 'text'],
+    ],
+  },
+  {
+    titel: 'Milling',
+    velden: [
+      ['walsenmolen', 'Roller mill', '', 'text'],
+      ['stort_special_bin_kg', 'Special bin dump', 'kg', 'number'],
+      ['naam_special_bin', 'Special bin name (Software / Braukon)', '', 'text'],
+    ],
+  },
+  {
+    titel: 'Mashing',
+    velden: [
+      ['beslag_dikte', 'Mash thickness', '', 'number'],
+      ['mash_inmaischen_temp', 'Mash-in temp', '°C', 'number'],
+      ['mash_inmaischen_tijd', 'Mash-in time', 'min', 'number'],
+      ['mash_verhogen1_temp', 'Step-up 1 temp', '°C', 'number'],
+      ['mash_verhogen1_tijd', 'Step-up 1 time', 'min', 'number'],
+      ['mash_verhogen2_temp', 'Step-up 2 temp', '°C', 'number'],
+      ['mash_verhogen2_tijd', 'Step-up 2 time', 'min', 'number'],
+      ['mash_verhogen3_temp', 'Step-up 3 temp', '°C', 'number'],
+      ['mash_verhogen3_tijd', 'Step-up 3 time', 'min', 'number'],
+      ['mash_verhogen4_temp', 'Step-up 4 temp', '°C', 'number'],
+      ['mash_verhogen4_tijd', 'Step-up 4 time', 'min', 'number'],
+      ['mash_uitmaischen_temp', 'Mash-out temp', '°C', 'number'],
+      ['mash_uitmaischen_tijd', 'Mash-out time', 'min', 'number'],
+    ],
+  },
+  {
+    titel: 'Filtration',
+    velden: [
+      ['kamers_mashfilter', 'Mash filter chambers', '', 'number'],
+      ['cumm_sparging_vol', 'Cumm. sparging volume', 'hl', 'number'],
+    ],
+  },
+  {
+    titel: 'Boiling',
+    velden: [
+      ['verwacht_extract_begin_kook', 'Expected extract at start of boil', '°P', 'number'],
+      ['volume_kook', 'Boil volume', 'hl', 'number'],
+      ['intensiteit_koken', 'Boil intensity', 'KJ/min', 'number'],
+      ['gewenste_verdamping', 'Desired evaporation', '%', 'number'],
+    ],
+  },
+  {
+    titel: 'Whirlpool',
+    velden: [
+      ['wortvoorkoeler_temp', 'Wort pre-cooler temp', '°C', 'number'],
+      ['whirlpool_rust', 'Whirlpool rest', 'min', 'number'],
+    ],
+  },
+  {
+    titel: 'Cooling',
+    velden: [
+      ['volume_water_additie_terugkoeling', 'Water addition volume (back-cooling)', 'hl', 'number'],
+      ['eindvolume_brouwsel', 'Final batch volume', 'hl', 'number'],
+    ],
+  },
 ];
+const BROUW_FIELDS = BROUW_SECTIES.flatMap(s => s.velden); // platte lijst, voor opslaan
 const WATER_FIELDS = [
   ['ca', 'Ca', 'ppm', 'number'],
   ['mg', 'Mg', 'ppm', 'number'],
@@ -308,7 +376,7 @@ function urlParam(naam) {
 function renderVeldenGrid(containerId, fields, data) {
   const container = document.getElementById(containerId);
   container.innerHTML = fields.map(([key, label, unit, type]) => `
-    <div class="re-field">
+    <div class="re-paramrow-simple">
       <label for="veld-${key}">${label}${unit ? ' (' + unit + ')' : ''}</label>
       <input type="${type}" id="veld-${key}" value="${data && data[key] !== null && data[key] !== undefined ? data[key] : ''}" />
     </div>`).join('');
@@ -323,6 +391,21 @@ function leesVeldenGrid(fields) {
     result[key] = type === 'number' ? Number(v) : v;
   });
   return result;
+}
+
+// Brouwparameters: zelfde compacte rij-stijl als renderVeldenGrid, maar dan
+// met subsectie-koppen (General/Milling/Mashing/...) ertussen, allemaal in
+// dezelfde twee-koloms flow.
+function renderBrouwSecties(containerId, secties, data) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = secties.map(sectie => `
+    <div class="re-subkop">${sectie.titel}</div>
+    ${sectie.velden.map(([key, label, unit, type]) => `
+      <div class="re-paramrow-simple">
+        <label for="veld-${key}">${label}${unit ? ' (' + unit + ')' : ''}</label>
+        <input type="${type}" id="veld-${key}" value="${data && data[key] !== null && data[key] !== undefined ? data[key] : ''}" />
+      </div>`).join('')}
+  `).join('');
 }
 
 // Zelfde als hierboven, maar met een extra tolerantie-invoerveld (+/-) per
@@ -485,7 +568,7 @@ async function initReceptInvoer() {
 
   renderParamGrid('re-specs-grid', SPECS_FIELDS, null);
   renderParamGrid('re-ferm-grid', FERM_FIELDS, null);
-  renderVeldenGrid('re-brouw-grid', BROUW_FIELDS, null);
+  renderBrouwSecties('re-brouw-grid', BROUW_SECTIES, null);
   renderVeldenGrid('re-water-grid', WATER_FIELDS, null);
 
   const id = urlParam('id');
@@ -571,7 +654,7 @@ document.getElementById('re-kopieer-btn').addEventListener('click', async () => 
 
   renderParamGrid('re-specs-grid', SPECS_FIELDS, specs.data || {});
   renderParamGrid('re-ferm-grid', FERM_FIELDS, ferm.data || {});
-  renderVeldenGrid('re-brouw-grid', BROUW_FIELDS, brouw.data || {});
+  renderBrouwSecties('re-brouw-grid', BROUW_SECTIES, brouw.data || {});
   renderVeldenGrid('re-water-grid', WATER_FIELDS, water.data || {});
 
   vulIngredientSectiesUit(ingredients.data || []);
@@ -611,7 +694,7 @@ async function laadBestaandRecept(id) {
 
   renderParamGrid('re-specs-grid', SPECS_FIELDS, specs.data || {});
   renderParamGrid('re-ferm-grid', FERM_FIELDS, ferm.data || {});
-  renderVeldenGrid('re-brouw-grid', BROUW_FIELDS, brouw.data || {});
+  renderBrouwSecties('re-brouw-grid', BROUW_SECTIES, brouw.data || {});
   renderVeldenGrid('re-water-grid', WATER_FIELDS, water.data || {});
 
   vulIngredientSectiesUit(ingredients.data || []);
