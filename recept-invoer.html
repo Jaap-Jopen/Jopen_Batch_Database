@@ -76,6 +76,19 @@
 
     <form id="re-form">
 
+      <div class="re-section" id="re-kopieer-sectie" style="display:none;">
+        <h2>Start from existing recipe (optional)</h2>
+        <p class="re-versie-uitleg" style="margin-top:-4px;">Pick a similar recipe to copy its specifications, fermentation, water profile, costs, and ingredients into this form as a starting point. This always creates a brand new recipe — it does not link to or affect the original.</p>
+        <div class="re-grid">
+          <div class="re-field wide">
+            <label for="re-kopieer-select">Copy from</label>
+            <select id="re-kopieer-select"><option value="">— start blank —</option></select>
+          </div>
+        </div>
+        <button type="button" class="re-btn secundair" id="re-kopieer-btn">Copy into this form</button>
+        <span id="re-kopieer-melding" class="re-melding"></span>
+      </div>
+
       <div class="re-section">
         <h2>Basic info</h2>
         <div class="re-grid">
@@ -324,11 +337,79 @@ async function initReceptInvoer() {
     document.getElementById('re-titel').textContent = 'New recipe';
     document.getElementById('re-subtitel').textContent = '';
     document.getElementById('re-opslaan-nieuw-btn').style.display = 'inline-block';
+    document.getElementById('re-kopieer-sectie').style.display = 'block';
+    await vulKopieerSelect();
   }
 
   document.getElementById('re-loading').style.display = 'none';
   document.getElementById('re-inhoud').style.display = 'block';
 }
+
+async function vulKopieerSelect() {
+  const select = document.getElementById('re-kopieer-select');
+  const { data, error } = await supabaseClient
+    .from('recipes')
+    .select('id, naam, bierstijl, status')
+    .neq('status', 'gearchiveerd')
+    .order('naam');
+
+  if (error || !data) return;
+
+  data.forEach(r => {
+    const opt = document.createElement('option');
+    opt.value = r.id;
+    opt.textContent = `${r.naam}${r.bierstijl ? ' (' + r.bierstijl + ')' : ''}`;
+    select.appendChild(opt);
+  });
+}
+
+document.getElementById('re-kopieer-btn').addEventListener('click', async () => {
+  const bronId = document.getElementById('re-kopieer-select').value;
+  const melding = document.getElementById('re-kopieer-melding');
+
+  if (!bronId) {
+    melding.textContent = 'Choose a recipe to copy from first.';
+    melding.className = 're-melding fout';
+    return;
+  }
+
+  melding.textContent = 'Copying…';
+  melding.className = 're-melding';
+
+  const [recipe, specs, ferm, water, kosten, ingredients] = await Promise.all([
+    supabaseClient.from('recipes').select('*').eq('id', bronId).single(),
+    supabaseClient.from('recipe_specificaties').select('*').eq('recipe_id', bronId).maybeSingle(),
+    supabaseClient.from('recipe_fermentatie').select('*').eq('recipe_id', bronId).maybeSingle(),
+    supabaseClient.from('recipe_water').select('*').eq('recipe_id', bronId).maybeSingle(),
+    supabaseClient.from('recipe_kosten').select('*').eq('recipe_id', bronId).maybeSingle(),
+    supabaseClient.from('recipe_ingredients').select('*').eq('recipe_id', bronId).order('rol').order('volgorde'),
+  ]);
+
+  if (recipe.error || !recipe.data) {
+    melding.textContent = 'Could not load source recipe: ' + (recipe.error?.message || 'not found');
+    melding.className = 're-melding fout';
+    return;
+  }
+
+  const bron = recipe.data;
+
+  document.getElementById('veld-naam').value = `Copy of ${bron.naam}`;
+  document.getElementById('veld-short_name').value = bron.short_name || '';
+  document.getElementById('veld-bierstijl').value = bron.bierstijl || '';
+  document.getElementById('veld-locatie').value = bron.locatie || '';
+  document.getElementById('veld-status').value = 'concept';
+
+  renderVeldenGrid('re-specs-grid', SPECS_FIELDS, specs.data || {});
+  renderVeldenGrid('re-ferm-grid', FERM_FIELDS, ferm.data || {});
+  renderVeldenGrid('re-water-grid', WATER_FIELDS, water.data || {});
+  renderVeldenGrid('re-kosten-grid', KOSTEN_FIELDS, kosten.data || {});
+
+  document.getElementById('re-ing-tbody').innerHTML = '';
+  (ingredients.data || []).forEach(regel => voegIngredientRegelToe(regel));
+
+  melding.textContent = `Copied from "${bron.naam}". Review and adjust below, then create the recipe.`;
+  melding.className = 're-melding ok';
+});
 
 async function laadBestaandRecept(id) {
   const [recipe, specs, ferm, water, kosten, ingredients] = await Promise.all([
