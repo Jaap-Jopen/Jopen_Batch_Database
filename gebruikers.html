@@ -6,13 +6,18 @@
   <title>Jopen Brouwerij — Users</title>
   <link rel="stylesheet" href="jopen-shared.css" />
   <style>
-    table.gebruikers-tabel { width: 100%; border-collapse: collapse; background: #fff; margin-bottom: 32px; }
+    table.gebruikers-tabel { width: 100%; border-collapse: collapse; background: #fff; margin-bottom: 12px; }
     table.gebruikers-tabel th, table.gebruikers-tabel td { text-align: left; padding: 10px 14px; border-bottom: 1px solid #ddd; }
     table.gebruikers-tabel th { font-size: 0.85em; color: #555; }
     .rol-badge { font-size: 0.8em; padding: 2px 8px; border-radius: 10px; background: #eee; }
     .rol-badge.admin { background: #fbe4e6; color: #A80016; }
     .actief-nee { color: #999; font-style: italic; }
     .geen-toegang { padding: 40px 0; color: #555; }
+    .gebr-rol-select { padding: 4px 6px; border: 1px solid #ccc; border-radius: 4px; }
+    .gebr-opslaan-btn { padding: 4px 10px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; }
+    .gebr-verwijder-btn { padding: 4px 10px; border: 1px solid #A80016; color: #A80016; border-radius: 4px; background: #fff; cursor: pointer; }
+    .gebr-verwijder-btn:hover { background: #fbe4e6; }
+    .gebr-zelf { color: #999; font-size: 0.85em; font-style: italic; }
   </style>
 </head>
 <body>
@@ -29,6 +34,7 @@
 
     <div id="admin-inhoud" style="display:none;">
       <div id="gebruikers-lijst"><div class="jopen-subtitel">Loading users…</div></div>
+      <p id="lijst-melding" class="jopen-form-melding"></p>
 
       <h2 style="font-size:1.2em;">Invite a new colleague</h2>
       <form class="jopen-form" id="invite-form" style="margin: 0 0 40px;">
@@ -55,11 +61,13 @@
   <script src="config.js"></script>
   <script src="nav.js"></script>
   <script>
+    let huidigeGebruikerId = null;
+
     async function laadGebruikersLijst() {
       const container = document.getElementById('gebruikers-lijst');
       const { data, error } = await supabaseClient
         .from('gebruikers')
-        .select('naam, rol, actief, aangemaakt_op')
+        .select('id, naam, rol, actief, aangemaakt_op')
         .order('naam');
 
       if (error) {
@@ -72,18 +80,105 @@
         return;
       }
 
-      const rijen = data.map(g => `
-        <tr>
+      const rijen = data.map(g => {
+        const isZelf = g.id === huidigeGebruikerId;
+        return `
+        <tr data-id="${g.id}">
           <td>${g.naam}</td>
-          <td><span class="rol-badge ${g.rol}">${g.rol}</span></td>
+          <td>
+            ${isZelf
+              ? `<span class="rol-badge ${g.rol}">${g.rol}</span>`
+              : `<select class="gebr-rol-select">
+                   <option value="viewer" ${g.rol === 'viewer' ? 'selected' : ''}>viewer</option>
+                   <option value="editor" ${g.rol === 'editor' ? 'selected' : ''}>editor</option>
+                   <option value="admin" ${g.rol === 'admin' ? 'selected' : ''}>admin</option>
+                 </select>`}
+          </td>
           <td>${g.actief ? 'Yes' : '<span class="actief-nee">No</span>'}</td>
-        </tr>`).join('');
+          <td>
+            ${isZelf
+              ? `<span class="gebr-zelf">(you)</span>`
+              : `<button class="gebr-opslaan-btn">Save</button>
+                 <button class="gebr-verwijder-btn">Delete</button>`}
+          </td>
+        </tr>`;
+      }).join('');
 
       container.innerHTML = `
         <table class="gebruikers-tabel">
-          <thead><tr><th>Name</th><th>Role</th><th>Active</th></tr></thead>
+          <thead><tr><th>Name</th><th>Role</th><th>Active</th><th></th></tr></thead>
           <tbody>${rijen}</tbody>
         </table>`;
+
+      container.querySelectorAll('tr[data-id]').forEach(tr => {
+        const opslaanBtn = tr.querySelector('.gebr-opslaan-btn');
+        const verwijderBtn = tr.querySelector('.gebr-verwijder-btn');
+        if (opslaanBtn) opslaanBtn.addEventListener('click', () => slaRolOp(tr));
+        if (verwijderBtn) verwijderBtn.addEventListener('click', () => verwijderGebruiker(tr));
+      });
+    }
+
+    async function slaRolOp(tr) {
+      const melding = document.getElementById('lijst-melding');
+      const id = tr.dataset.id;
+      const nieuweRol = tr.querySelector('.gebr-rol-select').value;
+
+      melding.textContent = 'Saving role…';
+      melding.className = 'jopen-form-melding';
+
+      const { error } = await supabaseClient
+        .from('gebruikers')
+        .update({ rol: nieuweRol })
+        .eq('id', id);
+
+      if (error) {
+        melding.textContent = 'Save failed: ' + error.message;
+        melding.className = 'jopen-form-melding fout';
+        return;
+      }
+
+      melding.textContent = 'Role updated.';
+      melding.className = 'jopen-form-melding ok';
+      laadGebruikersLijst();
+    }
+
+    async function verwijderGebruiker(tr) {
+      const id = tr.dataset.id;
+      const naam = tr.children[0].textContent;
+      const melding = document.getElementById('lijst-melding');
+
+      if (!confirm(`Delete ${naam}? This permanently removes their account and login access. This cannot be undone.`)) {
+        return;
+      }
+
+      melding.textContent = 'Deleting…';
+      melding.className = 'jopen-form-melding';
+
+      const { data, error } = await supabaseClient.functions.invoke('delete-user', {
+        body: { user_id: id },
+      });
+
+      if (error) {
+        let detail = error.message;
+        try {
+          const body = await error.context.json();
+          if (body?.error) detail = body.error;
+        } catch (_) {
+          // response wasn't JSON, or context was missing — fall back to error.message
+        }
+        melding.textContent = 'Delete failed: ' + detail;
+        melding.className = 'jopen-form-melding fout';
+        return;
+      }
+      if (data?.error) {
+        melding.textContent = 'Delete failed: ' + data.error;
+        melding.className = 'jopen-form-melding fout';
+        return;
+      }
+
+      melding.textContent = `${naam} deleted.`;
+      melding.className = 'jopen-form-melding ok';
+      laadGebruikersLijst();
     }
 
     async function initGebruikersPagina() {
@@ -94,6 +189,7 @@
         return;
       }
 
+      huidigeGebruikerId = gebruiker.id;
       document.getElementById('admin-inhoud').style.display = 'block';
       laadGebruikersLijst();
     }
