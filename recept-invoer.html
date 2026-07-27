@@ -189,18 +189,30 @@
       <div class="re-section">
         <h2>Malt &amp; Grains</h2>
         <table class="re-ing-table">
-          <thead><tr><th>Ingredient</th><th>Amount</th><th>Unit</th><th>Timing</th><th>Order</th><th>Note</th><th></th></tr></thead>
+          <thead><tr><th>Ingredient</th><th>Amount (kg)</th><th>Unit</th><th>EBC</th><th>%</th><th>Timing</th><th>Order</th><th>Note</th><th></th></tr></thead>
           <tbody id="re-ing-mout-tbody"></tbody>
+          <tfoot>
+            <tr style="font-weight:bold; border-top: 2px solid var(--hop-dark);">
+              <td>Total</td>
+              <td id="re-mout-totaal-kg">0</td>
+              <td></td>
+              <td></td>
+              <td>100%</td>
+              <td colspan="4"></td>
+            </tr>
+          </tfoot>
         </table>
+        <p class="re-versie-uitleg" style="margin-top:-4px;">Calculated color (EBC) needs a confirmed formula before it can be added — see chat.</p>
         <button type="button" class="re-btn secundair" data-tbody="re-ing-mout-tbody" data-roles="hoofdmout" data-add-btn>+ Add malt/grain</button>
       </div>
 
       <div class="re-section">
         <h2>Hops and Herbs</h2>
         <table class="re-ing-table">
-          <thead><tr><th>Role</th><th>Ingredient</th><th>Amount</th><th>Unit</th><th>Timing</th><th>Order</th><th>HDT</th><th>Note</th><th></th></tr></thead>
+          <thead><tr><th>Role</th><th>Ingredient</th><th>Alpha %</th><th>Amount</th><th>Unit</th><th>Timing</th><th>Order</th><th>HDT</th><th>Note</th><th></th></tr></thead>
           <tbody id="re-ing-hop-tbody"></tbody>
         </table>
+        <p class="re-versie-uitleg" style="margin-top:-4px;">Total bitterness (EBU) needs a confirmed formula before it can be added — see chat.</p>
         <button type="button" class="re-btn secundair" data-tbody="re-ing-hop-tbody" data-roles="hopgift_kook,dry_hop" data-add-btn>+ Add hop/herb</button>
       </div>
 
@@ -419,7 +431,7 @@ const VERPAKKING_FIELDS = [
 const VERPAKKING_FORMATEN = ['12x33cl', '24x33cl', '6x75cl', '20L', '50L', '20L keykeg', '20L Polykeg', '12x33cl blik', '24x33cl blik', '6x4x33cl'];
 
 const PROCESSTAPPEN_FIELDS = [
-  ['dry_hop_warm', 'Dry hop warm'], ['dry_hop_cold', 'Dry hop cold'],
+  ['dry_hop_warm', 'Dry hop warm'], ['dry_hop_cold', 'Dry hop 16°C'], ['dry_hop_0c', 'Dry hop 0°C'],
   ['hopsteiner', 'Hopsteiner'], ['bevasil', 'Bevasil'], ['nagardo', 'Nagardo'],
   ['gluten_test', 'Gluten test'], ['sample_to_lab', 'Sample to lab'],
   ['fuge_after_cooling', 'Fuge after cooling'], ['cool_to_7c', 'Cool to 7°C'], ['cool_to_0c', 'Cool to 0°C'],
@@ -577,6 +589,7 @@ function voegIngredientRegelToe(tbodyId, rollenLijst, regel = {}) {
 
   const meerdereRollen = rollenLijst.length > 1;
   const isHopSectie = tbodyId === 're-ing-hop-tbody';
+  const isMoutSectie = tbodyId === 're-ing-mout-tbody';
   const rolKolomHtml = meerdereRollen
     ? `<td><select class="re-ing-rol">${rolOptiesVoor(rollenLijst, regel.rol || rollenLijst[0])}</select></td>`
     : '';
@@ -592,13 +605,33 @@ function voegIngredientRegelToe(tbodyId, rollenLijst, regel = {}) {
         <option value="2" ${regel.hdt === 2 ? 'selected' : ''}>HDT 2</option>
       </select>
     </td>` : '';
+  const alphaKolomHtml = isHopSectie ? `<td><input type="number" class="re-ing-alpha" value="${regel.alpha_pct ?? ''}" /></td>` : '';
+  const ebcKolomHtml = isMoutSectie ? `<td><input type="number" class="re-ing-ebc" value="${regel.kleur_ebc ?? ''}" /></td>` : '';
+  const percentageKolomHtml = isMoutSectie ? `<td class="re-ing-percentage">—</td>` : '';
+
+  // Timing: bij Hop (boil) vrije invoer (getal, bijv. kooktijd in minuten); bij
+  // Dry hop een keuze uit Warm / 16°C / Cold (0°C) i.p.v. vrije tekst.
+  const tijdstipKolomHtml = isHopSectie ? `
+    <td>
+      <input type="text" class="re-ing-tijdstip-boil" value="${regel.rol !== 'dry_hop' ? (regel.tijdstip ?? '') : ''}"
+             style="${isBoilRij ? '' : 'display:none;'}" placeholder="min" />
+      <select class="re-ing-tijdstip-dryhop" style="${isBoilRij ? 'display:none;' : ''}">
+        <option value="" ${!regel.tijdstip ? 'selected' : ''}>—</option>
+        <option value="warm" ${regel.tijdstip === 'warm' ? 'selected' : ''}>Warm</option>
+        <option value="16c" ${regel.tijdstip === '16c' ? 'selected' : ''}>16°C</option>
+        <option value="0c" ${regel.tijdstip === '0c' ? 'selected' : ''}>Cold (0°C)</option>
+      </select>
+    </td>` : `<td><input type="text" class="re-ing-tijdstip" value="${regel.tijdstip ?? ''}" /></td>`;
 
   tr.innerHTML = `
     ${rolKolomHtml}
     <td><select class="re-ing-ingredient">${ingredientOpties(regel.ingredient_id)}</select></td>
+    ${alphaKolomHtml}
     <td><input type="number" class="re-ing-hoeveelheid" value="${regel.hoeveelheid ?? ''}" /></td>
     <td><input type="text" class="re-ing-eenheid" value="${regel.eenheid ?? ''}" /></td>
-    <td><input type="text" class="re-ing-tijdstip" value="${regel.tijdstip ?? ''}" /></td>
+    ${ebcKolomHtml}
+    ${percentageKolomHtml}
+    ${tijdstipKolomHtml}
     <td><input type="number" class="re-ing-volgorde" value="${regel.volgorde ?? ''}" style="width:60px;" /></td>
     ${hdtKolomHtml}
     <td><input type="text" class="re-ing-notitie" value="${regel.notitie ?? ''}" /></td>
@@ -612,21 +645,53 @@ function voegIngredientRegelToe(tbodyId, rollenLijst, regel = {}) {
   }
 
   tbody.appendChild(tr);
-  tr.querySelector('.re-verwijder-regel').addEventListener('click', () => { tr.remove(); herberekenHopgewichten(); });
+  tr.querySelector('.re-verwijder-regel').addEventListener('click', () => {
+    tr.remove();
+    herberekenHopgewichten();
+    if (isMoutSectie) herberekenMoutTotalen();
+  });
   tr.querySelectorAll('.re-ing-hoeveelheid, .re-ing-ingredient, .re-ing-rol').forEach(el => {
     el.addEventListener('input', herberekenHopgewichten);
     el.addEventListener('change', herberekenHopgewichten);
   });
+  if (isMoutSectie) {
+    tr.querySelectorAll('.re-ing-hoeveelheid, .re-ing-ebc').forEach(el => {
+      el.addEventListener('input', herberekenMoutTotalen);
+    });
+  }
+  // Alpha% automatisch voorstellen vanuit de standaardwaarde op het
+  // ingrediënt zelf, zodra een hopsoort gekozen wordt (blijft aanpasbaar).
+  if (isHopSectie) {
+    const ingredientSelect = tr.querySelector('.re-ing-ingredient');
+    const alphaInput = tr.querySelector('.re-ing-alpha');
+    if (ingredientSelect && alphaInput && !regel.alpha_pct) {
+      ingredientSelect.addEventListener('change', () => {
+        const gekozen = alleIngredientenLijst.find(i => String(i.id) === ingredientSelect.value);
+        if (gekozen && gekozen.alpha_pct !== undefined && gekozen.alpha_pct !== null && alphaInput.value === '') {
+          alphaInput.value = gekozen.alpha_pct;
+        }
+      });
+    }
+  }
 
-  // Rol-wijziging binnen Hops and Herbs: HDT alleen bruikbaar bij Hop (boil)
+  // Rol-wijziging binnen Hops and Herbs: HDT alleen bruikbaar bij Hop (boil),
+  // en Timing wisselt tussen vrije invoer (boil) en keuzeveld (dry hop).
   if (isHopSectie) {
     const rolSelect = tr.querySelector('.re-ing-rol');
     const hdtSelect = tr.querySelector('.re-ing-hdt');
-    if (rolSelect && hdtSelect) {
+    const tijdstipBoil = tr.querySelector('.re-ing-tijdstip-boil');
+    const tijdstipDryhop = tr.querySelector('.re-ing-tijdstip-dryhop');
+    if (rolSelect) {
       rolSelect.addEventListener('change', () => {
         const isBoil = rolSelect.value === 'hopgift_kook';
-        hdtSelect.disabled = !isBoil;
-        if (!isBoil) hdtSelect.value = '';
+        if (hdtSelect) {
+          hdtSelect.disabled = !isBoil;
+          if (!isBoil) hdtSelect.value = '';
+        }
+        if (tijdstipBoil && tijdstipDryhop) {
+          tijdstipBoil.style.display = isBoil ? '' : 'none';
+          tijdstipDryhop.style.display = isBoil ? 'none' : '';
+        }
       });
     }
   }
@@ -639,17 +704,35 @@ document.querySelectorAll('[data-add-btn]').forEach(btn => {
 });
 
 function leesIngredientRegelsUit(tbodyId) {
+  const isHopSectie = tbodyId === 're-ing-hop-tbody';
   return Array.from(document.querySelectorAll(`#${tbodyId} tr`)).map(tr => {
     const hdtEl = tr.querySelector('.re-ing-hdt');
     const hdtVal = hdtEl ? hdtEl.value : '';
+    const rol = tr.querySelector('.re-ing-rol').value;
+
+    let tijdstip;
+    if (isHopSectie) {
+      const isBoil = rol === 'hopgift_kook';
+      tijdstip = isBoil
+        ? (tr.querySelector('.re-ing-tijdstip-boil').value.trim() || null)
+        : (tr.querySelector('.re-ing-tijdstip-dryhop').value || null);
+    } else {
+      tijdstip = tr.querySelector('.re-ing-tijdstip').value.trim() || null;
+    }
+
+    const alphaEl = tr.querySelector('.re-ing-alpha');
+    const ebcEl = tr.querySelector('.re-ing-ebc');
+
     return {
-      rol: tr.querySelector('.re-ing-rol').value,
+      rol,
       ingredient_id: Number(tr.querySelector('.re-ing-ingredient').value),
       hoeveelheid: tr.querySelector('.re-ing-hoeveelheid').value === '' ? null : Number(tr.querySelector('.re-ing-hoeveelheid').value),
       eenheid: tr.querySelector('.re-ing-eenheid').value.trim() || null,
-      tijdstip: tr.querySelector('.re-ing-tijdstip').value.trim() || null,
+      tijdstip,
       volgorde: tr.querySelector('.re-ing-volgorde').value === '' ? null : Number(tr.querySelector('.re-ing-volgorde').value),
       hdt: hdtVal === '' ? null : Number(hdtVal),
+      alpha_pct: alphaEl ? (alphaEl.value === '' ? null : Number(alphaEl.value)) : null,
+      kleur_ebc: ebcEl ? (ebcEl.value === '' ? null : Number(ebcEl.value)) : null,
       notitie: tr.querySelector('.re-ing-notitie').value.trim() || null,
     };
   });
@@ -662,6 +745,21 @@ const ALLE_ING_TBODY_IDS = [
 
 function leesAlleIngredientRegels() {
   return ALLE_ING_TBODY_IDS.flatMap(tbodyId => leesIngredientRegelsUit(tbodyId));
+}
+
+function herberekenMoutTotalen() {
+  const rijen = Array.from(document.querySelectorAll('#re-ing-mout-tbody tr'));
+  const gewichten = rijen.map(tr => Number(tr.querySelector('.re-ing-hoeveelheid').value) || 0);
+  const totaalKg = gewichten.reduce((a, b) => a + b, 0);
+
+  rijen.forEach((tr, i) => {
+    const cel = tr.querySelector('.re-ing-percentage');
+    if (!cel) return;
+    cel.textContent = totaalKg > 0 ? `${((gewichten[i] / totaalKg) * 100).toFixed(1)}%` : '—';
+  });
+
+  const totaalCel = document.getElementById('re-mout-totaal-kg');
+  if (totaalCel) totaalCel.textContent = totaalKg.toFixed(1);
 }
 
 function herberekenHopgewichten() {
@@ -763,17 +861,16 @@ async function vulKopieerSelect() {
   });
 }
 
-// Hop Boil altijd bovenaan (hoogste Timing eerst, aflopend), daarna Dry hop:
-// eerst rijen waarvan Timing "warm" bevat, dan de rest ("16C"). Er is nog geen
-// apart veld dat warm/16C vastlegt -- dit leunt op de tekst in het
-// Timing-veld, zie kanttekening in de chat.
+// Hop Boil altijd bovenaan (hoogste Timing eerst, aflopend), daarna Dry hop
+// in de volgorde Warm / 16°C / Cold (0°C), gebaseerd op de exacte keuze in
+// het Timing-veld (geen tekstherkenning meer nodig nu dit een dropdown is).
 function sorteerHopHerbsRegels(rijen) {
   const boil = rijen.filter(r => r.rol === 'hopgift_kook')
     .sort((a, b) => (parseFloat(b.tijdstip) || -Infinity) - (parseFloat(a.tijdstip) || -Infinity));
-  const dryHop = rijen.filter(r => r.rol === 'dry_hop');
-  const dryHopWarm = dryHop.filter(r => (r.tijdstip || '').toLowerCase().includes('warm'));
-  const dryHopRest = dryHop.filter(r => !(r.tijdstip || '').toLowerCase().includes('warm'));
-  return [...boil, ...dryHopWarm, ...dryHopRest];
+  const dryHopVolgorde = ['warm', '16c', '0c'];
+  const dryHop = rijen.filter(r => r.rol === 'dry_hop')
+    .sort((a, b) => dryHopVolgorde.indexOf(a.tijdstip) - dryHopVolgorde.indexOf(b.tijdstip));
+  return [...boil, ...dryHop];
 }
 
 function vulIngredientSectiesUit(ingredients) {
@@ -788,6 +885,7 @@ function vulIngredientSectiesUit(ingredients) {
     else if (regel.rol === 'toegift_kelder') voegIngredientRegelToe('re-ing-keldertoegift-tbody', ['toegift_kelder'], regel);
   });
   herberekenHopgewichten();
+  herberekenMoutTotalen();
 }
 
 document.getElementById('re-kopieer-btn').addEventListener('click', async () => {

@@ -327,7 +327,7 @@ async function openDetail(id) {
     supabaseClient.from('recipe_processtappen').select('*').eq('recipe_id', id).maybeSingle(),
     supabaseClient.from('recipe_comments').select('*').eq('recipe_id', id).maybeSingle(),
     supabaseClient.from('recipe_kosten').select('*').eq('recipe_id', id).maybeSingle(),
-    supabaseClient.from('recipe_ingredients').select('rol, hoeveelheid, eenheid, tijdstip, volgorde, hdt, notitie, ingredients(naam, categorie)').eq('recipe_id', id).order('rol').order('volgorde'),
+    supabaseClient.from('recipe_ingredients').select('rol, hoeveelheid, eenheid, tijdstip, volgorde, hdt, alpha_pct, kleur_ebc, notitie, ingredients(naam, categorie)').eq('recipe_id', id).order('rol').order('volgorde'),
     supabaseClient.from('recipe_revisies').select('*').eq('recipe_id', id).order('id', { ascending: false }),
   ]);
 
@@ -471,7 +471,7 @@ async function openDetail(id) {
   ].filter(([,v]) => v !== null && v !== undefined);
 
   const processtappenLabels = {
-    dry_hop_warm: 'Dry hop warm', dry_hop_cold: 'Dry hop cold', hopsteiner: 'Hopsteiner',
+    dry_hop_warm: 'Dry hop warm', dry_hop_cold: 'Dry hop 16°C', dry_hop_0c: 'Dry hop 0°C', hopsteiner: 'Hopsteiner',
     bevasil: 'Bevasil', nagardo: 'Nagardo', gluten_test: 'Gluten test', sample_to_lab: 'Sample to lab',
     fuge_after_cooling: 'Fuge after cooling', cool_to_7c: 'Cool to 7°C', cool_to_0c: 'Cool to 0°C',
     check_hbt_addition: 'Check HBT addition', keldersplitsing: 'Keldersplitsing',
@@ -510,35 +510,56 @@ async function openDetail(id) {
     toegift_brouwerij: 'Brewhouse addition', toegift_kelder: 'Cellar addition', gist: 'Yeast'
   };
 
-  // Hop Boil altijd bovenaan (hoogste Timing eerst, aflopend), daarna Dry hop:
-  // eerst rijen waarvan Timing "warm" bevat, dan de rest ("16C"). Leunt op de
-  // tekst in het Timing-veld, zie kanttekening in de chat.
+  // Hop Boil altijd bovenaan (hoogste Timing eerst, aflopend), daarna Dry hop
+  // in de volgorde Warm / 16°C / Cold (0°C), op basis van de exacte
+  // dropdown-waarde (warm/16c/0c) uit het invoerscherm.
   function sorteerHopHerbsRegels(rijen) {
     const boil = rijen.filter(r => r.rol === 'hopgift_kook')
       .sort((a, b) => (parseFloat(b.tijdstip) || -Infinity) - (parseFloat(a.tijdstip) || -Infinity));
-    const dryHop = rijen.filter(r => r.rol === 'dry_hop');
-    const dryHopWarm = dryHop.filter(r => (r.tijdstip || '').toLowerCase().includes('warm'));
-    const dryHopRest = dryHop.filter(r => !(r.tijdstip || '').toLowerCase().includes('warm'));
-    return [...boil, ...dryHopWarm, ...dryHopRest];
+    const dryHopVolgorde = ['warm', '16c', '0c'];
+    const dryHop = rijen.filter(r => r.rol === 'dry_hop')
+      .sort((a, b) => dryHopVolgorde.indexOf(a.tijdstip) - dryHopVolgorde.indexOf(b.tijdstip));
+    return [...boil, ...dryHop];
   }
 
-  function ingTabelHtml(rollenFilter, kolomRol, toonHdt = false) {
+  const dryHopTimingLabels = { warm: 'Warm', '16c': '16°C', '0c': 'Cold (0°C)' };
+  function timingWeergave(i) {
+    if (i.rol === 'dry_hop') return dryHopTimingLabels[i.tijdstip] || i.tijdstip || '—';
+    return i.tijdstip || '—';
+  }
+
+  function ingTabelHtml(rollenFilter, kolomRol, toonHdt = false, toonAlpha = false, toonMout = false) {
     let subset = ings.filter(i => rollenFilter.includes(i.rol));
     if (subset.length === 0) return '<div class="empty">None added.</div>';
     if (toonHdt) subset = sorteerHopHerbsRegels(subset);
+
+    const totaalKg = toonMout ? subset.reduce((sum, i) => sum + (i.hoeveelheid || 0), 0) : 0;
+
     const rows = subset.map(i => `
       <tr>
         ${kolomRol ? `<td><span class="rol-tag">${rolLabels[i.rol] || i.rol}</span></td>` : ''}
         <td>${escapeHtml(i.ingredients?.naam || '—')}</td>
+        ${toonAlpha ? `<td>${i.alpha_pct ?? '—'}</td>` : ''}
         <td>${i.hoeveelheid ?? '—'} ${i.eenheid || ''}</td>
-        <td>${escapeHtml(i.tijdstip || '—')}</td>
+        ${toonMout ? `<td>${i.kleur_ebc ?? '—'}</td><td>${totaalKg > 0 ? ((i.hoeveelheid || 0) / totaalKg * 100).toFixed(1) + '%' : '—'}</td>` : ''}
+        <td>${escapeHtml(timingWeergave(i))}</td>
         ${toonHdt ? `<td>${(i.rol === 'hopgift_kook' && i.hdt) ? 'HDT ' + i.hdt : '—'}</td>` : ''}
         <td>${escapeHtml(i.notitie || '—')}</td>
       </tr>`).join('');
+
+    const footerRow = toonMout ? `
+      <tfoot><tr style="font-weight:bold; border-top: 2px solid var(--hop-dark);">
+        <td>Total</td><td>${totaalKg.toFixed(1)} kg</td><td></td><td>100%</td><td colspan="2"></td>
+      </tr></tfoot>` : '';
+
     return `
       <table class="ing-table">
-        <thead><tr>${kolomRol ? '<th>Role</th>' : ''}<th>Name</th><th>Amount</th><th>Timing</th>${toonHdt ? '<th>HDT</th>' : ''}<th>Note</th></tr></thead>
+        <thead><tr>
+          ${kolomRol ? '<th>Role</th>' : ''}<th>Name</th>${toonAlpha ? '<th>Alpha %</th>' : ''}<th>Amount</th>
+          ${toonMout ? '<th>EBC</th><th>%</th>' : ''}<th>Timing</th>${toonHdt ? '<th>HDT</th>' : ''}<th>Note</th>
+        </tr></thead>
         <tbody>${rows}</tbody>
+        ${footerRow}
       </table>`;
   }
 
@@ -620,10 +641,10 @@ async function openDetail(id) {
     ${paramSectiesHtml(brouwSecties) || '<div class="empty">None entered.</div>'}
 
     <div class="section-title">Malt &amp; Grains</div>
-    ${ingTabelHtml(['hoofdmout'], false)}
+    ${ingTabelHtml(['hoofdmout'], false, false, false, true)}
 
     <div class="section-title">Hops and Herbs</div>
-    ${ingTabelHtml(['hopgift_kook', 'dry_hop'], true, true)}
+    ${ingTabelHtml(['hopgift_kook', 'dry_hop'], true, true, true, false)}
 
     <div class="section-title">Hops total weights</div>
     ${hopSomHtml()}
