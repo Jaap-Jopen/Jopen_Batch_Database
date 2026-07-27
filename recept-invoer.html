@@ -40,6 +40,10 @@
   table.re-ing-table select, table.re-ing-table input { width: 100%; padding: 5px 6px; border: 1px solid var(--line); border-radius: 4px; font-family: var(--serif); font-size: 13px; }
   .re-verwijder-regel { background: transparent; border: 1px solid var(--line); border-radius: 4px; color: #a33f2c; cursor: pointer; padding: 4px 8px; }
 
+  table.re-som-table { width: 100%; border-collapse: collapse; }
+  table.re-som-table th { text-align: left; font-family: var(--mono); font-size: 10px; text-transform: uppercase; color: #6b6355; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  table.re-som-table td { padding: 6px 8px; border-bottom: 1px solid #ece8dc; font-family: var(--mono); font-size: 13px; }
+
   .re-btn { background: var(--hop-dark); color: #fff; border: none; padding: 10px 18px; border-radius: 4px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; cursor: pointer; }
   .re-btn:hover { background: var(--hop); }
   .re-btn.secundair { background: transparent; color: var(--hop-dark); border: 1px solid var(--line); }
@@ -57,6 +61,7 @@
 
   .re-loading { text-align: center; padding: 60px 20px; font-family: var(--mono); font-size: 13px; color: #7a7266; }
   .re-geen-rechten { text-align: center; padding: 60px 20px; font-family: var(--mono); font-size: 13px; color: #a33f2c; }
+  .re-leeg { font-family: var(--mono); font-size: 12px; color: #7a7266; padding: 8px 0; }
 </style>
 </head>
 <body>
@@ -78,7 +83,7 @@
 
       <div class="re-section" id="re-kopieer-sectie" style="display:none;">
         <h2>Start from existing recipe (optional)</h2>
-        <p class="re-versie-uitleg" style="margin-top:-4px;">Pick a similar recipe to copy its specifications, fermentation, water profile, costs, and ingredients into this form as a starting point. This always creates a brand new recipe — it does not link to or affect the original.</p>
+        <p class="re-versie-uitleg" style="margin-top:-4px;">Pick a similar recipe to copy its data into this form as a starting point. This always creates a brand new recipe — it does not link to or affect the original.</p>
         <div class="re-grid">
           <div class="re-field wide">
             <label for="re-kopieer-select">Copy from</label>
@@ -120,32 +125,79 @@
       </div>
 
       <div class="re-section">
-        <h2>Specifications</h2>
+        <h2>End product specifications</h2>
         <div class="re-grid" id="re-specs-grid"></div>
       </div>
 
       <div class="re-section">
-        <h2>Fermentation</h2>
+        <h2>Process parameters</h2>
         <div class="re-grid" id="re-ferm-grid"></div>
       </div>
 
       <div class="re-section">
-        <h2>Water profile</h2>
+        <h2>Brewing parameters</h2>
+        <div class="re-grid" id="re-brouw-grid"></div>
+      </div>
+
+      <div class="re-section">
+        <h2>Malt &amp; Grains</h2>
+        <table class="re-ing-table">
+          <thead><tr><th>Ingredient</th><th>Amount</th><th>Unit</th><th>Timing</th><th>Order</th><th>Note</th><th></th></tr></thead>
+          <tbody id="re-ing-mout-tbody"></tbody>
+        </table>
+        <button type="button" class="re-btn secundair" data-tbody="re-ing-mout-tbody" data-roles="hoofdmout" data-add-btn>+ Add malt/grain</button>
+      </div>
+
+      <div class="re-section">
+        <h2>Hops and Herbs</h2>
+        <table class="re-ing-table">
+          <thead><tr><th>Role</th><th>Ingredient</th><th>Amount</th><th>Unit</th><th>Timing</th><th>Order</th><th>Note</th><th></th></tr></thead>
+          <tbody id="re-ing-hop-tbody"></tbody>
+        </table>
+        <button type="button" class="re-btn secundair" data-tbody="re-ing-hop-tbody" data-roles="hopgift_kook,dry_hop" data-add-btn>+ Add hop/herb</button>
+      </div>
+
+      <div class="re-section">
+        <h2>Hops total weights</h2>
+        <p class="re-versie-uitleg" style="margin-top:-4px;">Calculated automatically from the Hops and Herbs rows above.</p>
+        <div id="re-hop-som-container"><div class="re-leeg">No hops/herbs added yet.</div></div>
+      </div>
+
+      <div class="re-section">
+        <h2>Additions Brewing</h2>
+        <table class="re-ing-table">
+          <thead><tr><th>Ingredient</th><th>Amount</th><th>Unit</th><th>Timing</th><th>Order</th><th>Note</th><th></th></tr></thead>
+          <tbody id="re-ing-brouwtoegift-tbody"></tbody>
+        </table>
+        <button type="button" class="re-btn secundair" data-tbody="re-ing-brouwtoegift-tbody" data-roles="toegift_brouwerij" data-add-btn>+ Add brewing addition</button>
+      </div>
+
+      <div class="re-section">
+        <h2>Yeasts</h2>
+        <table class="re-ing-table">
+          <thead><tr><th>Ingredient</th><th>Amount</th><th>Unit</th><th>Timing</th><th>Order</th><th>Note</th><th></th></tr></thead>
+          <tbody id="re-ing-gist-tbody"></tbody>
+        </table>
+        <button type="button" class="re-btn secundair" data-tbody="re-ing-gist-tbody" data-roles="gist" data-add-btn>+ Add yeast</button>
+      </div>
+
+      <div class="re-section">
+        <h2>Additions Cellar</h2>
+        <table class="re-ing-table">
+          <thead><tr><th>Ingredient</th><th>Amount</th><th>Unit</th><th>Timing</th><th>Order</th><th>Note</th><th></th></tr></thead>
+          <tbody id="re-ing-keldertoegift-tbody"></tbody>
+        </table>
+        <button type="button" class="re-btn secundair" data-tbody="re-ing-keldertoegift-tbody" data-roles="toegift_kelder" data-add-btn>+ Add cellar addition</button>
+      </div>
+
+      <div class="re-section">
+        <h2>Target water profile</h2>
         <div class="re-grid" id="re-water-grid"></div>
       </div>
 
       <div class="re-section">
-        <h2>Costs</h2>
-        <div class="re-grid" id="re-kosten-grid"></div>
-      </div>
-
-      <div class="re-section">
-        <h2>Ingredients</h2>
-        <table class="re-ing-table">
-          <thead><tr><th>Role</th><th>Ingredient</th><th>Amount</th><th>Unit</th><th>Timing</th><th>Order</th><th>Note</th><th></th></tr></thead>
-          <tbody id="re-ing-tbody"></tbody>
-        </table>
-        <button type="button" class="re-btn secundair" id="re-ing-toevoegen-btn">+ Add ingredient row</button>
+        <h2>Revision data</h2>
+        <div id="re-revisies-container"><div class="re-leeg">Revision history will appear here once the recipe has been saved.</div></div>
       </div>
 
       <div class="re-versie-vak" id="re-versie-vak" style="display:none;">
@@ -186,8 +238,8 @@ const SPECS_FIELDS = [
   ['dissolved_o2', 'Dissolved O2', 'ppb', 'number'],
 ];
 const FERM_FIELDS = [
-  ['pitching_temp', 'Pitching temp', '°C', 'number'],
-  ['main_ferm_temp', 'Main ferment temp', '°C', 'number'],
+  ['pitching_temp', 'Start fermentation temp', '°C', 'number'],
+  ['main_ferm_temp', 'Max fermentation temp', '°C', 'number'],
   ['t_release', 'T release', '°C', 'number'],
   ['temp_dry_warm', 'Dry hop warm temp', '°C', 'number'],
   ['extract_dry_warm_1', 'Extract dry warm 1', '°P', 'number'],
@@ -200,6 +252,18 @@ const FERM_FIELDS = [
   ['troebeling_na_sep', 'Turbidity after separation', 'EBC', 'number'],
   ['bier_risico', 'Beer risk', '', 'text'],
   ['bier_status', 'Beer status', '', 'text'],
+];
+const BROUW_FIELDS = [
+  ['kamers_mashfilter', 'Mash filter chambers', '', 'number'],
+  ['walsenmolen', 'Roller mill', '', 'text'],
+  ['beslag_dikte', 'Mash thickness', '', 'number'],
+  ['volume_kook', 'Boil volume', 'hl', 'number'],
+  ['wortvoorkoeler_temp', 'Wort pre-cooler temp', '°C', 'number'],
+  ['eindvolume_brouwsel', 'Final batch volume', 'hl', 'number'],
+  ['gewenste_verdamping', 'Desired evaporation', '%', 'number'],
+  ['intensiteit_koken', 'Boil intensity', 'KJ/min', 'number'],
+  ['whirlpool_rust', 'Whirlpool rest', 'min', 'number'],
+  ['lauterfactor', 'Lauter factor', '', 'number'],
 ];
 const WATER_FIELDS = [
   ['ca', 'Ca', 'ppm', 'number'],
@@ -215,16 +279,10 @@ const WATER_FIELDS = [
   ['ph_eind_koken', 'pH end boil', '', 'number'],
   ['beluchting', 'Aeration', 'l/h', 'number'],
 ];
-const KOSTEN_FIELDS = [
-  ['cost_clr_per_kge', 'Cost CLR/kg extract', '€', 'number'],
-  ['cost_bh_per_kge', 'Cost BH/kg extract', '€', 'number'],
-  ['cost_grondstoffen_hl', 'Raw material cost/HL', '€', 'number'],
-  ['bierverlies_pct', 'Beer loss', '%', 'number'],
-];
-const ROL_OPTIES = [
-  ['hoofdmout', 'Malt'], ['hopgift_kook', 'Hop (boil)'], ['dry_hop', 'Dry hop'],
-  ['toegift_brouwerij', 'Brewhouse addition'], ['toegift_kelder', 'Cellar addition'], ['gist', 'Yeast'],
-];
+const ROL_LABELS = {
+  hoofdmout: 'Malt', hopgift_kook: 'Hop (boil)', dry_hop: 'Dry hop',
+  toegift_brouwerij: 'Brewhouse addition', toegift_kelder: 'Cellar addition', gist: 'Yeast',
+};
 
 let huidigeGebruiker = null;
 let alleIngredientenLijst = [];
@@ -261,19 +319,24 @@ function ingredientOpties(geselecteerdId) {
   ).join('');
 }
 
-function rolOpties(geselecteerd) {
-  return ROL_OPTIES.map(([val, label]) =>
-    `<option value="${val}" ${val === geselecteerd ? 'selected' : ''}>${label}</option>`
+function rolOptiesVoor(rollenLijst, geselecteerd) {
+  return rollenLijst.map(rol =>
+    `<option value="${rol}" ${rol === geselecteerd ? 'selected' : ''}>${ROL_LABELS[rol] || rol}</option>`
   ).join('');
 }
 
-function voegIngredientRegelToe(regel = {}) {
-  const tbody = document.getElementById('re-ing-tbody');
-  const rijId = 'ing-rij-' + (ingredientRegelTeller++);
+function voegIngredientRegelToe(tbodyId, rollenLijst, regel = {}) {
+  const tbody = document.getElementById(tbodyId);
   const tr = document.createElement('tr');
-  tr.id = rijId;
+  tr.id = 'ing-rij-' + (ingredientRegelTeller++);
+
+  const meerdereRollen = rollenLijst.length > 1;
+  const rolKolomHtml = meerdereRollen
+    ? `<td><select class="re-ing-rol">${rolOptiesVoor(rollenLijst, regel.rol || rollenLijst[0])}</select></td>`
+    : '';
+
   tr.innerHTML = `
-    <td><select class="re-ing-rol">${rolOpties(regel.rol)}</select></td>
+    ${rolKolomHtml}
     <td><select class="re-ing-ingredient">${ingredientOpties(regel.ingredient_id)}</select></td>
     <td><input type="number" class="re-ing-hoeveelheid" value="${regel.hoeveelheid ?? ''}" /></td>
     <td><input type="text" class="re-ing-eenheid" value="${regel.eenheid ?? ''}" /></td>
@@ -282,12 +345,26 @@ function voegIngredientRegelToe(regel = {}) {
     <td><input type="text" class="re-ing-notitie" value="${regel.notitie ?? ''}" /></td>
     <td><button type="button" class="re-verwijder-regel">&times;</button></td>
   `;
+  if (!meerdereRollen) {
+    tr.insertAdjacentHTML('afterbegin', `<input type="hidden" class="re-ing-rol" value="${rollenLijst[0]}" />`);
+  }
+
   tbody.appendChild(tr);
-  tr.querySelector('.re-verwijder-regel').addEventListener('click', () => tr.remove());
+  tr.querySelector('.re-verwijder-regel').addEventListener('click', () => { tr.remove(); herberekenHopgewichten(); });
+  tr.querySelectorAll('.re-ing-hoeveelheid, .re-ing-ingredient, .re-ing-rol').forEach(el => {
+    el.addEventListener('input', herberekenHopgewichten);
+    el.addEventListener('change', herberekenHopgewichten);
+  });
 }
 
-function leesIngredientRegels() {
-  return Array.from(document.querySelectorAll('#re-ing-tbody tr')).map(tr => ({
+document.querySelectorAll('[data-add-btn]').forEach(btn => {
+  const tbodyId = btn.dataset.tbody;
+  const rollenLijst = btn.dataset.roles.split(',');
+  btn.addEventListener('click', () => voegIngredientRegelToe(tbodyId, rollenLijst));
+});
+
+function leesIngredientRegelsUit(tbodyId) {
+  return Array.from(document.querySelectorAll(`#${tbodyId} tr`)).map(tr => ({
     rol: tr.querySelector('.re-ing-rol').value,
     ingredient_id: Number(tr.querySelector('.re-ing-ingredient').value),
     hoeveelheid: tr.querySelector('.re-ing-hoeveelheid').value === '' ? null : Number(tr.querySelector('.re-ing-hoeveelheid').value),
@@ -296,6 +373,43 @@ function leesIngredientRegels() {
     volgorde: tr.querySelector('.re-ing-volgorde').value === '' ? null : Number(tr.querySelector('.re-ing-volgorde').value),
     notitie: tr.querySelector('.re-ing-notitie').value.trim() || null,
   }));
+}
+
+const ALLE_ING_TBODY_IDS = [
+  're-ing-mout-tbody', 're-ing-hop-tbody', 're-ing-brouwtoegift-tbody',
+  're-ing-gist-tbody', 're-ing-keldertoegift-tbody',
+];
+
+function leesAlleIngredientRegels() {
+  return ALLE_ING_TBODY_IDS.flatMap(tbodyId => leesIngredientRegelsUit(tbodyId));
+}
+
+function herberekenHopgewichten() {
+  const rijen = leesIngredientRegelsUit('re-ing-hop-tbody');
+  const container = document.getElementById('re-hop-som-container');
+
+  if (rijen.length === 0) {
+    container.innerHTML = '<div class="re-leeg">No hops/herbs added yet.</div>';
+    return;
+  }
+
+  const totalen = {};
+  rijen.forEach(r => {
+    const ingredient = alleIngredientenLijst.find(i => i.id === r.ingredient_id);
+    const naam = ingredient ? ingredient.naam : `#${r.ingredient_id}`;
+    const key = naam + '|' + (r.eenheid || '');
+    if (!totalen[key]) totalen[key] = { naam, eenheid: r.eenheid || '', totaal: 0 };
+    totalen[key].totaal += (r.hoeveelheid || 0);
+  });
+
+  const rijenHtml = Object.values(totalen).map(t => `
+    <tr><td>${escapeHtml(t.naam)}</td><td>${t.totaal}${t.eenheid ? ' ' + escapeHtml(t.eenheid) : ''}</td></tr>`).join('');
+
+  container.innerHTML = `
+    <table class="re-som-table">
+      <thead><tr><th>Hop / herb</th><th>Total amount</th></tr></thead>
+      <tbody>${rijenHtml}</tbody>
+    </table>`;
 }
 
 function leesBasisgegevens() {
@@ -327,8 +441,8 @@ async function initReceptInvoer() {
 
   renderVeldenGrid('re-specs-grid', SPECS_FIELDS, null);
   renderVeldenGrid('re-ferm-grid', FERM_FIELDS, null);
+  renderVeldenGrid('re-brouw-grid', BROUW_FIELDS, null);
   renderVeldenGrid('re-water-grid', WATER_FIELDS, null);
-  renderVeldenGrid('re-kosten-grid', KOSTEN_FIELDS, null);
 
   const id = urlParam('id');
   if (id) {
@@ -363,6 +477,18 @@ async function vulKopieerSelect() {
   });
 }
 
+function vulIngredientSectiesUit(ingredients) {
+  ALLE_ING_TBODY_IDS.forEach(tbodyId => { document.getElementById(tbodyId).innerHTML = ''; });
+  (ingredients || []).forEach(regel => {
+    if (regel.rol === 'hoofdmout') voegIngredientRegelToe('re-ing-mout-tbody', ['hoofdmout'], regel);
+    else if (regel.rol === 'hopgift_kook' || regel.rol === 'dry_hop') voegIngredientRegelToe('re-ing-hop-tbody', ['hopgift_kook', 'dry_hop'], regel);
+    else if (regel.rol === 'toegift_brouwerij') voegIngredientRegelToe('re-ing-brouwtoegift-tbody', ['toegift_brouwerij'], regel);
+    else if (regel.rol === 'gist') voegIngredientRegelToe('re-ing-gist-tbody', ['gist'], regel);
+    else if (regel.rol === 'toegift_kelder') voegIngredientRegelToe('re-ing-keldertoegift-tbody', ['toegift_kelder'], regel);
+  });
+  herberekenHopgewichten();
+}
+
 document.getElementById('re-kopieer-btn').addEventListener('click', async () => {
   const bronId = document.getElementById('re-kopieer-select').value;
   const melding = document.getElementById('re-kopieer-melding');
@@ -376,12 +502,12 @@ document.getElementById('re-kopieer-btn').addEventListener('click', async () => 
   melding.textContent = 'Copying…';
   melding.className = 're-melding';
 
-  const [recipe, specs, ferm, water, kosten, ingredients] = await Promise.all([
+  const [recipe, specs, ferm, brouw, water, ingredients] = await Promise.all([
     supabaseClient.from('recipes').select('*').eq('id', bronId).single(),
     supabaseClient.from('recipe_specificaties').select('*').eq('recipe_id', bronId).maybeSingle(),
     supabaseClient.from('recipe_fermentatie').select('*').eq('recipe_id', bronId).maybeSingle(),
+    supabaseClient.from('recipe_brouwspecificaties').select('*').eq('recipe_id', bronId).maybeSingle(),
     supabaseClient.from('recipe_water').select('*').eq('recipe_id', bronId).maybeSingle(),
-    supabaseClient.from('recipe_kosten').select('*').eq('recipe_id', bronId).maybeSingle(),
     supabaseClient.from('recipe_ingredients').select('*').eq('recipe_id', bronId).order('rol').order('volgorde'),
   ]);
 
@@ -401,24 +527,24 @@ document.getElementById('re-kopieer-btn').addEventListener('click', async () => 
 
   renderVeldenGrid('re-specs-grid', SPECS_FIELDS, specs.data || {});
   renderVeldenGrid('re-ferm-grid', FERM_FIELDS, ferm.data || {});
+  renderVeldenGrid('re-brouw-grid', BROUW_FIELDS, brouw.data || {});
   renderVeldenGrid('re-water-grid', WATER_FIELDS, water.data || {});
-  renderVeldenGrid('re-kosten-grid', KOSTEN_FIELDS, kosten.data || {});
 
-  document.getElementById('re-ing-tbody').innerHTML = '';
-  (ingredients.data || []).forEach(regel => voegIngredientRegelToe(regel));
+  vulIngredientSectiesUit(ingredients.data || []);
 
   melding.textContent = `Copied from "${bron.naam}". Review and adjust below, then create the recipe.`;
   melding.className = 're-melding ok';
 });
 
 async function laadBestaandRecept(id) {
-  const [recipe, specs, ferm, water, kosten, ingredients] = await Promise.all([
+  const [recipe, specs, ferm, brouw, water, ingredients, revisies] = await Promise.all([
     supabaseClient.from('recipes').select('*').eq('id', id).single(),
     supabaseClient.from('recipe_specificaties').select('*').eq('recipe_id', id).maybeSingle(),
     supabaseClient.from('recipe_fermentatie').select('*').eq('recipe_id', id).maybeSingle(),
+    supabaseClient.from('recipe_brouwspecificaties').select('*').eq('recipe_id', id).maybeSingle(),
     supabaseClient.from('recipe_water').select('*').eq('recipe_id', id).maybeSingle(),
-    supabaseClient.from('recipe_kosten').select('*').eq('recipe_id', id).maybeSingle(),
     supabaseClient.from('recipe_ingredients').select('*').eq('recipe_id', id).order('rol').order('volgorde'),
+    supabaseClient.from('recipe_revisies').select('*').eq('recipe_id', id).order('id', { ascending: false }),
   ]);
 
   if (recipe.error || !recipe.data) {
@@ -441,17 +567,30 @@ async function laadBestaandRecept(id) {
 
   renderVeldenGrid('re-specs-grid', SPECS_FIELDS, specs.data || {});
   renderVeldenGrid('re-ferm-grid', FERM_FIELDS, ferm.data || {});
+  renderVeldenGrid('re-brouw-grid', BROUW_FIELDS, brouw.data || {});
   renderVeldenGrid('re-water-grid', WATER_FIELDS, water.data || {});
-  renderVeldenGrid('re-kosten-grid', KOSTEN_FIELDS, kosten.data || {});
 
-  (ingredients.data || []).forEach(regel => voegIngredientRegelToe(regel));
+  vulIngredientSectiesUit(ingredients.data || []);
+
+  const revisieData = revisies.data || [];
+  if (revisieData.length > 0) {
+    document.getElementById('re-revisies-container').innerHTML = `
+      <table class="re-som-table">
+        <thead><tr><th>Version</th><th>Date</th><th>By</th><th>Comment</th></tr></thead>
+        <tbody>${revisieData.map(rv => `
+          <tr>
+            <td>v${rv.versie_major}.${rv.versie_minor}</td>
+            <td>${rv.datum || ''}</td>
+            <td>${escapeHtml(rv.door || '')}</td>
+            <td>${escapeHtml(rv.wijziging || '')}</td>
+          </tr>`).join('')}</tbody>
+      </table>`;
+  }
 
   document.getElementById('re-versie-vak').style.display = 'block';
   document.getElementById('re-opslaan-klein-btn').style.display = 'inline-block';
   document.getElementById('re-opslaan-groot-btn').style.display = 'inline-block';
 }
-
-document.getElementById('re-ing-toevoegen-btn').addEventListener('click', () => voegIngredientRegelToe());
 
 document.getElementById('re-opslaan-nieuw-btn').addEventListener('click', async () => {
   const melding = document.getElementById('re-melding');
@@ -636,21 +775,21 @@ async function slaBestaandReceptOp(soort) {
 async function schrijfGerelateerdeData(recipeId) {
   const specs = leesVeldenGrid(SPECS_FIELDS);
   const ferm = leesVeldenGrid(FERM_FIELDS);
+  const brouw = leesVeldenGrid(BROUW_FIELDS);
   const water = leesVeldenGrid(WATER_FIELDS);
-  const kosten = leesVeldenGrid(KOSTEN_FIELDS);
-  const ingredientRegels = leesIngredientRegels();
+  const ingredientRegels = leesAlleIngredientRegels();
 
   const { error: specsErr } = await supabaseClient.from('recipe_specificaties').upsert({ recipe_id: recipeId, ...specs });
-  if (specsErr) return 'specifications: ' + specsErr.message;
+  if (specsErr) return 'end product specifications: ' + specsErr.message;
 
   const { error: fermErr } = await supabaseClient.from('recipe_fermentatie').upsert({ recipe_id: recipeId, ...ferm });
-  if (fermErr) return 'fermentation: ' + fermErr.message;
+  if (fermErr) return 'process parameters: ' + fermErr.message;
+
+  const { error: brouwErr } = await supabaseClient.from('recipe_brouwspecificaties').upsert({ recipe_id: recipeId, ...brouw });
+  if (brouwErr) return 'brewing parameters: ' + brouwErr.message;
 
   const { error: waterErr } = await supabaseClient.from('recipe_water').upsert({ recipe_id: recipeId, ...water });
-  if (waterErr) return 'water profile: ' + waterErr.message;
-
-  const { error: kostenErr } = await supabaseClient.from('recipe_kosten').upsert({ recipe_id: recipeId, ...kosten });
-  if (kostenErr) return 'costs: ' + kostenErr.message;
+  if (waterErr) return 'target water profile: ' + waterErr.message;
 
   const { error: verwijderErr } = await supabaseClient.from('recipe_ingredients').delete().eq('recipe_id', recipeId);
   if (verwijderErr) return 'ingredients (clearing old rows): ' + verwijderErr.message;

@@ -303,13 +303,14 @@ async function openDetail(id) {
   const container = document.getElementById('detail-container');
   container.innerHTML = `<div class="loading">Loading recipe…</div>`;
 
-  const [recipe, specs, ferm, water, kosten, ingredients] = await Promise.all([
+  const [recipe, specs, ferm, brouw, water, ingredients, revisies] = await Promise.all([
     supabaseClient.from('recipes').select('*').eq('id', id).single(),
     supabaseClient.from('recipe_specificaties').select('*').eq('recipe_id', id).maybeSingle(),
     supabaseClient.from('recipe_fermentatie').select('*').eq('recipe_id', id).maybeSingle(),
+    supabaseClient.from('recipe_brouwspecificaties').select('*').eq('recipe_id', id).maybeSingle(),
     supabaseClient.from('recipe_water').select('*').eq('recipe_id', id).maybeSingle(),
-    supabaseClient.from('recipe_kosten').select('*').eq('recipe_id', id).maybeSingle(),
-    supabaseClient.from('recipe_ingredients').select('rol, hoeveelheid, eenheid, tijdstip, volgorde, ingredients(naam, categorie)').eq('recipe_id', id).order('rol').order('volgorde'),
+    supabaseClient.from('recipe_ingredients').select('rol, hoeveelheid, eenheid, tijdstip, volgorde, notitie, ingredients(naam, categorie)').eq('recipe_id', id).order('rol').order('volgorde'),
+    supabaseClient.from('recipe_revisies').select('*').eq('recipe_id', id).order('id', { ascending: false }),
   ]);
 
   if (recipe.error) {
@@ -319,9 +320,10 @@ async function openDetail(id) {
   const r = recipe.data;
   const s = specs.data || {};
   const f = ferm.data || {};
+  const b = brouw.data || {};
   const w = water.data || {};
-  const k = kosten.data || {};
   const ings = ingredients.data || [];
+  const revisieData = revisies.data || [];
 
   // Andere versies van hetzelfde recept (zelfde recipe_group_id), voor het
   // "Previous versions"-lijstje onderaan de kaart.
@@ -340,28 +342,54 @@ async function openDetail(id) {
     ['Bitterness', s.bitterheid, 'EBU'],
     ['Color', s.kleur, 'EBC'],
     ['pH', s.ph, ''],
+    ['ADF', s.adf_pct, '%'],
+    ['Turbidity (lab)', s.troebeling_lab, 'EBC'],
+    ['CO2 bottle', s.co2_fles, 'g/l'],
+    ['CO2 can', s.co2_can, 'g/l'],
+    ['CO2 keg', s.co2_fust, 'g/l'],
+    ['Headspace O2', s.headspace_o2, 'ppb'],
+    ['Dissolved O2', s.dissolved_o2, 'ppb'],
   ].filter(([,v]) => v !== null && v !== undefined);
 
   const fermRows = [
-    ['Pitching temp', f.pitching_temp, '°C'],
-    ['Main ferment temp', f.main_ferm_temp, '°C'],
+    ['Start fermentation temp', f.pitching_temp, '°C'],
+    ['Max fermentation temp', f.main_ferm_temp, '°C'],
+    ['T release', f.t_release, '°C'],
+    ['Dry hop warm temp', f.temp_dry_warm, '°C'],
+    ['Extract dry warm 1', f.extract_dry_warm_1, '°P'],
+    ['Extract dry warm 2', f.extract_dry_warm_2, '°P'],
+    ['Extract dry warm 3', f.extract_dry_warm_3, '°P'],
     ['Fermentation time', f.vergistingstijd, 'days'],
     ['Lager time', f.lagertijd, 'days'],
+    ['Lager temp', f.lager_temp, '°C'],
+    ['Pasteurization', f.pasteurisatie, 'PU'],
+    ['Turbidity after separation', f.troebeling_na_sep, 'EBC'],
     ['Beer risk', f.bier_risico, ''],
     ['Beer status', f.bier_status, ''],
   ].filter(([,v]) => v !== null && v !== undefined);
 
+  const brouwRows = [
+    ['Mash filter chambers', b.kamers_mashfilter, ''],
+    ['Roller mill', b.walsenmolen, ''],
+    ['Mash thickness', b.beslag_dikte, ''],
+    ['Boil volume', b.volume_kook, 'hl'],
+    ['Wort pre-cooler temp', b.wortvoorkoeler_temp, '°C'],
+    ['Final batch volume', b.eindvolume_brouwsel, 'hl'],
+    ['Desired evaporation', b.gewenste_verdamping, '%'],
+    ['Boil intensity', b.intensiteit_koken, 'KJ/min'],
+    ['Whirlpool rest', b.whirlpool_rust, 'min'],
+    ['Lauter factor', b.lauterfactor, ''],
+  ].filter(([,v]) => v !== null && v !== undefined);
+
   const waterRows = [
     ['Ca', w.ca, 'ppm'], ['Mg', w.mg, 'ppm'], ['Na', w.na, 'ppm'],
-    ['Cl', w.cl, 'ppm'], ['SO4', w.so4, 'ppm'], ['Alkalinity', w.alkalinity, ''],
+    ['Cl', w.cl, 'ppm'], ['SO4', w.so4, 'ppm'], ['Cl:SO4 ratio', w.ratio_cl_so4, ''],
+    ['Alkalinity', w.alkalinity, ''], ['Mash water', w.maischwater, ''],
+    ['pH mash', w.ph_maische, ''], ['pH start boil', w.ph_start_koken, ''],
+    ['pH end boil', w.ph_eind_koken, ''], ['Aeration', w.beluchting, 'l/h'],
   ].filter(([,v]) => v !== null && v !== undefined);
 
-  const kostenRows = [
-    ['Raw material cost/HL', k.cost_grondstoffen_hl, '€'],
-    ['Beer loss', k.bierverlies_pct, '%'],
-  ].filter(([,v]) => v !== null && v !== undefined);
-
-  function cardHtml(title, rows, unitFirst=false) {
+  function cardHtml(title, rows) {
     if (rows.length === 0) return '';
     return `<div class="card"><h3>${title}</h3>${rows.map(([label,val,unit]) =>
       `<div class="kv"><span>${label}</span><span>${escapeHtml(String(val))}${unit? ' '+unit:''}</span></div>`).join('')}</div>`;
@@ -371,13 +399,39 @@ async function openDetail(id) {
     hoofdmout: 'Malt', hopgift_kook: 'Hop (boil)', dry_hop: 'Dry hop',
     toegift_brouwerij: 'Brewhouse addition', toegift_kelder: 'Cellar addition', gist: 'Yeast'
   };
-  const ingRows = ings.map(i => `
-    <tr>
-      <td><span class="rol-tag">${rolLabels[i.rol]||i.rol}</span></td>
-      <td>${escapeHtml(i.ingredients?.naam || '—')}</td>
-      <td>${i.hoeveelheid ?? '—'} ${i.eenheid || ''}</td>
-      <td>${escapeHtml(i.tijdstip || '—')}</td>
-    </tr>`).join('');
+
+  function ingTabelHtml(rollenFilter, kolomRol) {
+    const subset = ings.filter(i => rollenFilter.includes(i.rol));
+    if (subset.length === 0) return '<div class="empty">None added.</div>';
+    const rows = subset.map(i => `
+      <tr>
+        ${kolomRol ? `<td><span class="rol-tag">${rolLabels[i.rol] || i.rol}</span></td>` : ''}
+        <td>${escapeHtml(i.ingredients?.naam || '—')}</td>
+        <td>${i.hoeveelheid ?? '—'} ${i.eenheid || ''}</td>
+        <td>${escapeHtml(i.tijdstip || '—')}</td>
+        <td>${escapeHtml(i.notitie || '—')}</td>
+      </tr>`).join('');
+    return `
+      <table class="ing-table">
+        <thead><tr>${kolomRol ? '<th>Role</th>' : ''}<th>Name</th><th>Amount</th><th>Timing</th><th>Note</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  function hopSomHtml() {
+    const hopRijen = ings.filter(i => i.rol === 'hopgift_kook' || i.rol === 'dry_hop');
+    if (hopRijen.length === 0) return '<div class="empty">None added.</div>';
+    const totalen = {};
+    hopRijen.forEach(i => {
+      const naam = i.ingredients?.naam || 'unknown';
+      const key = naam + '|' + (i.eenheid || '');
+      if (!totalen[key]) totalen[key] = { naam, eenheid: i.eenheid || '', totaal: 0 };
+      totalen[key].totaal += (i.hoeveelheid || 0);
+    });
+    const rows = Object.values(totalen).map(t => `
+      <tr><td>${escapeHtml(t.naam)}</td><td>${t.totaal}${t.eenheid ? ' ' + escapeHtml(t.eenheid) : ''}</td></tr>`).join('');
+    return `<table class="ing-table"><thead><tr><th>Hop / herb</th><th>Total amount</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
 
   const vorigeVersiesHtml = (overigeVersies && overigeVersies.length > 0) ? `
     <div class="section-title">Previous versions</div>
@@ -393,6 +447,20 @@ async function openDetail(id) {
       </tbody>
     </table>` : '';
 
+  const revisiesHtml = revisieData.length > 0 ? `
+    <table class="ing-table">
+      <thead><tr><th>Version</th><th>Date</th><th>By</th><th>Comment</th></tr></thead>
+      <tbody>
+        ${revisieData.map(rv => `
+          <tr>
+            <td>v${rv.versie_major}.${rv.versie_minor}</td>
+            <td>${rv.datum || ''}</td>
+            <td>${escapeHtml(rv.door || '')}</td>
+            <td>${escapeHtml(rv.wijziging || '')}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>` : '<div class="empty">No revision history yet.</div>';
+
   container.innerHTML = `
     <h2 class="recipe-title">${escapeHtml(r.naam)}</h2>
     <div class="recipe-meta">
@@ -400,18 +468,40 @@ async function openDetail(id) {
       version ${r.versie_major ?? 1}.${r.versie_minor ?? 0} · <span class="status-pill status-${r.status}">${statusLabel(r.status)}</span>
       ${magBewerken() ? ` · <a class="back-link" style="margin:0;" href="recept-invoer.html?id=${r.id}">Edit &rarr;</a>` : ''}
     </div>
-    <div class="grid-cards">
-      ${cardHtml('Specifications', specRows)}
-      ${cardHtml('Fermentation', fermRows)}
-      ${cardHtml('Water profile', waterRows)}
-      ${cardHtml('Costs', kostenRows)}
-    </div>
-    <div class="section-title">Ingredients (${ings.length})</div>
-    ${ings.length ? `
-      <table class="ing-table">
-        <thead><tr><th>Role</th><th>Name</th><th>Amount</th><th>Timing</th></tr></thead>
-        <tbody>${ingRows}</tbody>
-      </table>` : '<div class="empty">No ingredients found for this recipe.</div>'}
+
+    <div class="section-title">End product specifications</div>
+    <div class="grid-cards">${cardHtml('', specRows) || '<div class="empty">None entered.</div>'}</div>
+
+    <div class="section-title">Process parameters</div>
+    <div class="grid-cards">${cardHtml('', fermRows) || '<div class="empty">None entered.</div>'}</div>
+
+    <div class="section-title">Brewing parameters</div>
+    <div class="grid-cards">${cardHtml('', brouwRows) || '<div class="empty">None entered.</div>'}</div>
+
+    <div class="section-title">Malt &amp; Grains</div>
+    ${ingTabelHtml(['hoofdmout'], false)}
+
+    <div class="section-title">Hops and Herbs</div>
+    ${ingTabelHtml(['hopgift_kook', 'dry_hop'], true)}
+
+    <div class="section-title">Hops total weights</div>
+    ${hopSomHtml()}
+
+    <div class="section-title">Additions Brewing</div>
+    ${ingTabelHtml(['toegift_brouwerij'], false)}
+
+    <div class="section-title">Yeasts</div>
+    ${ingTabelHtml(['gist'], false)}
+
+    <div class="section-title">Additions Cellar</div>
+    ${ingTabelHtml(['toegift_kelder'], false)}
+
+    <div class="section-title">Target water profile</div>
+    <div class="grid-cards">${cardHtml('', waterRows) || '<div class="empty">None entered.</div>'}</div>
+
+    <div class="section-title">Revision data</div>
+    ${revisiesHtml}
+
     ${vorigeVersiesHtml}
   `;
 }
