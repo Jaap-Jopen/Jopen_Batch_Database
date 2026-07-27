@@ -61,6 +61,12 @@
   }
   .re-subkop:first-child { margin-top: 0; }
   .re-full-span { column-span: all; margin-top: 8px; }
+  .re-badge-field label { color: #a83a1a; font-weight: 700; }
+  .re-badge-field input {
+    border: 2px solid #d9534f;
+    background: #fff3f0;
+    font-weight: 600;
+  }
   .re-comment-row { margin-bottom: 10px; }
   .re-comment-row label { display: block; font-family: var(--mono); font-size: 11px; color: #6b6355; margin-bottom: 4px; }
   .re-comment-row input {
@@ -159,6 +165,14 @@
               <option value="gearchiveerd">Archived</option>
             </select>
           </div>
+          <div class="re-field re-badge-field">
+            <label for="veld-bier_risico">Beer risk</label>
+            <input type="text" id="veld-bier_risico" />
+          </div>
+          <div class="re-field re-badge-field">
+            <label for="veld-bier_status">Beer status</label>
+            <input type="text" id="veld-bier_status" />
+          </div>
         </div>
         <div id="re-laatste-revisie" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
           <div class="re-subkop">Latest revision</div>
@@ -214,6 +228,34 @@
         </table>
         <p class="re-versie-uitleg" style="margin-top:-4px;">Total bitterness (EBU) needs a confirmed formula before it can be added — see chat.</p>
         <button type="button" class="re-btn secundair" data-tbody="re-ing-hop-tbody" data-roles="hopgift_kook,dry_hop" data-add-btn>+ Add hop/herb</button>
+
+        <div class="re-subkop" style="margin-top:16px;">Dry hop notes</div>
+        <div class="re-grid">
+          <div class="re-field wide">
+            <label for="veld-dry_hop_comment_warm">Dry hop comment (warm)</label>
+            <input type="text" id="veld-dry_hop_comment_warm" />
+          </div>
+          <div class="re-field wide">
+            <label for="veld-dry_hop_methode_warm">Dry hop method (warm)</label>
+            <input type="text" id="veld-dry_hop_methode_warm" />
+          </div>
+          <div class="re-field wide">
+            <label for="veld-dry_hop_comment_16c">Dry hop comment (16°C)</label>
+            <input type="text" id="veld-dry_hop_comment_16c" />
+          </div>
+          <div class="re-field wide">
+            <label for="veld-dry_hop_methode_16c">Dry hop method (16°C)</label>
+            <input type="text" id="veld-dry_hop_methode_16c" />
+          </div>
+          <div class="re-field wide">
+            <label for="veld-dry_hop_1_dag">Dry hop 1 day</label>
+            <input type="number" id="veld-dry_hop_1_dag" />
+          </div>
+          <div class="re-field wide">
+            <label for="veld-dry_hop_2_dag">Dry hop 2 day</label>
+            <input type="number" id="veld-dry_hop_2_dag" />
+          </div>
+        </div>
       </div>
 
       <div class="re-section">
@@ -242,6 +284,16 @@
 
       <div class="re-section">
         <h2>Additions Cellar</h2>
+        <div class="re-grid" style="margin-bottom:14px;">
+          <div class="re-field wide">
+            <label for="veld-kelder_toevoeging_dag">Cellar addition day</label>
+            <input type="number" id="veld-kelder_toevoeging_dag" />
+          </div>
+          <div class="re-field wide">
+            <label for="veld-comment_verwerken">Processing comment</label>
+            <textarea id="veld-comment_verwerken"></textarea>
+          </div>
+        </div>
         <table class="re-ing-table">
           <thead><tr><th>Ingredient</th><th>Amount</th><th>Unit</th><th>Timing</th><th>Order</th><th>Note</th><th></th></tr></thead>
           <tbody id="re-ing-keldertoegift-tbody"></tbody>
@@ -326,8 +378,7 @@ const FERM_FIELDS = [
   ['lager_temp', 'Lager temp', '°C', 'number'],
   ['pasteurisatie', 'Pasteurization', 'PU', 'number'],
   ['troebeling_na_sep', 'Turbidity after separation', 'EBC', 'number'],
-  ['bier_risico', 'Beer risk', '', 'text'],
-  ['bier_status', 'Beer status', '', 'text'],
+  ['bitterheid_bh', 'Bitterness BH', 'EBU', 'number'],
 ];
 const BROUW_SECTIES = [
   {
@@ -820,6 +871,24 @@ function leesBasisgegevens() {
   };
 }
 
+// Vult de velden die buiten hun "eigen" param-grid zijn geplaatst: Beer
+// risk/status (in General, uit recipe_fermentatie) en de dry-hop-notities/
+// kelder-dag/comment-verwerken (in Hops and Herbs / Additions Cellar, uit
+// recipe_processtappen).
+function vulExtraVeldenUit(fermData, procData) {
+  document.getElementById('veld-bier_risico').value = (fermData && fermData.bier_risico) || '';
+  document.getElementById('veld-bier_status').value = (fermData && fermData.bier_status) || '';
+
+  document.getElementById('veld-dry_hop_comment_warm').value = (procData && procData.dry_hop_comment_warm) || '';
+  document.getElementById('veld-dry_hop_methode_warm').value = (procData && procData.dry_hop_methode_warm) || '';
+  document.getElementById('veld-dry_hop_comment_16c').value = (procData && procData.dry_hop_comment_16c) || '';
+  document.getElementById('veld-dry_hop_methode_16c').value = (procData && procData.dry_hop_methode_16c) || '';
+  document.getElementById('veld-dry_hop_1_dag').value = (procData && procData.dry_hop_1_dag != null) ? procData.dry_hop_1_dag : '';
+  document.getElementById('veld-dry_hop_2_dag').value = (procData && procData.dry_hop_2_dag != null) ? procData.dry_hop_2_dag : '';
+  document.getElementById('veld-kelder_toevoeging_dag').value = (procData && procData.kelder_toevoeging_dag != null) ? procData.kelder_toevoeging_dag : '';
+  document.getElementById('veld-comment_verwerken').value = (procData && procData.comment_verwerken) || '';
+}
+
 async function initReceptInvoer() {
   huidigeGebruiker = await getHuidigeGebruiker();
 
@@ -845,6 +914,7 @@ async function initReceptInvoer() {
   renderFormatenCheckboxen('re-formaten-checkboxen', []);
   renderCheckboxGrid('re-processtappen-checkboxen', PROCESSTAPPEN_FIELDS, null);
   renderVeldenGrid('re-kosten-grid', KOSTEN_FIELDS, null);
+  vulExtraVeldenUit(null, null);
 
   const id = urlParam('id');
   if (id) {
@@ -955,6 +1025,7 @@ document.getElementById('re-kopieer-btn').addEventListener('click', async () => 
   renderFormatenCheckboxen('re-formaten-checkboxen', (verpakking.data && verpakking.data.formaten) || []);
   renderCheckboxGrid('re-processtappen-checkboxen', PROCESSTAPPEN_FIELDS, processtappen.data || {});
   renderVeldenGrid('re-kosten-grid', KOSTEN_FIELDS, kosten.data || {});
+  vulExtraVeldenUit(ferm.data || {}, processtappen.data || {});
   const bronComments = (comments.data && comments.data.comments) || [];
   document.getElementById('veld-comment-1').value = bronComments[0] || '';
   document.getElementById('veld-comment-2').value = bronComments[1] || '';
@@ -1008,6 +1079,7 @@ async function laadBestaandRecept(id) {
   renderFormatenCheckboxen('re-formaten-checkboxen', (verpakking.data && verpakking.data.formaten) || []);
   renderCheckboxGrid('re-processtappen-checkboxen', PROCESSTAPPEN_FIELDS, processtappen.data || {});
   renderVeldenGrid('re-kosten-grid', KOSTEN_FIELDS, kosten.data || {});
+  vulExtraVeldenUit(ferm.data || {}, processtappen.data || {});
   const bestaandeComments = (comments.data && comments.data.comments) || [];
   document.getElementById('veld-comment-1').value = bestaandeComments[0] || '';
   document.getElementById('veld-comment-2').value = bestaandeComments[1] || '';
@@ -1223,6 +1295,23 @@ async function slaBestaandReceptOp(soort) {
   setTimeout(() => { window.location.href = 'receptoverzicht.html'; }, 1000);
 }
 
+// Total WP hop / Total dry hop: aparte aggregaat-totalen naast de
+// per-hopsoort-totalen die al in "Hops total weights" staan. Worden niet
+// getoond in de UI, alleen opgeslagen. Aanname: "WP" (whirlpool) = alle
+// Hop (boil)-regels, "dry hop" = alle Dry hop-regels, ongeacht ingrediënt.
+// Zeg het als dit een andere afbakening moet zijn (bv. alleen Timing "0").
+function berekenHopTotalen() {
+  const rijen = leesIngredientRegelsUit('re-ing-hop-tbody');
+  let totalWpHop = 0;
+  let totalDryHop = 0;
+  rijen.forEach(r => {
+    const hoeveelheid = r.hoeveelheid || 0;
+    if (r.rol === 'hopgift_kook') totalWpHop += hoeveelheid;
+    else if (r.rol === 'dry_hop') totalDryHop += hoeveelheid;
+  });
+  return { totalWpHop, totalDryHop };
+}
+
 async function schrijfGerelateerdeData(recipeId) {
   const specs = leesParamGrid(SPECS_FIELDS);
   const ferm = leesParamGrid(FERM_FIELDS);
@@ -1232,6 +1321,29 @@ async function schrijfGerelateerdeData(recipeId) {
   const formaten = leesFormatenCheckboxen('re-formaten-checkboxen');
   const processtappen = leesCheckboxGrid(PROCESSTAPPEN_FIELDS);
   const kosten = leesVeldenGrid(KOSTEN_FIELDS);
+
+  // Beer risk/status: verhuisd naar General, maar horen data-technisch nog
+  // steeds bij recipe_fermentatie.
+  ferm.bier_risico = document.getElementById('veld-bier_risico').value.trim() || null;
+  ferm.bier_status = document.getElementById('veld-bier_status').value.trim() || null;
+
+  // Dry hop notities/dagen + kelder-dag + comment verwerken + hop-totalen:
+  // horen data-technisch bij recipe_processtappen.
+  processtappen.dry_hop_comment_warm = document.getElementById('veld-dry_hop_comment_warm').value.trim() || null;
+  processtappen.dry_hop_methode_warm = document.getElementById('veld-dry_hop_methode_warm').value.trim() || null;
+  processtappen.dry_hop_comment_16c = document.getElementById('veld-dry_hop_comment_16c').value.trim() || null;
+  processtappen.dry_hop_methode_16c = document.getElementById('veld-dry_hop_methode_16c').value.trim() || null;
+  const dryHop1DagVal = document.getElementById('veld-dry_hop_1_dag').value;
+  processtappen.dry_hop_1_dag = dryHop1DagVal === '' ? null : Number(dryHop1DagVal);
+  const dryHop2DagVal = document.getElementById('veld-dry_hop_2_dag').value;
+  processtappen.dry_hop_2_dag = dryHop2DagVal === '' ? null : Number(dryHop2DagVal);
+  const kelderDagVal = document.getElementById('veld-kelder_toevoeging_dag').value;
+  processtappen.kelder_toevoeging_dag = kelderDagVal === '' ? null : Number(kelderDagVal);
+  processtappen.comment_verwerken = document.getElementById('veld-comment_verwerken').value.trim() || null;
+
+  const { totalWpHop, totalDryHop } = berekenHopTotalen();
+  processtappen.total_wp_hop = totalWpHop;
+  processtappen.total_dry_hop = totalDryHop;
   const comments = [
     document.getElementById('veld-comment-1').value.trim(),
     document.getElementById('veld-comment-2').value.trim(),
