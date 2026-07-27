@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -24,30 +24,30 @@
 
   <main class="jopen-pagina">
     <h1>Settings</h1>
-    <p class="jopen-subtitel">Achtergrond-instellingen die de rest van de app gebruikt. Alleen voor admins.</p>
+    <p class="jopen-subtitel">Background configuration used by the rest of the app. Admins only.</p>
 
     <div id="geen-toegang" class="geen-toegang" style="display:none;">
-      Dit scherm is alleen zichtbaar voor admins.
+      This screen is only visible to admins.
     </div>
 
     <div id="admin-inhoud" style="display:none;">
 
-      <!-- Sectie 1: ingredient-categorieën. Toekomstige instellingen komen
-           hieronder als eigen .settings-section-blok, zelfde patroon. -->
+      <!-- Section 1: ingredient categories. Future settings go below this
+           as their own .settings-section block, same pattern. -->
       <div class="settings-section">
         <h2>Ingredient categories</h2>
-        <p class="uitleg">Vaste lijst waaruit gekozen wordt bij een nieuw ingrediënt. Per categorie bepaal je welke velden relevant zijn.</p>
+        <p class="uitleg">Fixed list to choose from when creating a new ingredient. Per category, define which fields are relevant.</p>
 
-        <div id="cat-lijst"><p class="jopen-subtitel">Laden…</p></div>
+        <div id="cat-lijst"><p class="jopen-subtitel">Loading…</p></div>
 
         <table class="cat-tabel">
           <tbody>
             <tr class="cat-nieuw-rij">
-              <td><input type="text" id="cat-nieuw-naam" placeholder="Nieuwe categorienaam…" /></td>
+              <td><input type="text" id="cat-nieuw-naam" placeholder="New category name…" /></td>
               <td class="cat-check"><input type="checkbox" id="cat-nieuw-alpha" title="Alpha %" /></td>
               <td class="cat-check"><input type="checkbox" id="cat-nieuw-extract" title="Extract %" /></td>
-              <td class="cat-check"><input type="checkbox" id="cat-nieuw-gistfactor" title="Gistfactor" /></td>
-              <td><button id="cat-toevoegen-btn">Toevoegen</button></td>
+              <td class="cat-check"><input type="checkbox" id="cat-nieuw-gistfactor" title="Yeast factor" /></td>
+              <td><button id="cat-toevoegen-btn">Add</button></td>
             </tr>
           </tbody>
         </table>
@@ -81,7 +81,7 @@
         .order('sort_order');
 
       if (error) {
-        container.innerHTML = `<p class="jopen-form-melding fout">Kon categorieën niet laden: ${error.message}</p>`;
+        container.innerHTML = `<p class="jopen-form-melding fout">Could not load categories: ${error.message}</p>`;
         return;
       }
 
@@ -97,14 +97,14 @@
           <td><input type="text" class="cat-naam-veld" value="${c.name}" /></td>
           <td class="cat-check"><input type="checkbox" class="cat-alpha-veld" ${c.uses_alpha_pct ? 'checked' : ''} title="Alpha %" /></td>
           <td class="cat-check"><input type="checkbox" class="cat-extract-veld" ${c.uses_extract_pct ? 'checked' : ''} title="Extract %" /></td>
-          <td class="cat-check"><input type="checkbox" class="cat-gistfactor-veld" ${c.uses_gistfactor ? 'checked' : ''} title="Gistfactor" /></td>
-          <td><button class="cat-opslaan-rij-btn">Opslaan</button></td>
+          <td class="cat-check"><input type="checkbox" class="cat-gistfactor-veld" ${c.uses_gistfactor ? 'checked' : ''} title="Yeast factor" /></td>
+          <td><button class="cat-opslaan-rij-btn">Save</button></td>
         </tr>`).join('');
 
       container.innerHTML = `
         <table class="cat-tabel">
           <thead>
-            <tr><th>Naam</th><th>Alpha %</th><th>Extract %</th><th>Gistfactor</th><th></th></tr>
+            <tr><th>Name</th><th>Alpha %</th><th>Extract %</th><th>Yeast factor</th><th></th></tr>
           </thead>
           <tbody>${rijen}</tbody>
         </table>`;
@@ -131,11 +131,11 @@
         .eq('id', id);
 
       if (error) {
-        melding.textContent = 'Opslaan mislukt: ' + error.message;
+        melding.textContent = 'Save failed: ' + error.message;
         melding.className = 'jopen-form-melding fout';
         return;
       }
-      melding.textContent = 'Opgeslagen.';
+      melding.textContent = 'Saved.';
       melding.className = 'jopen-form-melding ok';
       laadCategorieen();
     }
@@ -145,7 +145,7 @@
       const naam = document.getElementById('cat-nieuw-naam').value.trim();
 
       if (!naam) {
-        melding.textContent = 'Vul een naam in voor de nieuwe categorie.';
+        melding.textContent = 'Enter a name for the new category.';
         melding.className = 'jopen-form-melding fout';
         return;
       }
@@ -161,7 +161,7 @@
       const { error } = await supabaseClient.from('ingredient_categories').insert(nieuw);
 
       if (error) {
-        melding.textContent = 'Toevoegen mislukt: ' + error.message;
+        melding.textContent = 'Add failed: ' + error.message;
         melding.className = 'jopen-form-melding fout';
         return;
       }
@@ -170,7 +170,7 @@
       document.getElementById('cat-nieuw-alpha').checked = false;
       document.getElementById('cat-nieuw-extract').checked = false;
       document.getElementById('cat-nieuw-gistfactor').checked = false;
-      melding.textContent = 'Categorie toegevoegd.';
+      melding.textContent = 'Category added.';
       melding.className = 'jopen-form-melding ok';
       laadCategorieen();
     });

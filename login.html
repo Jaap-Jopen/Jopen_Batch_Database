@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Jopen Brouwerij — Inloggen</title>
+  <title>Jopen Brouwerij — Log in</title>
   <link rel="stylesheet" href="jopen-shared.css" />
 </head>
 <body>
@@ -12,15 +12,15 @@
 
   <main class="jopen-pagina">
     <form class="jopen-form" id="login-form">
-      <h1 style="font-size:1.3em; margin-top:0;">Inloggen</h1>
+      <h1 style="font-size:1.3em; margin-top:0;">Log in</h1>
 
-      <label for="email">E-mailadres</label>
+      <label for="email">Email address</label>
       <input type="email" id="email" required autocomplete="username" />
 
-      <label for="wachtwoord">Wachtwoord</label>
+      <label for="wachtwoord">Password</label>
       <input type="password" id="wachtwoord" required autocomplete="current-password" />
 
-      <button type="submit">Inloggen</button>
+      <button type="submit">Log in</button>
 
       <p id="login-melding" class="jopen-form-melding"></p>
     </form>
@@ -36,7 +36,7 @@
       const wachtwoord = document.getElementById('wachtwoord').value;
       const melding = document.getElementById('login-melding');
 
-      melding.textContent = 'Bezig met inloggen...';
+      melding.textContent = 'Logging in...';
       melding.className = 'jopen-form-melding';
 
       const { error } = await supabaseClient.auth.signInWithPassword({
@@ -45,7 +45,7 @@
       });
 
       if (error) {
-        melding.textContent = 'Inloggen mislukt: ' + error.message;
+        melding.textContent = 'Login failed: ' + error.message;
         melding.className = 'jopen-form-melding fout';
         return;
       }

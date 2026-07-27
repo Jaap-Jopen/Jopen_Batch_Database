@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Jopen Brouwerij — Gebruikers</title>
+  <title>Jopen Brouwerij — Users</title>
   <link rel="stylesheet" href="jopen-shared.css" />
   <style>
     table.gebruikers-tabel { width: 100%; border-collapse: collapse; background: #fff; margin-bottom: 32px; }
@@ -20,32 +20,32 @@
   <div id="jopen-nav"></div>
 
   <main class="jopen-pagina">
-    <h1>Gebruikers</h1>
-    <p class="jopen-subtitel">Overzicht van collega's en hun rol, en nieuwe collega's uitnodigen.</p>
+    <h1>Users</h1>
+    <p class="jopen-subtitel">Overview of colleagues and their role, and inviting new colleagues.</p>
 
     <div id="geen-toegang" class="geen-toegang" style="display:none;">
-      Dit scherm is alleen zichtbaar voor admins. Log in met een admin-account om gebruikers te beheren.
+      This screen is only visible to admins. Log in with an admin account to manage users.
     </div>
 
     <div id="admin-inhoud" style="display:none;">
-      <div id="gebruikers-lijst"><div class="jopen-subtitel">Gebruikers laden…</div></div>
+      <div id="gebruikers-lijst"><div class="jopen-subtitel">Loading users…</div></div>
 
-      <h2 style="font-size:1.2em;">Nieuwe collega uitnodigen</h2>
+      <h2 style="font-size:1.2em;">Invite a new colleague</h2>
       <form class="jopen-form" id="invite-form" style="margin: 0 0 40px;">
-        <label for="invite-email">E-mailadres</label>
+        <label for="invite-email">Email address</label>
         <input type="email" id="invite-email" required />
 
-        <label for="invite-naam">Naam</label>
+        <label for="invite-naam">Name</label>
         <input type="text" id="invite-naam" required />
 
-        <label for="invite-rol">Rol</label>
+        <label for="invite-rol">Role</label>
         <select id="invite-rol" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
           <option value="viewer">Viewer</option>
           <option value="editor">Editor</option>
           <option value="admin">Admin</option>
         </select>
 
-        <button type="submit">Uitnodiging versturen</button>
+        <button type="submit">Send invite</button>
         <p id="invite-melding" class="jopen-form-melding"></p>
       </form>
     </div>
@@ -63,12 +63,12 @@
         .order('naam');
 
       if (error) {
-        container.innerHTML = `<p class="jopen-form-melding fout">Kon gebruikers niet laden: ${error.message}</p>`;
+        container.innerHTML = `<p class="jopen-form-melding fout">Could not load users: ${error.message}</p>`;
         return;
       }
 
       if (!data || data.length === 0) {
-        container.innerHTML = `<p class="jopen-subtitel">Nog geen gebruikers.</p>`;
+        container.innerHTML = `<p class="jopen-subtitel">No users yet.</p>`;
         return;
       }
 
@@ -76,12 +76,12 @@
         <tr>
           <td>${g.naam}</td>
           <td><span class="rol-badge ${g.rol}">${g.rol}</span></td>
-          <td>${g.actief ? 'Ja' : '<span class="actief-nee">Nee</span>'}</td>
+          <td>${g.actief ? 'Yes' : '<span class="actief-nee">No</span>'}</td>
         </tr>`).join('');
 
       container.innerHTML = `
         <table class="gebruikers-tabel">
-          <thead><tr><th>Naam</th><th>Rol</th><th>Actief</th></tr></thead>
+          <thead><tr><th>Name</th><th>Role</th><th>Active</th></tr></thead>
           <tbody>${rijen}</tbody>
         </table>`;
     }
@@ -105,39 +105,39 @@
       const rol = document.getElementById('invite-rol').value;
       const melding = document.getElementById('invite-melding');
 
-      melding.textContent = 'Bezig met uitnodigen…';
+      melding.textContent = 'Sending invite…';
       melding.className = 'jopen-form-melding';
 
-      // supabaseClient.functions.invoke() stuurt automatisch de Authorization-
-      // header van de huidige ingelogde gebruiker mee — geen handmatig token nodig.
+      // supabaseClient.functions.invoke() automatically sends the Authorization
+      // header of the currently logged-in user — no manual token needed.
       const { data, error } = await supabaseClient.functions.invoke('invite-user', {
         body: { email, naam, rol },
       });
 
       if (error) {
-        // supabase-js geeft bij een non-2xx status alleen een generieke melding
+        // supabase-js only gives a generic message on a non-2xx status
         // ("Edge Function returned a non-2xx status code") in error.message.
-        // De echte foutmelding van onze functie zit in de response-body zelf
-        // (error.context is de ruwe fetch Response) — die proberen we hier
-        // uit te lezen zodat je niet steeds naar de Edge Function-logs hoeft.
+        // The real error message from our function is in the response body
+        // itself (error.context is the raw fetch Response) — we try to read
+        // that here so you don't have to check the Edge Function logs every time.
         let detail = error.message;
         try {
           const body = await error.context.json();
           if (body?.error) detail = body.error;
         } catch (_) {
-          // response was geen JSON, of context ontbrak — val terug op error.message
+          // response wasn't JSON, or context was missing — fall back to error.message
         }
-        melding.textContent = 'Uitnodigen mislukt: ' + detail;
+        melding.textContent = 'Invite failed: ' + detail;
         melding.className = 'jopen-form-melding fout';
         return;
       }
       if (data?.error) {
-        melding.textContent = 'Uitnodigen mislukt: ' + data.error;
+        melding.textContent = 'Invite failed: ' + data.error;
         melding.className = 'jopen-form-melding fout';
         return;
       }
 
-      melding.textContent = `Uitnodiging verstuurd naar ${email}.`;
+      melding.textContent = `Invite sent to ${email}.`;
       melding.className = 'jopen-form-melding ok';
       document.getElementById('invite-form').reset();
       laadGebruikersLijst();

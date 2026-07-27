@@ -10,10 +10,10 @@
 // ============================================================================
 
 const JOPEN_MODULES = [
-  { naam: 'Start', href: 'index.html' },
-  { naam: 'Recepten', href: 'receptoverzicht.html' },
-  { naam: 'Ingrediënten', href: 'ingredienten.html' },
-  { naam: 'Gebruikers', href: 'gebruikers.html' },
+  { naam: 'Home', href: 'index.html' },
+  { naam: 'Recipes', href: 'receptoverzicht.html' },
+  { naam: 'Ingredients', href: 'ingredienten.html' },
+  { naam: 'Users', href: 'gebruikers.html' },
   { naam: 'Settings', href: 'settings.html' },
 ];
 
@@ -30,8 +30,8 @@ function renderNav(huidigeGebruiker) {
 
   const rechterkant = huidigeGebruiker
     ? `<span class="jopen-nav-gebruiker">${huidigeGebruiker.naam} <span class="jopen-nav-rol">(${huidigeGebruiker.rol})</span></span>
-       <button id="jopen-uitloggen-btn" class="jopen-nav-uitloggen">Uitloggen</button>`
-    : `<a href="login.html" class="jopen-nav-link">Inloggen</a>`;
+       <button id="jopen-uitloggen-btn" class="jopen-nav-uitloggen">Log out</button>`
+    : `<a href="login.html" class="jopen-nav-link">Log in</a>`;
 
   container.innerHTML = `
     <nav class="jopen-nav">

@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Jopen — Ingrediënten</title>
+<title>Jopen — Ingredients</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="jopen-shared.css">
 <style>
@@ -95,20 +95,20 @@
 <main class="ing-main">
   <div id="ing-list-view">
     <div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:12px;">
-      <h1 class="ing-titel" style="font-size:28px; margin:0;">Ingrediënten</h1>
-      <button class="ing-bewerk-btn" id="ing-nieuw-btn" style="display:none; margin-top:0;">+ Nieuw ingrediënt</button>
+      <h1 class="ing-titel" style="font-size:28px; margin:0;">Ingredients</h1>
+      <button class="ing-bewerk-btn" id="ing-nieuw-btn" style="display:none; margin-top:0;">+ New ingredient</button>
     </div>
     <div class="ing-toolbar">
-      <input id="ing-search" placeholder="Zoek op naam of leverancier…">
-      <select id="ing-filter-categorie"><option value="">Alle categorieën</option></select>
-      <select id="ing-filter-status"><option value="">Alle statussen</option></select>
+      <input id="ing-search" placeholder="Search by name or supplier…">
+      <select id="ing-filter-categorie"><option value="">All categories</option></select>
+      <select id="ing-filter-status"><option value="">All statuses</option></select>
       <div class="ing-count" id="ing-result-count"></div>
     </div>
-    <div id="ing-list-container"><div class="ing-loading">Ingrediënten laden…</div></div>
+    <div id="ing-list-container"><div class="ing-loading">Loading ingredients…</div></div>
   </div>
 
   <div id="ing-detail">
-    <a class="ing-back" id="ing-back-btn">&larr; Terug naar overzicht</a>
+    <a class="ing-back" id="ing-back-btn">&larr; Back to overview</a>
     <div id="ing-detail-container"></div>
   </div>
 </main>
@@ -118,7 +118,15 @@
 <script>
 let alleIngredienten = [];
 let alleCategorieen = [];
-let huidigeGebruikerRol = null; // wordt gevuld met 'admin' | 'editor' | 'viewer' | null (niet ingelogd)
+let huidigeGebruikerRol = null; // filled with 'admin' | 'editor' | 'viewer' | null (not logged in)
+
+// Display-only translation of the status values as stored in the database
+// (Dutch: actief/inactief/uitgefaseerd) — the stored value itself is left
+// unchanged, only what's shown to the user is translated.
+function statusLabel(status) {
+  const labels = { actief: 'Active', inactief: 'Inactive', uitgefaseerd: 'Phased out' };
+  return labels[status] || status || 'Unknown';
+}
 
 async function initIngredientenPagina() {
   const gebruiker = await getHuidigeGebruiker();
@@ -147,7 +155,7 @@ async function laadIngredienten() {
     .order('naam');
 
   if (error) {
-    container.innerHTML = `<div class="ing-error">Fout bij laden: ${error.message}</div>`;
+    container.innerHTML = `<div class="ing-error">Error loading: ${error.message}</div>`;
     return;
   }
 
@@ -161,7 +169,7 @@ function vulFilters(ingredienten) {
 
   const catSelect = document.getElementById('ing-filter-categorie');
   const huidigeCat = catSelect.value;
-  catSelect.innerHTML = '<option value="">Alle categorieën</option>';
+  catSelect.innerHTML = '<option value="">All categories</option>';
   alleCategorieen.forEach(c => {
     const opt = document.createElement('option');
     opt.value = c.id; opt.textContent = c.name;
@@ -171,10 +179,10 @@ function vulFilters(ingredienten) {
 
   const statusSelect = document.getElementById('ing-filter-status');
   const huidigeStatus = statusSelect.value;
-  statusSelect.innerHTML = '<option value="">Alle statussen</option>';
+  statusSelect.innerHTML = '<option value="">All statuses</option>';
   statussen.forEach(s => {
     const opt = document.createElement('option');
-    opt.value = s; opt.textContent = s;
+    opt.value = s; opt.textContent = statusLabel(s);
     statusSelect.appendChild(opt);
   });
   statusSelect.value = huidigeStatus;
@@ -208,10 +216,10 @@ document.getElementById('ing-filter-status').addEventListener('change', pasFilte
 function renderIngLijst(ingredienten) {
   const container = document.getElementById('ing-list-container');
   document.getElementById('ing-result-count').textContent =
-    `${ingredienten.length} ingrediënt${ingredienten.length === 1 ? '' : 'en'}`;
+    `${ingredienten.length} ingredient${ingredienten.length === 1 ? '' : 's'}`;
 
   if (ingredienten.length === 0) {
-    container.innerHTML = `<div class="ing-empty">Geen ingrediënten gevonden.</div>`;
+    container.innerHTML = `<div class="ing-empty">No ingredients found.</div>`;
     return;
   }
 
@@ -221,12 +229,12 @@ function renderIngLijst(ingredienten) {
       <td>${escapeHtml(i.ingredient_categories?.name || i.categorie || '—')}</td>
       <td>${escapeHtml(i.eenheid || '—')}</td>
       <td>${escapeHtml(i.leverancier || '—')}</td>
-      <td><span class="status-pill status-${i.status || 'onbekend'}">${escapeHtml(i.status || 'onbekend')}</span></td>
+      <td><span class="status-pill status-${i.status || 'onbekend'}">${escapeHtml(statusLabel(i.status))}</span></td>
     </tr>`).join('');
 
   container.innerHTML = `
     <table class="ing-tabel">
-      <thead><tr><th>Naam</th><th>Categorie</th><th>Eenheid</th><th>Leverancier</th><th>Status</th></tr></thead>
+      <thead><tr><th>Name</th><th>Category</th><th>Unit</th><th>Supplier</th><th>Status</th></tr></thead>
       <tbody>${rijen}</tbody>
     </table>`;
 
@@ -245,26 +253,26 @@ function renderDetailAlleen(id) {
   const i = alleIngredienten.find(x => String(x.id) === String(id));
   const container = document.getElementById('ing-detail-container');
   if (!i) {
-    container.innerHTML = `<div class="ing-error">Ingrediënt niet gevonden.</div>`;
+    container.innerHTML = `<div class="ing-error">Ingredient not found.</div>`;
     return;
   }
 
   const magBewerken = huidigeGebruikerRol === 'admin' || huidigeGebruikerRol === 'editor';
   const cat = i.ingredient_categories || null;
-  const categorieNaam = cat?.name || i.categorie || 'onbekende categorie';
+  const categorieNaam = cat?.name || i.categorie || 'unknown category';
 
   const rows = [
-    ['Categorie', categorieNaam, ''],
-    ['Eenheid', i.eenheid, ''],
-    ['Prijs', i.prijs, '€'],
+    ['Category', categorieNaam, ''],
+    ['Unit', i.eenheid, ''],
+    ['Price', i.prijs, '€'],
   ];
-  // Alleen tonen wat relevant is voor deze categorie (bij oude, nog niet
-  // gemapte ingrediënten zonder category_id: alles tonen, we weten het niet).
+  // Only show what's relevant for this category (for old, not-yet-mapped
+  // ingredients without a category_id: show everything, since we don't know).
   if (!cat || cat.uses_extract_pct) rows.push(['Extract %', i.extract_pct, '%']);
   if (!cat || cat.uses_alpha_pct) rows.push(['Alpha %', i.alpha_pct, '%']);
-  if (!cat || cat.uses_gistfactor) rows.push(['Gistfactor', i.gistfactor, '']);
-  rows.push(['Leverancier', i.leverancier, '']);
-  rows.push(['Status', i.status, '']);
+  if (!cat || cat.uses_gistfactor) rows.push(['Yeast factor', i.gistfactor, '']);
+  rows.push(['Supplier', i.leverancier, '']);
+  rows.push(['Status', statusLabel(i.status), '']);
 
   container.innerHTML = `
     <h2 class="ing-titel">${escapeHtml(i.naam)}</h2>
@@ -275,7 +283,7 @@ function renderDetailAlleen(id) {
           <span>${label}</span>
           <span>${val !== null && val !== undefined && val !== '' ? escapeHtml(String(val)) + (unit ? ' ' + unit : '') : '—'}</span>
         </div>`).join('')}
-      ${magBewerken ? `<button class="ing-bewerk-btn" id="ing-bewerk-btn">Bewerken</button>` : ''}
+      ${magBewerken ? `<button class="ing-bewerk-btn" id="ing-bewerk-btn">Edit</button>` : ''}
     </div>
   `;
 
@@ -299,31 +307,31 @@ function renderDetailBewerken(i) {
 
   container.innerHTML = `
     <h2 class="ing-titel">${escapeHtml(i.naam)}</h2>
-    <div class="ing-meta">Bewerken</div>
+    <div class="ing-meta">Editing</div>
     <div class="ing-card">
       <div class="ing-edit-row">
-        <label for="veld-category_id">Categorie</label>
+        <label for="veld-category_id">Category</label>
         <select id="veld-category_id" style="width:160px;">
-          <option value="">— kies —</option>
+          <option value="">— select —</option>
           ${categorieOpties}
         </select>
       </div>
-      ${veld('Eenheid', 'eenheid')}
-      ${veld('Prijs', 'prijs', '€', 'number')}
+      ${veld('Unit', 'eenheid')}
+      ${veld('Price', 'prijs', '€', 'number')}
       <div id="veld-extract_pct-rij">${veld('Extract %', 'extract_pct', '%', 'number')}</div>
       <div id="veld-alpha_pct-rij">${veld('Alpha %', 'alpha_pct', '%', 'number')}</div>
-      <div id="veld-gistfactor-rij">${veld('Gistfactor', 'gistfactor', '', 'number')}</div>
-      ${veld('Leverancier', 'leverancier')}
+      <div id="veld-gistfactor-rij">${veld('Yeast factor', 'gistfactor', '', 'number')}</div>
+      ${veld('Supplier', 'leverancier')}
       <div class="ing-edit-row">
         <label for="veld-status">Status</label>
         <select id="veld-status" style="width:160px;">
-          <option value="actief" ${i.status === 'actief' ? 'selected' : ''}>actief</option>
-          <option value="inactief" ${i.status === 'inactief' ? 'selected' : ''}>inactief</option>
-          <option value="uitgefaseerd" ${i.status === 'uitgefaseerd' ? 'selected' : ''}>uitgefaseerd</option>
+          <option value="actief" ${i.status === 'actief' ? 'selected' : ''}>Active</option>
+          <option value="inactief" ${i.status === 'inactief' ? 'selected' : ''}>Inactive</option>
+          <option value="uitgefaseerd" ${i.status === 'uitgefaseerd' ? 'selected' : ''}>Phased out</option>
         </select>
       </div>
-      <button class="ing-opslaan-btn" id="ing-opslaan-btn">Opslaan</button>
-      <button class="ing-annuleer-btn" id="ing-annuleer-btn">Annuleren</button>
+      <button class="ing-opslaan-btn" id="ing-opslaan-btn">Save</button>
+      <button class="ing-annuleer-btn" id="ing-annuleer-btn">Cancel</button>
       <div id="ing-edit-melding" class="ing-melding"></div>
     </div>
   `;
@@ -344,7 +352,7 @@ function renderDetailBewerken(i) {
 
 async function slaIngredientOp(i) {
   const melding = document.getElementById('ing-edit-melding');
-  melding.textContent = 'Bezig met opslaan…';
+  melding.textContent = 'Saving…';
   melding.className = 'ing-melding';
 
   const getal = (id) => {
@@ -382,12 +390,12 @@ async function slaIngredientOp(i) {
     .eq('id', i.id);
 
   if (error) {
-    melding.textContent = 'Opslaan mislukt: ' + error.message;
+    melding.textContent = 'Save failed: ' + error.message;
     melding.className = 'ing-melding fout';
     return;
   }
 
-  melding.textContent = 'Opgeslagen.';
+  melding.textContent = 'Saved.';
   melding.className = 'ing-melding ok';
 
   // Lokale kopie + lijst bijwerken zodat het overzicht meteen klopt
@@ -410,36 +418,36 @@ function toonNieuwFormulier() {
   const categorieOpties = alleCategorieen.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
 
   container.innerHTML = `
-    <h2 class="ing-titel">Nieuw ingrediënt</h2>
-    <div class="ing-meta">Verplichte velden: naam en categorie</div>
+    <h2 class="ing-titel">New ingredient</h2>
+    <div class="ing-meta">Required fields: name and category</div>
     <div class="ing-card">
       <div class="ing-edit-row">
-        <label for="nieuw-naam">Naam *</label>
+        <label for="nieuw-naam">Name *</label>
         <input type="text" id="nieuw-naam" required />
       </div>
       <div class="ing-edit-row">
-        <label for="nieuw-category_id">Categorie *</label>
+        <label for="nieuw-category_id">Category *</label>
         <select id="nieuw-category_id" style="width:160px;" required>
-          <option value="">— kies —</option>
+          <option value="">— select —</option>
           ${categorieOpties}
         </select>
       </div>
-      ${veld('Eenheid', 'nieuw-eenheid')}
-      ${veld('Prijs', 'nieuw-prijs', '€', 'number')}
+      ${veld('Unit', 'nieuw-eenheid')}
+      ${veld('Price', 'nieuw-prijs', '€', 'number')}
       <div id="nieuw-extract_pct-rij">${veld('Extract %', 'nieuw-extract_pct', '%', 'number')}</div>
       <div id="nieuw-alpha_pct-rij">${veld('Alpha %', 'nieuw-alpha_pct', '%', 'number')}</div>
-      <div id="nieuw-gistfactor-rij">${veld('Gistfactor', 'nieuw-gistfactor', '', 'number')}</div>
-      ${veld('Leverancier', 'nieuw-leverancier')}
+      <div id="nieuw-gistfactor-rij">${veld('Yeast factor', 'nieuw-gistfactor', '', 'number')}</div>
+      ${veld('Supplier', 'nieuw-leverancier')}
       <div class="ing-edit-row">
         <label for="nieuw-status">Status</label>
         <select id="nieuw-status" style="width:160px;">
-          <option value="actief" selected>actief</option>
-          <option value="inactief">inactief</option>
-          <option value="uitgefaseerd">uitgefaseerd</option>
+          <option value="actief" selected>Active</option>
+          <option value="inactief">Inactive</option>
+          <option value="uitgefaseerd">Phased out</option>
         </select>
       </div>
-      <button class="ing-opslaan-btn" id="nieuw-opslaan-btn">Toevoegen</button>
-      <button class="ing-annuleer-btn" id="nieuw-annuleer-btn">Annuleren</button>
+      <button class="ing-opslaan-btn" id="nieuw-opslaan-btn">Add</button>
+      <button class="ing-annuleer-btn" id="nieuw-annuleer-btn">Cancel</button>
       <div id="nieuw-melding" class="ing-melding"></div>
     </div>
   `;
@@ -452,7 +460,7 @@ function toonNieuwFormulier() {
     document.getElementById('nieuw-gistfactor-rij').style.display = gekozen?.uses_gistfactor ? 'flex' : 'none';
   };
   categorieSelect.addEventListener('change', pasVeldZichtbaarheidToe);
-  pasVeldZichtbaarheidToe(); // niets zichtbaar tot een categorie gekozen is
+  pasVeldZichtbaarheidToe(); // nothing visible until a category is chosen
 
   document.getElementById('nieuw-annuleer-btn').addEventListener('click', () => {
     document.getElementById('ing-detail').classList.remove('actief');
@@ -467,7 +475,7 @@ async function slaNieuwIngredientOp() {
   const categoryIdVeld = document.getElementById('nieuw-category_id').value;
 
   if (!naam || !categoryIdVeld) {
-    melding.textContent = 'Naam en categorie zijn verplicht.';
+    melding.textContent = 'Name and category are required.';
     melding.className = 'ing-melding fout';
     return;
   }
@@ -483,7 +491,7 @@ async function slaNieuwIngredientOp() {
     return v === '' ? null : v;
   };
 
-  melding.textContent = 'Bezig met opslaan…';
+  melding.textContent = 'Saving…';
   melding.className = 'ing-melding';
 
   const { data: { session } } = await supabaseClient.auth.getSession();
@@ -509,7 +517,7 @@ async function slaNieuwIngredientOp() {
     .single();
 
   if (error) {
-    melding.textContent = 'Toevoegen mislukt: ' + error.message;
+    melding.textContent = 'Add failed: ' + error.message;
     melding.className = 'ing-melding fout';
     return;
   }
@@ -518,7 +526,7 @@ async function slaNieuwIngredientOp() {
   alleIngredienten.sort((a, b) => (a.naam || '').localeCompare(b.naam || ''));
   vulFilters(alleIngredienten);
 
-  melding.textContent = 'Toegevoegd! Je gaat terug naar het overzicht…';
+  melding.textContent = 'Added! Returning to the overview…';
   melding.className = 'ing-melding ok';
 
   setTimeout(() => {

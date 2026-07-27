@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Jopen Brouwerij — Wachtwoord instellen</title>
+  <title>Jopen Brouwerij — Set password</title>
   <link rel="stylesheet" href="jopen-shared.css" />
 </head>
 <body>
@@ -11,24 +11,24 @@
   <div id="jopen-nav"></div>
 
   <main class="jopen-pagina">
-    <div id="laden" class="jopen-subtitel">Uitnodiging controleren…</div>
+    <div id="laden" class="jopen-subtitel">Checking invitation…</div>
 
     <form class="jopen-form" id="wachtwoord-form" style="display:none;">
-      <h1 style="font-size:1.3em; margin-top:0;">Welkom bij Jopen Brouwerij</h1>
-      <p class="jopen-subtitel" style="margin-bottom:0;">Stel hieronder je wachtwoord in om in te loggen.</p>
+      <h1 style="font-size:1.3em; margin-top:0;">Welcome to Jopen Brouwerij</h1>
+      <p class="jopen-subtitel" style="margin-bottom:0;">Set your password below to log in.</p>
 
-      <label for="wachtwoord">Nieuw wachtwoord</label>
+      <label for="wachtwoord">New password</label>
       <input type="password" id="wachtwoord" required minlength="8" autocomplete="new-password" />
 
-      <label for="wachtwoord-herhaal">Herhaal wachtwoord</label>
+      <label for="wachtwoord-herhaal">Confirm password</label>
       <input type="password" id="wachtwoord-herhaal" required minlength="8" autocomplete="new-password" />
 
-      <button type="submit">Wachtwoord instellen</button>
+      <button type="submit">Set password</button>
       <p id="melding" class="jopen-form-melding"></p>
     </form>
 
     <div id="geen-uitnodiging" class="jopen-form-melding fout" style="display:none; max-width:360px; margin:60px auto; text-align:center;">
-      Geen (geldige) uitnodiging gevonden. Vraag een admin om een nieuwe uitnodiging te sturen via het Gebruikers-scherm.
+      No valid invitation found. Ask an admin to send a new invite from the Users screen.
     </div>
   </main>
 
@@ -36,9 +36,10 @@
   <script src="config.js"></script>
   <script src="nav.js"></script>
   <script>
-    // supabase-js pikt het access_token/refresh_token uit de URL-hash (achter de #)
-    // automatisch op zodra de client aangemaakt wordt (detectSessionInUrl, staat
-    // standaard aan) en zet daarmee de sessie klaar. We wachten dat hier af.
+    // supabase-js picks up the access_token/refresh_token from the URL hash
+    // (after the #) automatically when the client is created
+    // (detectSessionInUrl, on by default), setting up the session for us.
+    // We just wait for that here.
     async function initAcceptInvite() {
       const { data: { session } } = await supabaseClient.auth.getSession();
 
@@ -59,23 +60,23 @@
       const melding = document.getElementById('melding');
 
       if (wachtwoord !== herhaal) {
-        melding.textContent = 'De wachtwoorden komen niet overeen.';
+        melding.textContent = 'The passwords do not match.';
         melding.className = 'jopen-form-melding fout';
         return;
       }
 
-      melding.textContent = 'Bezig met opslaan…';
+      melding.textContent = 'Saving…';
       melding.className = 'jopen-form-melding';
 
       const { error } = await supabaseClient.auth.updateUser({ password: wachtwoord });
 
       if (error) {
-        melding.textContent = 'Kon wachtwoord niet instellen: ' + error.message;
+        melding.textContent = 'Could not set password: ' + error.message;
         melding.className = 'jopen-form-melding fout';
         return;
       }
 
-      melding.textContent = 'Wachtwoord ingesteld! Je wordt doorgestuurd…';
+      melding.textContent = 'Password set! Redirecting…';
       melding.className = 'jopen-form-melding ok';
       setTimeout(() => { window.location.href = 'index.html'; }, 1200);
     });
