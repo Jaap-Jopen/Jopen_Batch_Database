@@ -401,8 +401,8 @@ async function openDetail(id) {
     ]},
     { titel: 'Mashing', rows: [
       ['Mash thickness', b.beslag_dikte, ''],
-      ['Mash water', w.maischwater, ''],
-      ['pH mash', w.ph_maische, ''],
+      ['Mash water', b.maischwater, ''],
+      ['pH mash', b.ph_maische, ''],
       ['Mash-in temp', b.mash_inmaischen_temp, '°C'],
       ['Mash-in time', b.mash_inmaischen_tijd, 'min'],
       ['Step-up 1 temp', b.mash_verhogen1_temp, '°C'],
@@ -432,8 +432,8 @@ async function openDetail(id) {
     { titel: 'Boiling', rows: [
       ['Expected extract at start of boil', b.verwacht_extract_begin_kook, '°P'],
       ['Boil volume', b.volume_kook, 'hl'],
-      ['pH start boil', w.ph_start_koken, ''],
-      ['pH end boil', w.ph_eind_koken, ''],
+      ['pH start boil', b.ph_start_koken, ''],
+      ['pH end boil', b.ph_eind_koken, ''],
       ['Boil intensity', b.intensiteit_koken, 'KJ/min'],
       ['Desired evaporation', b.gewenste_verdamping, '%'],
     ]},
@@ -444,7 +444,7 @@ async function openDetail(id) {
     { titel: 'Cooling', rows: [
       ['Water addition volume (back-cooling)', b.volume_water_additie_terugkoeling, 'hl'],
       ['Final batch volume', b.eindvolume_brouwsel, 'hl'],
-      ['Aeration', w.beluchting, 'l/h'],
+      ['Aeration', b.beluchting, 'l/h'],
     ]},
     { titel: 'Automatic dosing', rows: [
       ['Mash-in acid', b.inmaischen_zuur_l, 'L'],
