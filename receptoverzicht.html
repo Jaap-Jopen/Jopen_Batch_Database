@@ -181,6 +181,12 @@
     text-align: center; padding: 60px 20px; font-family: var(--mono); font-size: 13px; color: #7a7266;
   }
   .error { color: #a33f2c; }
+
+  .param-columns { column-count: 2; column-gap: 28px; background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 16px 20px; margin-bottom: 10px; }
+  .param-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 5px 0; border-bottom: 1px solid #ece8dc; font-size: 14px; break-inside: avoid; }
+  .param-row span:first-child { color: #6b6355; }
+  .param-row span:last-child { font-family: var(--mono); }
+  .param-row .tol { color: #a89f8e; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -336,36 +342,36 @@ async function openDetail(id) {
     .order('versie_minor', { ascending: false });
 
   const specRows = [
-    ['Original extract', s.origineel_extract, '°P'],
-    ['Final extract', s.rest_extract, '°P'],
-    ['Alcohol', s.alcohol, '% v/v'],
-    ['Bitterness', s.bitterheid, 'EBU'],
-    ['Color', s.kleur, 'EBC'],
-    ['pH', s.ph, ''],
-    ['ADF', s.adf_pct, '%'],
-    ['Turbidity (lab)', s.troebeling_lab, 'EBC'],
-    ['CO2 bottle', s.co2_fles, 'g/l'],
-    ['CO2 can', s.co2_can, 'g/l'],
-    ['CO2 keg', s.co2_fust, 'g/l'],
-    ['Headspace O2', s.headspace_o2, 'ppb'],
-    ['Dissolved O2', s.dissolved_o2, 'ppb'],
+    ['Original extract', s.origineel_extract, '°P', s.origineel_extract_tol],
+    ['Final extract', s.rest_extract, '°P', s.rest_extract_tol],
+    ['Alcohol', s.alcohol, '% v/v', s.alcohol_tol],
+    ['Bitterness', s.bitterheid, 'EBU', s.bitterheid_tol],
+    ['Color', s.kleur, 'EBC', s.kleur_tol],
+    ['pH', s.ph, '', s.ph_tol],
+    ['ADF', s.adf_pct, '%', s.adf_pct_tol],
+    ['Turbidity (lab)', s.troebeling_lab, 'EBC', s.troebeling_lab_tol],
+    ['CO2 bottle', s.co2_fles, 'g/l', s.co2_fles_tol],
+    ['CO2 can', s.co2_can, 'g/l', s.co2_can_tol],
+    ['CO2 keg', s.co2_fust, 'g/l', s.co2_fust_tol],
+    ['Headspace O2', s.headspace_o2, 'ppb', s.headspace_o2_tol],
+    ['Dissolved O2', s.dissolved_o2, 'ppb', s.dissolved_o2_tol],
   ].filter(([,v]) => v !== null && v !== undefined);
 
   const fermRows = [
-    ['Start fermentation temp', f.pitching_temp, '°C'],
-    ['Max fermentation temp', f.main_ferm_temp, '°C'],
-    ['T release', f.t_release, '°C'],
-    ['Dry hop warm temp', f.temp_dry_warm, '°C'],
-    ['Extract dry warm 1', f.extract_dry_warm_1, '°P'],
-    ['Extract dry warm 2', f.extract_dry_warm_2, '°P'],
-    ['Extract dry warm 3', f.extract_dry_warm_3, '°P'],
-    ['Fermentation time', f.vergistingstijd, 'days'],
-    ['Lager time', f.lagertijd, 'days'],
-    ['Lager temp', f.lager_temp, '°C'],
-    ['Pasteurization', f.pasteurisatie, 'PU'],
-    ['Turbidity after separation', f.troebeling_na_sep, 'EBC'],
-    ['Beer risk', f.bier_risico, ''],
-    ['Beer status', f.bier_status, ''],
+    ['Start fermentation temp', f.pitching_temp, '°C', f.pitching_temp_tol],
+    ['Max fermentation temp', f.main_ferm_temp, '°C', f.main_ferm_temp_tol],
+    ['T release', f.t_release, '°C', f.t_release_tol],
+    ['Dry hop warm temp', f.temp_dry_warm, '°C', f.temp_dry_warm_tol],
+    ['Extract dry warm 1', f.extract_dry_warm_1, '°P', f.extract_dry_warm_1_tol],
+    ['Extract dry warm 2', f.extract_dry_warm_2, '°P', f.extract_dry_warm_2_tol],
+    ['Extract dry warm 3', f.extract_dry_warm_3, '°P', f.extract_dry_warm_3_tol],
+    ['Fermentation time', f.vergistingstijd, 'days', f.vergistingstijd_tol],
+    ['Lager time', f.lagertijd, 'days', f.lagertijd_tol],
+    ['Lager temp', f.lager_temp, '°C', f.lager_temp_tol],
+    ['Pasteurization', f.pasteurisatie, 'PU', f.pasteurisatie_tol],
+    ['Turbidity after separation', f.troebeling_na_sep, 'EBC', f.troebeling_na_sep_tol],
+    ['Beer risk', f.bier_risico, '', null],
+    ['Beer status', f.bier_status, '', null],
   ].filter(([,v]) => v !== null && v !== undefined);
 
   const brouwRows = [
@@ -393,6 +399,18 @@ async function openDetail(id) {
     if (rows.length === 0) return '';
     return `<div class="card"><h3>${title}</h3>${rows.map(([label,val,unit]) =>
       `<div class="kv"><span>${label}</span><span>${escapeHtml(String(val))}${unit? ' '+unit:''}</span></div>`).join('')}</div>`;
+  }
+
+  // Zelfde als cardHtml, maar dan compact in twee kolommen en met een
+  // tolerantie-waarde (+/-) ernaast, voor End product specifications en
+  // Process parameters.
+  function paramColumnsHtml(rows) {
+    if (rows.length === 0) return '';
+    return `<div class="param-columns">${rows.map(([label, val, unit, tol]) => `
+      <div class="param-row">
+        <span>${label}</span>
+        <span>${tol !== null && tol !== undefined && tol !== '' ? `<span class="tol">±${escapeHtml(String(tol))}</span> ` : ''}${escapeHtml(String(val))}${unit ? ' ' + unit : ''}</span>
+      </div>`).join('')}</div>`;
   }
 
   const rolLabels = {
@@ -470,10 +488,10 @@ async function openDetail(id) {
     </div>
 
     <div class="section-title">End product specifications</div>
-    <div class="grid-cards">${cardHtml('', specRows) || '<div class="empty">None entered.</div>'}</div>
+    ${paramColumnsHtml(specRows) || '<div class="empty">None entered.</div>'}
 
     <div class="section-title">Process parameters</div>
-    <div class="grid-cards">${cardHtml('', fermRows) || '<div class="empty">None entered.</div>'}</div>
+    ${paramColumnsHtml(fermRows) || '<div class="empty">None entered.</div>'}
 
     <div class="section-title">Brewing parameters</div>
     <div class="grid-cards">${cardHtml('', brouwRows) || '<div class="empty">None entered.</div>'}</div>

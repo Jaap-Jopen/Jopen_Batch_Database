@@ -34,6 +34,18 @@
   }
   .re-field.wide { grid-column: 1 / -1; }
 
+  .re-param-columns { column-count: 2; column-gap: 28px; }
+  .re-paramrow {
+    display: grid; grid-template-columns: 1fr 66px 74px; gap: 8px; align-items: center;
+    padding: 5px 0; border-bottom: 1px solid #ece8dc; break-inside: avoid;
+  }
+  .re-paramrow label { font-family: var(--mono); font-size: 11.5px; color: #6b6355; }
+  .re-paramrow input {
+    padding: 5px 6px; border: 1px solid var(--line); border-radius: 4px;
+    font-family: var(--serif); font-size: 13px; background: #fff; width: 100%;
+  }
+  .re-paramrow .re-tol-input { font-family: var(--mono); font-size: 12px; }
+
   table.re-ing-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
   table.re-ing-table th { text-align: left; font-family: var(--mono); font-size: 10px; text-transform: uppercase; color: #6b6355; padding: 6px 8px; border-bottom: 1px solid var(--line); }
   table.re-ing-table td { padding: 6px 8px; border-bottom: 1px solid #ece8dc; }
@@ -126,12 +138,12 @@
 
       <div class="re-section">
         <h2>End product specifications</h2>
-        <div class="re-grid" id="re-specs-grid"></div>
+        <div class="re-param-columns" id="re-specs-grid"></div>
       </div>
 
       <div class="re-section">
         <h2>Process parameters</h2>
-        <div class="re-grid" id="re-ferm-grid"></div>
+        <div class="re-param-columns" id="re-ferm-grid"></div>
       </div>
 
       <div class="re-section">
@@ -313,6 +325,38 @@ function leesVeldenGrid(fields) {
   return result;
 }
 
+// Zelfde als hierboven, maar met een extra tolerantie-invoerveld (+/-) per
+// rij — voor End product specifications en Process parameters. Tolerantie
+// wordt altijd als tekst gelezen/opgeslagen (in het origineel staan hier ook
+// symbolen als "<" en "-", niet alleen getallen).
+function renderParamGrid(containerId, fields, data) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = fields.map(([key, label, unit, type]) => {
+    const tolKey = key + '_tol';
+    const specVal = data && data[key] !== null && data[key] !== undefined ? data[key] : '';
+    const tolVal = data && data[tolKey] !== null && data[tolKey] !== undefined ? data[tolKey] : '';
+    return `
+      <div class="re-paramrow">
+        <label for="veld-${key}">${label}${unit ? ' (' + unit + ')' : ''}</label>
+        <input type="text" class="re-tol-input" id="veld-${tolKey}" value="${tolVal}" placeholder="±" title="Tolerance" />
+        <input type="${type}" id="veld-${key}" value="${specVal}" title="Spec" />
+      </div>`;
+  }).join('');
+}
+
+function leesParamGrid(fields) {
+  const result = {};
+  fields.forEach(([key, , , type]) => {
+    const specEl = document.getElementById('veld-' + key);
+    const tolEl = document.getElementById('veld-' + key + '_tol');
+    const v = specEl.value;
+    result[key] = v === '' ? null : (type === 'number' ? Number(v) : v);
+    const tv = tolEl.value.trim();
+    result[key + '_tol'] = tv === '' ? null : tv;
+  });
+  return result;
+}
+
 function ingredientOpties(geselecteerdId) {
   return alleIngredientenLijst.map(i =>
     `<option value="${i.id}" ${String(i.id) === String(geselecteerdId) ? 'selected' : ''}>${escapeHtml(i.naam)}${i.categorie_naam ? ' — ' + escapeHtml(i.categorie_naam) : ''}</option>`
@@ -439,8 +483,8 @@ async function initReceptInvoer() {
     alleIngredientenLijst = (ingData || []).map(i => ({ id: i.id, naam: i.naam, categorie_naam: i.ingredient_categories?.name }));
   }
 
-  renderVeldenGrid('re-specs-grid', SPECS_FIELDS, null);
-  renderVeldenGrid('re-ferm-grid', FERM_FIELDS, null);
+  renderParamGrid('re-specs-grid', SPECS_FIELDS, null);
+  renderParamGrid('re-ferm-grid', FERM_FIELDS, null);
   renderVeldenGrid('re-brouw-grid', BROUW_FIELDS, null);
   renderVeldenGrid('re-water-grid', WATER_FIELDS, null);
 
@@ -525,8 +569,8 @@ document.getElementById('re-kopieer-btn').addEventListener('click', async () => 
   document.getElementById('veld-locatie').value = bron.locatie || '';
   document.getElementById('veld-status').value = 'concept';
 
-  renderVeldenGrid('re-specs-grid', SPECS_FIELDS, specs.data || {});
-  renderVeldenGrid('re-ferm-grid', FERM_FIELDS, ferm.data || {});
+  renderParamGrid('re-specs-grid', SPECS_FIELDS, specs.data || {});
+  renderParamGrid('re-ferm-grid', FERM_FIELDS, ferm.data || {});
   renderVeldenGrid('re-brouw-grid', BROUW_FIELDS, brouw.data || {});
   renderVeldenGrid('re-water-grid', WATER_FIELDS, water.data || {});
 
@@ -565,8 +609,8 @@ async function laadBestaandRecept(id) {
   document.getElementById('veld-locatie').value = bestaandRecept.locatie || '';
   document.getElementById('veld-status').value = bestaandRecept.status || 'concept';
 
-  renderVeldenGrid('re-specs-grid', SPECS_FIELDS, specs.data || {});
-  renderVeldenGrid('re-ferm-grid', FERM_FIELDS, ferm.data || {});
+  renderParamGrid('re-specs-grid', SPECS_FIELDS, specs.data || {});
+  renderParamGrid('re-ferm-grid', FERM_FIELDS, ferm.data || {});
   renderVeldenGrid('re-brouw-grid', BROUW_FIELDS, brouw.data || {});
   renderVeldenGrid('re-water-grid', WATER_FIELDS, water.data || {});
 
@@ -773,8 +817,8 @@ async function slaBestaandReceptOp(soort) {
 }
 
 async function schrijfGerelateerdeData(recipeId) {
-  const specs = leesVeldenGrid(SPECS_FIELDS);
-  const ferm = leesVeldenGrid(FERM_FIELDS);
+  const specs = leesParamGrid(SPECS_FIELDS);
+  const ferm = leesParamGrid(FERM_FIELDS);
   const brouw = leesVeldenGrid(BROUW_FIELDS);
   const water = leesVeldenGrid(WATER_FIELDS);
   const ingredientRegels = leesAlleIngredientRegels();
