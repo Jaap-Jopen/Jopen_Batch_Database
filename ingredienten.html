@@ -94,7 +94,10 @@
 
 <main class="ing-main">
   <div id="ing-list-view">
-    <h1 class="ing-titel" style="font-size:28px;">Ingrediënten</h1>
+    <div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:12px;">
+      <h1 class="ing-titel" style="font-size:28px; margin:0;">Ingrediënten</h1>
+      <button class="ing-bewerk-btn" id="ing-nieuw-btn" style="display:none; margin-top:0;">+ Nieuw ingrediënt</button>
+    </div>
     <div class="ing-toolbar">
       <input id="ing-search" placeholder="Zoek op naam of leverancier…">
       <select id="ing-filter-categorie"><option value="">Alle categorieën</option></select>
@@ -119,8 +122,15 @@ let huidigeGebruikerRol = null; // wordt gevuld met 'admin' | 'editor' | 'viewer
 async function initIngredientenPagina() {
   const gebruiker = await getHuidigeGebruiker();
   huidigeGebruikerRol = gebruiker ? gebruiker.rol : null;
+
+  if (huidigeGebruikerRol === 'admin' || huidigeGebruikerRol === 'editor') {
+    document.getElementById('ing-nieuw-btn').style.display = 'inline-block';
+  }
+
   laadIngredienten();
 }
+
+document.getElementById('ing-nieuw-btn').addEventListener('click', toonNieuwFormulier);
 
 async function laadIngredienten() {
   const container = document.getElementById('ing-list-container');
@@ -144,18 +154,24 @@ function vulFilters(ingredienten) {
   const statussen = [...new Set(ingredienten.map(i => i.status).filter(Boolean))].sort();
 
   const catSelect = document.getElementById('ing-filter-categorie');
+  const huidigeCat = catSelect.value;
+  catSelect.innerHTML = '<option value="">Alle categorieën</option>';
   categorieen.forEach(c => {
     const opt = document.createElement('option');
     opt.value = c; opt.textContent = c;
     catSelect.appendChild(opt);
   });
+  catSelect.value = huidigeCat;
 
   const statusSelect = document.getElementById('ing-filter-status');
+  const huidigeStatus = statusSelect.value;
+  statusSelect.innerHTML = '<option value="">Alle statussen</option>';
   statussen.forEach(s => {
     const opt = document.createElement('option');
     opt.value = s; opt.textContent = s;
     statusSelect.appendChild(opt);
   });
+  statusSelect.value = huidigeStatus;
 }
 
 function huidigeFilters() {
@@ -339,6 +355,122 @@ async function slaIngredientOp(i) {
   // Lokale kopie + lijst bijwerken zodat het overzicht meteen klopt
   Object.assign(i, updateData);
   setTimeout(() => renderDetailAlleen(i.id), 600);
+}
+
+function toonNieuwFormulier() {
+  document.getElementById('ing-list-view').style.display = 'none';
+  document.getElementById('ing-detail').classList.add('actief');
+
+  const container = document.getElementById('ing-detail-container');
+
+  const veld = (label, id, unit = '', type = 'text') => `
+    <div class="ing-edit-row">
+      <label for="${id}">${label}</label>
+      <input type="${type}" id="${id}" ${unit ? `placeholder="${unit}"` : ''} />
+    </div>`;
+
+  container.innerHTML = `
+    <h2 class="ing-titel">Nieuw ingrediënt</h2>
+    <div class="ing-meta">Verplichte velden: naam en categorie</div>
+    <div class="ing-card">
+      <div class="ing-edit-row">
+        <label for="nieuw-naam">Naam *</label>
+        <input type="text" id="nieuw-naam" required />
+      </div>
+      <div class="ing-edit-row">
+        <label for="nieuw-categorie">Categorie *</label>
+        <input type="text" id="nieuw-categorie" required />
+      </div>
+      ${veld('Eenheid', 'nieuw-eenheid')}
+      ${veld('Prijs', 'nieuw-prijs', '€', 'number')}
+      ${veld('Extract %', 'nieuw-extract_pct', '%', 'number')}
+      ${veld('Alpha %', 'nieuw-alpha_pct', '%', 'number')}
+      ${veld('Gistfactor', 'nieuw-gistfactor', '', 'number')}
+      ${veld('Leverancier', 'nieuw-leverancier')}
+      <div class="ing-edit-row">
+        <label for="nieuw-status">Status</label>
+        <select id="nieuw-status" style="width:160px;">
+          <option value="actief" selected>actief</option>
+          <option value="inactief">inactief</option>
+          <option value="uitgefaseerd">uitgefaseerd</option>
+        </select>
+      </div>
+      <button class="ing-opslaan-btn" id="nieuw-opslaan-btn">Toevoegen</button>
+      <button class="ing-annuleer-btn" id="nieuw-annuleer-btn">Annuleren</button>
+      <div id="nieuw-melding" class="ing-melding"></div>
+    </div>
+  `;
+
+  document.getElementById('nieuw-annuleer-btn').addEventListener('click', () => {
+    document.getElementById('ing-detail').classList.remove('actief');
+    document.getElementById('ing-list-view').style.display = 'block';
+  });
+  document.getElementById('nieuw-opslaan-btn').addEventListener('click', slaNieuwIngredientOp);
+}
+
+async function slaNieuwIngredientOp() {
+  const melding = document.getElementById('nieuw-melding');
+  const naam = document.getElementById('nieuw-naam').value.trim();
+  const categorie = document.getElementById('nieuw-categorie').value.trim();
+
+  if (!naam || !categorie) {
+    melding.textContent = 'Naam en categorie zijn verplicht.';
+    melding.className = 'ing-melding fout';
+    return;
+  }
+
+  const getal = (id) => {
+    const v = document.getElementById(id).value;
+    return v === '' ? null : Number(v);
+  };
+  const tekst = (id) => {
+    const v = document.getElementById(id).value.trim();
+    return v === '' ? null : v;
+  };
+
+  melding.textContent = 'Bezig met opslaan…';
+  melding.className = 'ing-melding';
+
+  const { data: { session } } = await supabaseClient.auth.getSession();
+
+  const nieuw = {
+    naam,
+    categorie,
+    eenheid: tekst('nieuw-eenheid'),
+    prijs: getal('nieuw-prijs'),
+    extract_pct: getal('nieuw-extract_pct'),
+    alpha_pct: getal('nieuw-alpha_pct'),
+    gistfactor: getal('nieuw-gistfactor'),
+    leverancier: tekst('nieuw-leverancier'),
+    status: document.getElementById('nieuw-status').value,
+    aangemaakt_door: session?.user?.id ?? null,
+    gewijzigd_door: session?.user?.id ?? null,
+  };
+
+  const { data, error } = await supabaseClient
+    .from('ingredients')
+    .insert(nieuw)
+    .select()
+    .single();
+
+  if (error) {
+    melding.textContent = 'Toevoegen mislukt: ' + error.message;
+    melding.className = 'ing-melding fout';
+    return;
+  }
+
+  alleIngredienten.push(data);
+  alleIngredienten.sort((a, b) => (a.naam || '').localeCompare(b.naam || ''));
+  vulFilters(alleIngredienten);
+
+  melding.textContent = 'Toegevoegd! Je gaat terug naar het overzicht…';
+  melding.className = 'ing-melding ok';
+
+  setTimeout(() => {
+    document.getElementById('ing-detail').classList.remove('actief');
+    document.getElementById('ing-list-view').style.display = 'block';
+    renderIngLijst(alleIngredienten);
+  }, 700);
 }
 
 document.getElementById('ing-back-btn').addEventListener('click', () => {
