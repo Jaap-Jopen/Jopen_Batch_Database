@@ -432,6 +432,10 @@ async function openDetail(id) {
   ].map(sectie => ({ ...sectie, rows: sectie.rows.filter(([,v]) => v !== null && v !== undefined) }))
    .filter(sectie => sectie.rows.length > 0);
 
+  if (cm.length > 0) {
+    brouwSecties.push({ titel: 'Comments', rows: cm.map((c, i) => [`Comment ${i + 1}`, c, '']) });
+  }
+
   const waterRows = [
     ['Ca', w.ca, 'ppm'], ['Mg', w.mg, 'ppm'], ['Na', w.na, 'ppm'],
     ['Cl', w.cl, 'ppm'], ['SO4', w.so4, 'ppm'], ['Cl:SO4 ratio', w.ratio_cl_so4, ''],
@@ -500,16 +504,29 @@ async function openDetail(id) {
     toegift_brouwerij: 'Brewhouse addition', toegift_kelder: 'Cellar addition', gist: 'Yeast'
   };
 
+  // Hop Boil altijd bovenaan (hoogste Timing eerst, aflopend), daarna Dry hop:
+  // eerst rijen waarvan Timing "warm" bevat, dan de rest ("16C"). Leunt op de
+  // tekst in het Timing-veld, zie kanttekening in de chat.
+  function sorteerHopHerbsRegels(rijen) {
+    const boil = rijen.filter(r => r.rol === 'hopgift_kook')
+      .sort((a, b) => (parseFloat(b.tijdstip) || -Infinity) - (parseFloat(a.tijdstip) || -Infinity));
+    const dryHop = rijen.filter(r => r.rol === 'dry_hop');
+    const dryHopWarm = dryHop.filter(r => (r.tijdstip || '').toLowerCase().includes('warm'));
+    const dryHopRest = dryHop.filter(r => !(r.tijdstip || '').toLowerCase().includes('warm'));
+    return [...boil, ...dryHopWarm, ...dryHopRest];
+  }
+
   function ingTabelHtml(rollenFilter, kolomRol, toonHdt = false) {
-    const subset = ings.filter(i => rollenFilter.includes(i.rol));
+    let subset = ings.filter(i => rollenFilter.includes(i.rol));
     if (subset.length === 0) return '<div class="empty">None added.</div>';
+    if (toonHdt) subset = sorteerHopHerbsRegels(subset);
     const rows = subset.map(i => `
       <tr>
         ${kolomRol ? `<td><span class="rol-tag">${rolLabels[i.rol] || i.rol}</span></td>` : ''}
         <td>${escapeHtml(i.ingredients?.naam || '—')}</td>
         <td>${i.hoeveelheid ?? '—'} ${i.eenheid || ''}</td>
         <td>${escapeHtml(i.tijdstip || '—')}</td>
-        ${toonHdt ? `<td>${i.hdt ? 'HDT ' + i.hdt : '—'}</td>` : ''}
+        ${toonHdt ? `<td>${(i.rol === 'hopgift_kook' && i.hdt) ? 'HDT ' + i.hdt : '—'}</td>` : ''}
         <td>${escapeHtml(i.notitie || '—')}</td>
       </tr>`).join('');
     return `
@@ -625,9 +642,6 @@ async function openDetail(id) {
     ${processtappenActief.length > 0
       ? `<div class="ing-table" style="padding:10px 14px; background:#fff;">${processtappenActief.map(l => `<span class="rol-tag" style="margin-right:10px;">${escapeHtml(l)}</span>`).join('')}</div>`
       : '<div class="empty">None checked.</div>'}
-
-    <div class="section-title">Comments</div>
-    ${cm.length > 0 ? `<div class="ing-table" style="padding:10px 14px; background:#fff;">${cm.map(c => `<div class="kv"><span>${escapeHtml(c)}</span></div>`).join('')}</div>` : '<div class="empty">None entered.</div>'}
 
     <div class="section-title">Costs</div>
     ${paramColumnsHtml(kostenRows) || '<div class="empty">None entered.</div>'}

@@ -248,15 +248,6 @@
       </div>
 
       <div class="re-section">
-        <h2>Comments</h2>
-        <div class="re-grid">
-          <div class="re-field wide"><label for="veld-comment-1">Comment 1</label><input type="text" id="veld-comment-1" /></div>
-          <div class="re-field wide"><label for="veld-comment-2">Comment 2</label><input type="text" id="veld-comment-2" /></div>
-          <div class="re-field wide"><label for="veld-comment-3">Comment 3</label><input type="text" id="veld-comment-3" /></div>
-        </div>
-      </div>
-
-      <div class="re-section">
         <h2>Costs</h2>
         <div class="re-param-columns" id="re-kosten-grid"></div>
       </div>
@@ -509,7 +500,21 @@ function renderBrouwSecties(containerId, secties, data) {
         <label for="veld-${key}">${label}${unit ? ' (' + unit + ')' : ''}</label>
         <input type="${type}" id="veld-${key}" value="${data && data[key] !== null && data[key] !== undefined ? data[key] : ''}" />
       </div>`).join('')}
-  `).join('');
+  `).join('') + `
+    <div class="re-subkop">Comments</div>
+    <div class="re-field wide" style="margin-bottom:8px;">
+      <label for="veld-comment-1">Comment 1</label>
+      <input type="text" id="veld-comment-1" />
+    </div>
+    <div class="re-field wide" style="margin-bottom:8px;">
+      <label for="veld-comment-2">Comment 2</label>
+      <input type="text" id="veld-comment-2" />
+    </div>
+    <div class="re-field wide">
+      <label for="veld-comment-3">Comment 3</label>
+      <input type="text" id="veld-comment-3" />
+    </div>
+  `;
 }
 
 // Zelfde als hierboven, maar met een extra tolerantie-invoerveld (+/-) per
@@ -566,9 +571,13 @@ function voegIngredientRegelToe(tbodyId, rollenLijst, regel = {}) {
   const rolKolomHtml = meerdereRollen
     ? `<td><select class="re-ing-rol">${rolOptiesVoor(rollenLijst, regel.rol || rollenLijst[0])}</select></td>`
     : '';
+  // HDT hoort alleen bij Hop (boil), niet bij Dry hop -- de select staat er
+  // altijd (voor een consistente tabelbreedte), maar wordt uitgeschakeld
+  // zodra de rol niet hopgift_kook is (zie ook de change-listener verderop).
+  const isBoilRij = (regel.rol || rollenLijst[0]) === 'hopgift_kook';
   const hdtKolomHtml = isHopSectie ? `
     <td>
-      <select class="re-ing-hdt">
+      <select class="re-ing-hdt" ${isBoilRij ? '' : 'disabled'}>
         <option value="" ${!regel.hdt ? 'selected' : ''}>—</option>
         <option value="1" ${regel.hdt === 1 ? 'selected' : ''}>HDT 1</option>
         <option value="2" ${regel.hdt === 2 ? 'selected' : ''}>HDT 2</option>
@@ -599,6 +608,19 @@ function voegIngredientRegelToe(tbodyId, rollenLijst, regel = {}) {
     el.addEventListener('input', herberekenHopgewichten);
     el.addEventListener('change', herberekenHopgewichten);
   });
+
+  // Rol-wijziging binnen Hops and Herbs: HDT alleen bruikbaar bij Hop (boil)
+  if (isHopSectie) {
+    const rolSelect = tr.querySelector('.re-ing-rol');
+    const hdtSelect = tr.querySelector('.re-ing-hdt');
+    if (rolSelect && hdtSelect) {
+      rolSelect.addEventListener('change', () => {
+        const isBoil = rolSelect.value === 'hopgift_kook';
+        hdtSelect.disabled = !isBoil;
+        if (!isBoil) hdtSelect.value = '';
+      });
+    }
+  }
 }
 
 document.querySelectorAll('[data-add-btn]').forEach(btn => {
@@ -732,11 +754,26 @@ async function vulKopieerSelect() {
   });
 }
 
+// Hop Boil altijd bovenaan (hoogste Timing eerst, aflopend), daarna Dry hop:
+// eerst rijen waarvan Timing "warm" bevat, dan de rest ("16C"). Er is nog geen
+// apart veld dat warm/16C vastlegt -- dit leunt op de tekst in het
+// Timing-veld, zie kanttekening in de chat.
+function sorteerHopHerbsRegels(rijen) {
+  const boil = rijen.filter(r => r.rol === 'hopgift_kook')
+    .sort((a, b) => (parseFloat(b.tijdstip) || -Infinity) - (parseFloat(a.tijdstip) || -Infinity));
+  const dryHop = rijen.filter(r => r.rol === 'dry_hop');
+  const dryHopWarm = dryHop.filter(r => (r.tijdstip || '').toLowerCase().includes('warm'));
+  const dryHopRest = dryHop.filter(r => !(r.tijdstip || '').toLowerCase().includes('warm'));
+  return [...boil, ...dryHopWarm, ...dryHopRest];
+}
+
 function vulIngredientSectiesUit(ingredients) {
   ALLE_ING_TBODY_IDS.forEach(tbodyId => { document.getElementById(tbodyId).innerHTML = ''; });
+  const hopRegels = sorteerHopHerbsRegels((ingredients || []).filter(r => r.rol === 'hopgift_kook' || r.rol === 'dry_hop'));
+  hopRegels.forEach(regel => voegIngredientRegelToe('re-ing-hop-tbody', ['hopgift_kook', 'dry_hop'], regel));
+
   (ingredients || []).forEach(regel => {
     if (regel.rol === 'hoofdmout') voegIngredientRegelToe('re-ing-mout-tbody', ['hoofdmout'], regel);
-    else if (regel.rol === 'hopgift_kook' || regel.rol === 'dry_hop') voegIngredientRegelToe('re-ing-hop-tbody', ['hopgift_kook', 'dry_hop'], regel);
     else if (regel.rol === 'toegift_brouwerij') voegIngredientRegelToe('re-ing-brouwtoegift-tbody', ['toegift_brouwerij'], regel);
     else if (regel.rol === 'gist') voegIngredientRegelToe('re-ing-gist-tbody', ['gist'], regel);
     else if (regel.rol === 'toegift_kelder') voegIngredientRegelToe('re-ing-keldertoegift-tbody', ['toegift_kelder'], regel);
