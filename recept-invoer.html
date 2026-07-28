@@ -90,6 +90,34 @@
   .re-btn.groot { background: var(--amber); }
   .re-btn.groot:hover { opacity: 0.9; }
 
+  .re-savebar {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
+    background: #fff; border-top: 1px solid var(--line);
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+    padding: 12px 24px; display: flex; align-items: center; justify-content: flex-end; gap: 16px;
+  }
+  .re-savebar-info { font-family: var(--mono); font-size: 12px; color: #6b6355; margin-right: auto; }
+  main { padding-bottom: 90px; }
+
+  .re-modal-overlay {
+    position: fixed; inset: 0; background: rgba(28,43,38,0.45); z-index: 50;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .re-modal {
+    background: #fff; border-radius: 8px; padding: 24px 28px; max-width: 480px; width: 100%;
+    max-height: 85vh; overflow-y: auto;
+  }
+  .re-modal h2 { margin-top: 0; }
+  .re-modal-radio-group { margin: 16px 0; }
+  .re-modal-radio-option {
+    display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid #ece8dc;
+    cursor: pointer; font-size: 14px;
+  }
+  .re-modal-radio-option:last-child { border-bottom: none; }
+  .re-modal-radio-option input { margin-top: 3px; }
+  .re-modal-radio-option .sub { display: block; color: #6b6355; font-size: 12px; margin-top: 2px; }
+  .re-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+
   .re-melding { margin-top: 14px; font-size: 13px; font-family: var(--mono); }
   .re-melding.fout { color: #a33f2c; }
   .re-melding.ok { color: var(--hop-dark); }
@@ -328,24 +356,30 @@
         <div id="re-revisies-container"><div class="re-leeg">Revision history will appear here once the recipe has been saved.</div></div>
       </div>
 
-      <div class="re-versie-vak" id="re-versie-vak" style="display:none;">
-        <h2>Save as</h2>
-        <p class="re-versie-uitleg">A small change updates this recipe in place. A major change keeps the current version archived and viewable, and creates a new active version.</p>
-        <div class="re-field wide">
-          <label for="veld-wijziging">What did you change? *</label>
-          <textarea id="veld-wijziging" required></textarea>
-        </div>
-      </div>
-
-      <div style="margin-top: 20px;">
-        <button type="button" class="re-btn" id="re-opslaan-nieuw-btn" style="display:none;">Create recipe</button>
-        <button type="button" class="re-btn" id="re-opslaan-klein-btn" style="display:none;">Save small change</button>
-        <button type="button" class="re-btn groot" id="re-opslaan-groot-btn" style="display:none;">Save as new major version</button>
-      </div>
       <div id="re-melding" class="re-melding"></div>
     </form>
   </div>
 </main>
+
+<div class="re-savebar" id="re-savebar" style="display:none;">
+  <span class="re-savebar-info" id="re-savebar-info"></span>
+  <button type="button" class="re-btn secundair" id="re-savebar-btn">Save</button>
+</div>
+
+<div class="re-modal-overlay" id="re-save-modal-overlay" style="display:none;">
+  <div class="re-modal">
+    <h2>Save recipe</h2>
+    <div class="re-modal-radio-group" id="re-modal-radio-group"></div>
+    <div class="re-field wide">
+      <label for="veld-wijziging">Comment *</label>
+      <textarea id="veld-wijziging" required placeholder="Describe what changed in this version."></textarea>
+    </div>
+    <div class="re-modal-actions">
+      <button type="button" class="re-btn secundair" id="re-modal-cancel-btn">Cancel</button>
+      <button type="button" class="re-btn groot" id="re-modal-confirm-btn">Save</button>
+    </div>
+  </div>
+</div>
 
 <script src="config.js"></script>
 <script src="nav.js"></script>
@@ -520,6 +554,7 @@ let huidigeGebruiker = null;
 let alleIngredientenLijst = [];
 let bestaandRecept = null;
 let ingredientRegelTeller = 0;
+let receptModus = null; // 'nieuw' | 'bestaand'
 
 function urlParam(naam) {
   return new URLSearchParams(window.location.search).get(naam);
@@ -922,7 +957,10 @@ async function initReceptInvoer() {
   } else {
     document.getElementById('re-titel').textContent = 'New recipe';
     document.getElementById('re-subtitel').textContent = '';
-    document.getElementById('re-opslaan-nieuw-btn').style.display = 'inline-block';
+    receptModus = 'nieuw';
+    document.getElementById('re-savebar-info').textContent = 'New recipe';
+    document.getElementById('re-savebar-btn').textContent = 'Create recipe';
+    document.getElementById('re-savebar').style.display = 'flex';
     document.getElementById('re-kopieer-sectie').style.display = 'block';
     await vulKopieerSelect();
   }
@@ -1110,12 +1148,13 @@ async function laadBestaandRecept(id) {
     document.getElementById('re-laatste-revisie').style.display = 'block';
   }
 
-  document.getElementById('re-versie-vak').style.display = 'block';
-  document.getElementById('re-opslaan-klein-btn').style.display = 'inline-block';
-  document.getElementById('re-opslaan-groot-btn').style.display = 'inline-block';
+  receptModus = 'bestaand';
+  document.getElementById('re-savebar-info').textContent = `Current: v${bestaandRecept.versie_major}.${bestaandRecept.versie_minor}`;
+  document.getElementById('re-savebar-btn').textContent = 'Save';
+  document.getElementById('re-savebar').style.display = 'flex';
 }
 
-document.getElementById('re-opslaan-nieuw-btn').addEventListener('click', async () => {
+async function maakNieuwRecept() {
   const melding = document.getElementById('re-melding');
   const basis = leesBasisgegevens();
 
@@ -1170,14 +1209,50 @@ document.getElementById('re-opslaan-nieuw-btn').addEventListener('click', async 
   melding.textContent = 'Recipe created! Redirecting…';
   melding.className = 're-melding ok';
   setTimeout(() => { window.location.href = 'receptoverzicht.html'; }, 1000);
+}
+
+// -- Save-balk (altijd zichtbaar onderin) + opslaan-popup --
+function openSaveModal() {
+  const major = bestaandRecept.versie_major ?? 1;
+  const minor = bestaandRecept.versie_minor ?? 0;
+  const groep = document.getElementById('re-modal-radio-group');
+  groep.innerHTML = `
+    <label class="re-modal-radio-option">
+      <input type="radio" name="re-save-mode" value="klein" checked>
+      <span><strong>${major}.${minor + 1}</strong>, secondary version (draft)<span class="sub">Updates this version in place.</span></span>
+    </label>
+    <label class="re-modal-radio-option">
+      <input type="radio" name="re-save-mode" value="groot">
+      <span><strong>${major + 1}.0</strong>, primary version (publish)<span class="sub">Archives the current version and creates a new active one.</span></span>
+    </label>
+    <label class="re-modal-radio-option">
+      <input type="radio" name="re-save-mode" value="overwrite">
+      <span><strong>${major}.${minor}</strong>, overwrite current secondary version<span class="sub">Replaces the latest revision log entry instead of adding a new one.</span></span>
+    </label>
+  `;
+  document.getElementById('veld-wijziging').value = '';
+  document.getElementById('re-save-modal-overlay').style.display = 'flex';
+}
+
+function closeSaveModal() {
+  document.getElementById('re-save-modal-overlay').style.display = 'none';
+}
+
+document.getElementById('re-savebar-btn').addEventListener('click', async () => {
+  if (receptModus === 'nieuw') {
+    await maakNieuwRecept();
+  } else {
+    openSaveModal();
+  }
 });
 
-document.getElementById('re-opslaan-klein-btn').addEventListener('click', async () => {
-  await slaBestaandReceptOp('klein');
-});
+document.getElementById('re-modal-cancel-btn').addEventListener('click', closeSaveModal);
 
-document.getElementById('re-opslaan-groot-btn').addEventListener('click', async () => {
-  await slaBestaandReceptOp('groot');
+document.getElementById('re-modal-confirm-btn').addEventListener('click', async () => {
+  const gekozen = document.querySelector('input[name="re-save-mode"]:checked');
+  const mode = gekozen ? gekozen.value : 'klein';
+  closeSaveModal();
+  await slaBestaandReceptOp(mode);
 });
 
 async function slaBestaandReceptOp(soort) {
@@ -1202,6 +1277,57 @@ async function slaBestaandReceptOp(soort) {
   const { data: { session } } = await supabaseClient.auth.getSession();
   const gebruikerId = session?.user?.id ?? null;
   const vandaag = new Date().toISOString().slice(0, 10);
+
+  if (soort === 'overwrite') {
+    const { error: updateErr } = await supabaseClient
+      .from('recipes')
+      .update({ ...basis, gewijzigd_door: gebruikerId })
+      .eq('id', bestaandRecept.id);
+
+    if (updateErr) {
+      melding.textContent = 'Save failed: ' + updateErr.message;
+      melding.className = 're-melding fout';
+      return;
+    }
+
+    const fout = await schrijfGerelateerdeData(bestaandRecept.id);
+    if (fout) {
+      melding.textContent = 'Recipe updated, but: ' + fout;
+      melding.className = 're-melding fout';
+      return;
+    }
+
+    // Overschrijft de bestaande revisie-logregel voor deze versie i.p.v. een
+    // nieuwe toe te voegen -- versienummer blijft ongewijzigd.
+    const { data: bestaandeRevisie } = await supabaseClient
+      .from('recipe_revisies')
+      .select('id')
+      .eq('recipe_id', bestaandRecept.id)
+      .eq('versie_major', bestaandRecept.versie_major)
+      .eq('versie_minor', bestaandRecept.versie_minor)
+      .maybeSingle();
+
+    if (bestaandeRevisie) {
+      await supabaseClient.from('recipe_revisies')
+        .update({ datum: vandaag, door: huidigeGebruiker.naam, wijziging, gebruiker_id: gebruikerId })
+        .eq('id', bestaandeRevisie.id);
+    } else {
+      await supabaseClient.from('recipe_revisies').insert({
+        recipe_id: bestaandRecept.id,
+        versie_major: bestaandRecept.versie_major,
+        versie_minor: bestaandRecept.versie_minor,
+        datum: vandaag,
+        door: huidigeGebruiker.naam,
+        wijziging,
+        gebruiker_id: gebruikerId,
+      });
+    }
+
+    melding.textContent = `Saved (v${bestaandRecept.versie_major}.${bestaandRecept.versie_minor} overwritten). Redirecting…`;
+    melding.className = 're-melding ok';
+    setTimeout(() => { window.location.href = 'receptoverzicht.html'; }, 1000);
+    return;
+  }
 
   if (soort === 'klein') {
     const nieuweMinor = (bestaandRecept.versie_minor ?? 0) + 1;
