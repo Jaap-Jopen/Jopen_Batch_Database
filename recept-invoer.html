@@ -381,7 +381,7 @@
     <h2>Save recipe</h2>
     <div class="re-modal-radio-group" id="re-modal-radio-group"></div>
     <div class="re-field wide">
-      <label for="veld-wijziging">Comment *</label>
+      <label for="veld-wijziging" id="re-modal-comment-label">Comment *</label>
       <textarea id="veld-wijziging" required placeholder="Describe what changed in this version."></textarea>
     </div>
     <div class="re-modal-actions">
@@ -1227,11 +1227,27 @@ function openSaveModal() {
     </label>
     <label class="re-modal-radio-option">
       <input type="radio" name="re-save-mode" value="overwrite">
-      <span><strong>${major}.${minor}</strong>, overwrite current secondary version<span class="sub">Replaces the latest revision log entry instead of adding a new one.</span></span>
+      <span><strong>${major}.${minor}</strong>, overwrite current secondary version<span class="sub">Unregistered correction: no comment needed, version/revision history stays untouched.</span></span>
     </label>
   `;
   document.getElementById('veld-wijziging').value = '';
+  werkCommentVeldBij();
+  groep.querySelectorAll('input[name="re-save-mode"]').forEach(r => r.addEventListener('change', werkCommentVeldBij));
   document.getElementById('re-save-modal-overlay').style.display = 'flex';
+}
+
+function werkCommentVeldBij() {
+  const gekozen = document.querySelector('input[name="re-save-mode"]:checked');
+  const isOverwrite = gekozen && gekozen.value === 'overwrite';
+  const label = document.getElementById('re-modal-comment-label');
+  const veld = document.getElementById('veld-wijziging');
+  if (isOverwrite) {
+    label.textContent = 'Comment (optional)';
+    veld.required = false;
+  } else {
+    label.textContent = 'Comment *';
+    veld.required = true;
+  }
 }
 
 function closeSaveModal() {
@@ -1265,7 +1281,7 @@ async function slaBestaandReceptOp(soort) {
     melding.className = 're-melding fout';
     return;
   }
-  if (!wijziging) {
+  if (!wijziging && soort !== 'overwrite') {
     melding.textContent = 'Please describe what you changed.';
     melding.className = 're-melding fout';
     return;
@@ -1279,9 +1295,13 @@ async function slaBestaandReceptOp(soort) {
   const vandaag = new Date().toISOString().slice(0, 10);
 
   if (soort === 'overwrite') {
+    // Ongeregistreerde correctie: alleen de data zelf bijwerken. Geen wijziging
+    // aan versienummer, gewijzigd_door/gewijzigd_op op het recept, en de
+    // revisie-log wordt niet aangeraakt -- bedoeld voor het snel rechtzetten
+    // van kleine foutjes, niet voor iets dat in de historie moet komen.
     const { error: updateErr } = await supabaseClient
       .from('recipes')
-      .update({ ...basis, gewijzigd_door: gebruikerId })
+      .update({ ...basis })
       .eq('id', bestaandRecept.id);
 
     if (updateErr) {
@@ -1297,33 +1317,7 @@ async function slaBestaandReceptOp(soort) {
       return;
     }
 
-    // Overschrijft de bestaande revisie-logregel voor deze versie i.p.v. een
-    // nieuwe toe te voegen -- versienummer blijft ongewijzigd.
-    const { data: bestaandeRevisie } = await supabaseClient
-      .from('recipe_revisies')
-      .select('id')
-      .eq('recipe_id', bestaandRecept.id)
-      .eq('versie_major', bestaandRecept.versie_major)
-      .eq('versie_minor', bestaandRecept.versie_minor)
-      .maybeSingle();
-
-    if (bestaandeRevisie) {
-      await supabaseClient.from('recipe_revisies')
-        .update({ datum: vandaag, door: huidigeGebruiker.naam, wijziging, gebruiker_id: gebruikerId })
-        .eq('id', bestaandeRevisie.id);
-    } else {
-      await supabaseClient.from('recipe_revisies').insert({
-        recipe_id: bestaandRecept.id,
-        versie_major: bestaandRecept.versie_major,
-        versie_minor: bestaandRecept.versie_minor,
-        datum: vandaag,
-        door: huidigeGebruiker.naam,
-        wijziging,
-        gebruiker_id: gebruikerId,
-      });
-    }
-
-    melding.textContent = `Saved (v${bestaandRecept.versie_major}.${bestaandRecept.versie_minor} overwritten). Redirecting…`;
+    melding.textContent = `Saved (v${bestaandRecept.versie_major}.${bestaandRecept.versie_minor}, unregistered correction). Redirecting…`;
     melding.className = 're-melding ok';
     setTimeout(() => { window.location.href = 'receptoverzicht.html'; }, 1000);
     return;
