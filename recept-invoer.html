@@ -65,11 +65,11 @@
   }
   .re-subkop:first-child { margin-top: 0; }
   .re-full-span { column-span: all; margin-top: 8px; }
-  .re-badge-field label { color: #a83a1a; font-weight: 700; }
+  .re-badge-field label { font-weight: 700; }
   .re-badge-field input {
-    border: 2px solid #d9534f;
-    background: #fff3f0;
-    font-weight: 600;
+    border: 2px solid var(--line);
+    font-weight: 700;
+    transition: background-color 0.15s, color 0.15s, border-color 0.15s;
   }
   .re-comment-row { margin-bottom: 10px; }
   .re-comment-row label { display: block; font-family: var(--mono); font-size: 11px; color: #6b6355; margin-bottom: 4px; }
@@ -915,6 +915,42 @@ function leesBasisgegevens() {
   };
 }
 
+// Kleurenschema's exact zoals de voorwaardelijke opmaak in Moederdata.
+const BIER_RISICO_KLEUREN = [
+  [/suiker.*gevaarlijk/i, '#7030A0', '#ffffff'],
+  [/suikerhoudend/i, '#FF66FF', '#ffffff'],
+  [/gevaarlijk/i, '#548235', '#ffffff'],
+  [/standaard/i, '#00B0F0', '#ffffff'],
+  [/gevoelig/i, '#A9D18E', '#1f1f1f'],
+];
+const BIER_STATUS_KLEUREN = [
+  [/te verbeteren/i, '#FFC000', '#1f1f1f'],
+  [/standaard/i, '#92D050', '#1f1f1f'],
+  [/npi/i, '#FF0000', '#ffffff'],
+];
+
+function pasBadgeKleurToe(inputEl, kleurenSchema) {
+  const waarde = (inputEl.value || '').trim();
+  const match = kleurenSchema.find(([regex]) => regex.test(waarde));
+  if (match) {
+    inputEl.style.background = match[1];
+    inputEl.style.color = match[2];
+    inputEl.style.borderColor = match[1];
+  } else {
+    inputEl.style.background = '';
+    inputEl.style.color = '';
+    inputEl.style.borderColor = '';
+  }
+}
+
+function initBadgeKleuren() {
+  const risicoVeld = document.getElementById('veld-bier_risico');
+  const statusVeld = document.getElementById('veld-bier_status');
+  risicoVeld.addEventListener('input', () => pasBadgeKleurToe(risicoVeld, BIER_RISICO_KLEUREN));
+  statusVeld.addEventListener('input', () => pasBadgeKleurToe(statusVeld, BIER_STATUS_KLEUREN));
+}
+initBadgeKleuren();
+
 // Vult de velden die buiten hun "eigen" param-grid zijn geplaatst: Beer
 // risk/status (in General, uit recipe_fermentatie) en de dry-hop-notities/
 // kelder-dag/comment-verwerken (in Hops and Herbs / Additions Cellar, uit
@@ -922,6 +958,8 @@ function leesBasisgegevens() {
 function vulExtraVeldenUit(fermData, procData) {
   document.getElementById('veld-bier_risico').value = (fermData && fermData.bier_risico) || '';
   document.getElementById('veld-bier_status').value = (fermData && fermData.bier_status) || '';
+  pasBadgeKleurToe(document.getElementById('veld-bier_risico'), BIER_RISICO_KLEUREN);
+  pasBadgeKleurToe(document.getElementById('veld-bier_status'), BIER_STATUS_KLEUREN);
 
   document.getElementById('veld-dry_hop_comment_warm').value = (procData && procData.dry_hop_comment_warm) || '';
   document.getElementById('veld-dry_hop_methode_warm').value = (procData && procData.dry_hop_methode_warm) || '';

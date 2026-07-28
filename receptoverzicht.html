@@ -204,9 +204,9 @@
   .full-span .param-row { grid-template-columns: 140px 1fr; }
   .full-span .param-row span:last-child { white-space: normal; }
   .param-columns-2 { column-count: 2; }
-  .badge-row { display:inline-block; border:2px solid #d9534f; background:#fff3f0; border-radius:6px; padding:6px 12px; margin:4px 10px 4px 0; }
-  .badge-row span:first-child { display:block; color:#a83a1a; font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; }
-  .badge-row span:last-child { font-family: var(--mono); font-weight:600; }
+  .badge-row { display:inline-block; border:2px solid var(--line); border-radius:6px; padding:6px 12px; margin:4px 10px 4px 0; }
+  .badge-row span:first-child { display:block; font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.85; }
+  .badge-row span:last-child { font-family: var(--mono); font-weight:700; }
 </style>
 </head>
 <body>
@@ -408,8 +408,8 @@ async function openDetail(id) {
   ].filter(([,v]) => v !== null && v !== undefined);
 
   const generalBadgeRows = [
-    ['Beer risk', f.bier_risico],
-    ['Beer status', f.bier_status],
+    ['Beer risk', f.bier_risico, 'risico'],
+    ['Beer status', f.bier_status, 'status'],
   ].filter(([,v]) => v !== null && v !== undefined && v !== '');
 
   const brouwSecties = [
@@ -528,10 +528,31 @@ async function openDetail(id) {
       </div>`).join('')}</div>`;
   }
 
+  // Kleurenschema's exact zoals de voorwaardelijke opmaak in Moederdata.
+  const BIER_RISICO_KLEUREN = [
+    [/suiker.*gevaarlijk/i, '#7030A0', '#ffffff'],
+    [/suikerhoudend/i, '#FF66FF', '#ffffff'],
+    [/gevaarlijk/i, '#548235', '#ffffff'],
+    [/standaard/i, '#00B0F0', '#ffffff'],
+    [/gevoelig/i, '#A9D18E', '#1f1f1f'],
+  ];
+  const BIER_STATUS_KLEUREN = [
+    [/te verbeteren/i, '#FFC000', '#1f1f1f'],
+    [/standaard/i, '#92D050', '#1f1f1f'],
+    [/npi/i, '#FF0000', '#ffffff'],
+  ];
+
+  function badgeKleurStijl(type, waarde) {
+    const schema = type === 'status' ? BIER_STATUS_KLEUREN : BIER_RISICO_KLEUREN;
+    const match = schema.find(([regex]) => regex.test(String(waarde || '')));
+    if (!match) return '';
+    return ` style="background:${match[1]}; border-color:${match[1]}; color:${match[2]};"`;
+  }
+
   function badgeRowsHtml(rows) {
     if (rows.length === 0) return '';
-    return rows.map(([label, val]) => `
-      <div class="badge-row"><span>${escapeHtml(label)}</span><span>${escapeHtml(String(val))}</span></div>`).join('');
+    return rows.map(([label, val, type]) => `
+      <div class="badge-row"${badgeKleurStijl(type, val)}><span>${escapeHtml(label)}</span><span>${escapeHtml(String(val))}</span></div>`).join('');
   }
 
   // Voor brouwparameters: zelfde compacte tabel, maar met subsectie-koppen
