@@ -655,11 +655,14 @@ async function openDetail(id) {
     return rij.rendement[kolomIdx];
   }
 
+  // EBU voor één hopgift. Excel: (Gram*1000) * (alpha/100) * (rendement/100) / volume_liter
+  // "Amount" in dit formulier bevat dezelfde ruwe waarde als Excel's "Gram"-kolom
+  // (bv. 5000 voor 5000 gram), dus de *1000 uit het origineel blijft nodig.
   function bepaalHopEbu(gewichtGram, alphaPct, kooktijdMin, origineelExtractPlato, volumeKookHl) {
     const rendementPct = bepaalHopRendement(kooktijdMin, origineelExtractPlato);
     if (rendementPct === null || !volumeKookHl || !gewichtGram || alphaPct === null || alphaPct === undefined) return null;
     const volumeLiter = volumeKookHl * 100;
-    return gewichtGram * (alphaPct / 100) * (rendementPct / 100) / volumeLiter;
+    return (gewichtGram * 1000) * (alphaPct / 100) * (rendementPct / 100) / volumeLiter;
   }
 
   // Hop Boil altijd bovenaan (hoogste Timing eerst, aflopend), daarna Dry hop
