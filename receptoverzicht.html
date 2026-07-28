@@ -163,9 +163,13 @@
   .kv span:last-child { font-family: var(--mono); }
 
   .section-title {
-    font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--hop-dark);
-    font-family: var(--mono); margin: 30px 0 10px; border-bottom: 2px solid var(--hop-dark); padding-bottom: 6px;
+    font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em; color: #fff;
+    font-family: var(--mono); margin: 30px 0 10px; background: var(--hop-dark);
+    padding: 10px 16px; border-radius: 5px 5px 0 0;
   }
+  .section-title + .param-columns,
+  .section-title + table,
+  .section-title + .empty { margin-top: -10px; }
   .ing-table { width: 100%; border-collapse: collapse; background: #fff; margin-bottom: 10px; }
   .ing-table th {
     text-align: left; font-family: var(--mono); font-size: 10px; text-transform: uppercase;
