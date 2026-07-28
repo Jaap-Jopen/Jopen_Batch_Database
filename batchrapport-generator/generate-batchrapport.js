@@ -208,7 +208,7 @@ function vulRevisies(workbook, bundel) {
   bundel.recipe_revisies.forEach((rv, i) => {
     const cellen = REVISIE_MAP[String(i + 1)];
     if (!cellen) return;
-    if (cellen.versienummer) schrijfCel(workbook, cellen.versienummer, `v${rv.versie_major}.${rv.versie_minor}`);
+    if (cellen.versienummer) schrijfCel(workbook, cellen.versienummer, `${rv.versie_major}.${rv.versie_minor}`);
     if (cellen.datum) schrijfCel(workbook, cellen.datum, rv.datum);
     if (cellen.door) schrijfCel(workbook, cellen.door, rv.door);
     if (cellen.wijziging) schrijfCel(workbook, cellen.wijziging, rv.wijziging);
@@ -275,7 +275,13 @@ async function main() {
 
   const naam = bundel.recipes.naam || '';
   const locatie = (bundel.recipes.locatie || '').toLowerCase();
-  const isWP = locatie.includes('waarderpolder') || naam.toUpperCase().startsWith('WP ');
+  // Het WP/Kerk-onderscheid zit in `short_name` (bv. "WP Mooie Nel"), niet in
+  // `naam` (bv. "Mooie Nel") -- dat laatste is nu de schone weergavenaam en
+  // draagt de WP-prefix niet meer per se. Q1 krijgt dezelfde waarde als de
+  // WP-detectie, want Brouwen!A1 (='Recept-voorblad'!Q1) voedt tientallen
+  // IF(LEFT(A1,2)="WP",...)-formules in Brouwen -- die moeten dus kloppen.
+  const vestigingsBron = bundel.recipes.short_name || naam;
+  const isWP = locatie.includes('waarderpolder') || vestigingsBron.toUpperCase().startsWith('WP');
 
   console.log(`Sjabloon inladen (${isWP ? 'Waarderpolder' : 'Jopen Kerk'}-recept)...`);
   const workbook = new ExcelJS.Workbook();
@@ -288,14 +294,24 @@ async function main() {
   vulFormaten(workbook, bundel);
   vulHopRendementEnEbu(workbook, bundel);
 
-  // Basisvelden die niet uit de mapping-CSV komen (batchnummer zelf, plus de
-  // oorspronkelijke Q1-cel die nu geen HLOOKUP-sleutel meer hoeft te zijn)
   workbook.getWorksheet('Recept-voorblad').getCell('H3').value = 'Batch nr.:';
   workbook.getWorksheet('Recept-voorblad').getCell('K3').value = bundel.batch.batchnummer;
-  workbook.getWorksheet('Recept-voorblad').getCell('Q1').value = naam;
+  workbook.getWorksheet('Recept-voorblad').getCell('Q1').value = vestigingsBron;
+
+  // Bestandsnaam volgens de oorspronkelijke VBA-macro:
+  //   K3 & " " & C3 & " v" & A101 & " " & Left(Q1,2) & ".xlsx"
+  // A101 is hier "recipe_revisies rij 1" (versienummer, zonder "v"-prefix --
+  // die voegt deze formule zelf toe); valt terug op recipes.versie_major/
+  // _minor als er nog geen revisiehistorie is.
+  const laatsteRevisie = bundel.recipe_revisies[0];
+  const versienummer = laatsteRevisie
+    ? `${laatsteRevisie.versie_major}.${laatsteRevisie.versie_minor}`
+    : `${bundel.recipes.versie_major ?? 1}.${bundel.recipes.versie_minor ?? 0}`;
+  const vestigingsPrefix = vestigingsBron.slice(0, 2);
+  const bestandsnaam = `${bundel.batch.batchnummer} ${naam} v${versienummer} ${vestigingsPrefix}.xlsx`;
 
   if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-  const outputPath = path.join(OUTPUT_DIR, `batch-${batchnummer}.xlsx`);
+  const outputPath = path.join(OUTPUT_DIR, bestandsnaam);
   await workbook.xlsx.writeFile(outputPath);
   console.log(`Klaar: ${outputPath}`);
 }

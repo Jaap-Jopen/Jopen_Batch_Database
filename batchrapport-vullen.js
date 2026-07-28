@@ -182,7 +182,7 @@ function brVulRevisies(workbook, bundel, revisieMap) {
   bundel.recipe_revisies.forEach((rv, i) => {
     const cellen = revisieMap[String(i + 1)];
     if (!cellen) return;
-    if (cellen.versienummer) brSchrijfCel(workbook, cellen.versienummer, `v${rv.versie_major}.${rv.versie_minor}`);
+    if (cellen.versienummer) brSchrijfCel(workbook, cellen.versienummer, `${rv.versie_major}.${rv.versie_minor}`);
     if (cellen.datum) brSchrijfCel(workbook, cellen.datum, rv.datum);
     if (cellen.door) brSchrijfCel(workbook, cellen.door, rv.door);
     if (cellen.wijziging) brSchrijfCel(workbook, cellen.wijziging, rv.wijziging);
@@ -242,7 +242,10 @@ async function genereerEnDownloadBatchrapport(supabase, batchnummer) {
 
   const naam = bundel.recipes.naam || '';
   const locatie = (bundel.recipes.locatie || '').toLowerCase();
-  const isWP = locatie.includes('waarderpolder') || naam.toUpperCase().startsWith('WP ');
+  // Zie generate-batchrapport.js voor uitleg: WP/Kerk-detectie via short_name,
+  // niet naam -- en Q1 krijgt dezelfde waarde (voedt Brouwen!A1).
+  const vestigingsBron = bundel.recipes.short_name || naam;
+  const isWP = locatie.includes('waarderpolder') || vestigingsBron.toUpperCase().startsWith('WP');
 
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(templateBuffer);
@@ -255,14 +258,23 @@ async function genereerEnDownloadBatchrapport(supabase, batchnummer) {
   brVulHopRendementEnEbu(workbook, bundel);
 
   workbook.getWorksheet('Recept-voorblad').getCell('K3').value = bundel.batch.batchnummer;
-  workbook.getWorksheet('Recept-voorblad').getCell('Q1').value = naam;
+  workbook.getWorksheet('Recept-voorblad').getCell('Q1').value = vestigingsBron;
+
+  // Bestandsnaam volgens de oorspronkelijke VBA-macro:
+  //   K3 & " " & C3 & " v" & A101 & " " & Left(Q1,2) & ".xlsx"
+  const laatsteRevisie = bundel.recipe_revisies[0];
+  const versienummer = laatsteRevisie
+    ? `${laatsteRevisie.versie_major}.${laatsteRevisie.versie_minor}`
+    : `${bundel.recipes.versie_major ?? 1}.${bundel.recipes.versie_minor ?? 0}`;
+  const vestigingsPrefix = vestigingsBron.slice(0, 2);
+  const bestandsnaam = `${bundel.batch.batchnummer} ${naam} v${versienummer} ${vestigingsPrefix}.xlsx`;
 
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `batch-${batchnummer}.xlsx`;
+  a.download = bestandsnaam;
   document.body.appendChild(a);
   a.click();
   a.remove();
