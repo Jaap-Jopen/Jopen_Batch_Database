@@ -55,6 +55,30 @@
   }
   .ing-back:hover { text-decoration: underline; }
 
+  .ing-detail-grid { display: grid; grid-template-columns: minmax(280px, 560px) minmax(280px, 420px); gap: 24px; align-items: start; }
+  @media (max-width: 820px) { .ing-detail-grid { grid-template-columns: 1fr; } }
+
+  .ing-used-in-panel {
+    background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 20px 24px;
+  }
+  .ing-used-in-titel {
+    font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: #6b6355; margin-bottom: 12px;
+  }
+  #ing-used-in-search {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px;
+    font-family: var(--serif); font-size: 14px; margin-bottom: 12px; box-sizing: border-box;
+  }
+  .ing-used-in-lijst { max-height: 480px; overflow-y: auto; }
+  .ing-used-in-rij {
+    display: block; padding: 8px 4px; border-bottom: 1px solid #ece8dc; text-decoration: none; color: inherit;
+  }
+  .ing-used-in-rij:last-child { border-bottom: none; }
+  .ing-used-in-rij:hover { background: #faf8f2; }
+  .ing-used-in-naam { font-size: 14px; color: var(--hop-dark); }
+  .ing-used-in-detail { font-family: var(--mono); font-size: 11px; color: #6b6355; margin-top: 2px; }
+  .ing-used-in-leeg { font-size: 13px; color: #7a7266; padding: 8px 4px; }
+
   .ing-titel { font-size: 32px; margin: 0 0 4px; }
   .ing-meta { font-family: var(--mono); font-size: 13px; color: #6b6355; margin-bottom: 24px; }
 
@@ -112,7 +136,14 @@
 
   <div id="ing-detail">
     <a class="ing-back" id="ing-back-btn">&larr; Back to overview</a>
-    <div id="ing-detail-container"></div>
+    <div class="ing-detail-grid">
+      <div id="ing-detail-container"></div>
+      <div class="ing-used-in-panel">
+        <div class="ing-used-in-titel">Used in recipes</div>
+        <input id="ing-used-in-search" placeholder="Search recipes…" />
+        <div id="ing-used-in-container"><div class="ing-loading">Loading…</div></div>
+      </div>
+    </div>
   </div>
 </main>
 
@@ -250,7 +281,61 @@ function toonDetail(id) {
   document.getElementById('ing-list-view').style.display = 'none';
   document.getElementById('ing-detail').classList.add('actief');
   renderDetailAlleen(id);
+  laadGebruiktInRecepten(id);
 }
+
+let gebruiktInRecepten = [];
+
+async function laadGebruiktInRecepten(ingredientId) {
+  const container = document.getElementById('ing-used-in-container');
+  const zoekVeld = document.getElementById('ing-used-in-search');
+  zoekVeld.value = '';
+  container.innerHTML = '<div class="ing-loading">Loading…</div>';
+
+  const { data, error } = await supabaseClient
+    .from('recipe_ingredients')
+    .select('recipes(id, naam, bierstijl, status)')
+    .eq('ingredient_id', ingredientId);
+
+  if (error) {
+    container.innerHTML = `<div class="ing-error">Could not load recipes: ${escapeHtml(error.message)}</div>`;
+    return;
+  }
+
+  const perId = {};
+  (data || []).forEach(rij => {
+    const r = rij.recipes;
+    if (r && !perId[r.id]) perId[r.id] = r;
+  });
+  gebruiktInRecepten = Object.values(perId).sort((a, b) => (a.naam || '').localeCompare(b.naam || ''));
+
+  renderGebruiktInRecepten(gebruiktInRecepten);
+}
+
+function receptStatusLabel(status) {
+  const labels = { actief: 'Active', concept: 'Draft', gearchiveerd: 'Archived' };
+  return labels[status] || status || 'Unknown';
+}
+
+function renderGebruiktInRecepten(recepten) {
+  const container = document.getElementById('ing-used-in-container');
+  if (recepten.length === 0) {
+    container.innerHTML = '<div class="ing-used-in-leeg">Not used in any recipe.</div>';
+    return;
+  }
+  container.innerHTML = `<div class="ing-used-in-lijst">${recepten.map(r => `
+    <a class="ing-used-in-rij" href="receptoverzicht.html?id=${r.id}" target="_blank" rel="noopener">
+      <div class="ing-used-in-naam">${escapeHtml(r.naam)}</div>
+      <div class="ing-used-in-detail">${escapeHtml(r.bierstijl || '—')} · ${escapeHtml(receptStatusLabel(r.status))}</div>
+    </a>`).join('')}</div>`;
+}
+
+document.getElementById('ing-used-in-search').addEventListener('input', (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  const gefilterd = gebruiktInRecepten.filter(r =>
+    (r.naam || '').toLowerCase().includes(q) || (r.bierstijl || '').toLowerCase().includes(q));
+  renderGebruiktInRecepten(gefilterd);
+});
 
 function renderDetailAlleen(id) {
   const i = alleIngredienten.find(x => String(x.id) === String(id));

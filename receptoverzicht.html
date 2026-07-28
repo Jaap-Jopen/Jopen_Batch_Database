@@ -269,7 +269,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (error) throw error;
     mainEl.classList.add('active');
     connStatus.textContent = 'connected';
-    loadRecipes();
+
+    const directId = new URLSearchParams(window.location.search).get('id');
+    if (directId) {
+      await openDetail(directId);
+    } else {
+      loadRecipes();
+    }
   } catch (e) {
     connStatus.textContent = 'connection failed';
     document.getElementById('list-container').innerHTML =
@@ -743,6 +749,7 @@ async function openDetail(id) {
 document.getElementById('back-btn').addEventListener('click', () => {
   document.getElementById('detail-view').classList.remove('active');
   document.getElementById('list-view').style.display = 'block';
+  if (allRecipes.length === 0) loadRecipes();
 });
 
 function escapeHtml(str) {
