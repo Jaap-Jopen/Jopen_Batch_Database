@@ -97,6 +97,65 @@ a { color: var(--jopen-red); }
 
 .jopen-nav-uitloggen:hover { background: rgba(255,255,255,0.15); }
 
+.jopen-nav-gebruiker-wrap { position: relative; }
+
+.jopen-nav-gebruiker-btn {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.5);
+  color: #ffffff;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.jopen-nav-gebruiker-btn:hover { background: rgba(255,255,255,0.15); }
+
+.jopen-nav-caret { font-size: 0.7em; opacity: 0.85; }
+
+.jopen-nav-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: #ffffff;
+  color: #1f1f1f;
+  border-radius: 6px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.18);
+  min-width: 190px;
+  z-index: 100;
+  overflow: hidden;
+  padding: 4px 0;
+}
+
+.jopen-nav-dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 16px;
+  text-decoration: none;
+  color: #1f1f1f;
+  background: transparent;
+  border: none;
+  font-size: 0.9em;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.jopen-nav-dropdown-item:hover { background: var(--jopen-red-tint); }
+
+.jopen-nav-dropdown-item.actief {
+  font-weight: bold;
+  color: var(--jopen-red);
+}
+
+.jopen-nav-dropdown-divider {
+  border-top: 1px solid #eee;
+  margin: 4px 0;
+}
+
 /* --- Algemene pagina-container --- */
 
 .jopen-pagina {
