@@ -679,7 +679,9 @@ function leesParamGrid(fields) {
 }
 
 function ingredientOpties(geselecteerdId) {
-  return alleIngredientenLijst.map(i =>
+  const leegGeselecteerd = geselecteerdId === null || geselecteerdId === undefined || geselecteerdId === '';
+  const placeholder = `<option value="" ${leegGeselecteerd ? 'selected' : ''}>[empty — not matched]</option>`;
+  return placeholder + alleIngredientenLijst.map(i =>
     `<option value="${i.id}" ${String(i.id) === String(geselecteerdId) ? 'selected' : ''}>${escapeHtml(i.naam)}${i.categorie_naam ? ' — ' + escapeHtml(i.categorie_naam) : ''}</option>`
   ).join('');
 }
@@ -833,7 +835,7 @@ function leesIngredientRegelsUit(tbodyId) {
 
     return {
       rol,
-      ingredient_id: Number(tr.querySelector('.re-ing-ingredient').value),
+      ingredient_id: tr.querySelector('.re-ing-ingredient').value === '' ? null : Number(tr.querySelector('.re-ing-ingredient').value),
       hoeveelheid: tr.querySelector('.re-ing-hoeveelheid').value === '' ? null : Number(tr.querySelector('.re-ing-hoeveelheid').value),
       eenheid: tr.querySelector('.re-ing-eenheid').value.trim() || null,
       tijdstip,
