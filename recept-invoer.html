@@ -254,7 +254,7 @@
             </tr>
           </tfoot>
         </table>
-        <p class="re-versie-uitleg" style="margin-top:-4px;">Calculated color (EBC) needs a confirmed formula before it can be added — see chat.</p>
+        <p class="re-versie-uitleg" style="margin-top:-4px;">Calculated color: <strong id="re-mout-kleur-waarde">—</strong> EBC (weighted by weight/color per malt, ÷ Brouwsel (hl), + 1.75)</p>
         <button type="button" class="re-btn secundair" data-tbody="re-ing-mout-tbody" data-roles="hoofdmout" data-add-btn>+ Add malt/grain</button>
       </div>
 
@@ -966,7 +966,32 @@ function herberekenMoutTotalen() {
 
   const totaalCel = document.getElementById('re-mout-totaal-kg');
   if (totaalCel) totaalCel.textContent = totaalKg.toFixed(1);
+
+  // Calculated color: som van (kg * EBC * 0.08) / Brouwsel (hl) per moutregel,
+  // + 1.75. Excel: Recept-voorblad!F30:F40.
+  const brouwselHlEl = document.getElementById('veld-brouwsel_hl');
+  const brouwselHl = brouwselHlEl && brouwselHlEl.value !== '' ? Number(brouwselHlEl.value) : null;
+  const kleurCel = document.getElementById('re-mout-kleur-waarde');
+  if (kleurCel) {
+    if (!brouwselHl) {
+      kleurCel.textContent = '—';
+    } else {
+      const totaalBijdrage = rijen.reduce((som, tr) => {
+        const kg = Number(tr.querySelector('.re-ing-hoeveelheid').value) || 0;
+        const ebcEl = tr.querySelector('.re-ing-ebc');
+        const ebc = ebcEl && ebcEl.value !== '' ? Number(ebcEl.value) : 0;
+        return som + (kg * ebc * 0.08) / brouwselHl;
+      }, 0);
+      kleurCel.textContent = (totaalBijdrage + 1.75).toFixed(2);
+    }
+  }
 }
+
+// Brouwsel (hl) bepaalt mee de Calculated color, dus bij wijziging daar
+// meteen de moutkleur herberekenen.
+document.addEventListener('input', (e) => {
+  if (e.target && e.target.id === 'veld-brouwsel_hl') herberekenMoutTotalen();
+});
 
 function herberekenHopgewichten() {
   const rijen = leesIngredientRegelsUit('re-ing-hop-tbody');

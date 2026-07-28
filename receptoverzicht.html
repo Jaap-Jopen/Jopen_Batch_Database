@@ -743,6 +743,19 @@ async function openDetail(id) {
       </table>`;
   }
 
+  // Calculated color: som van (kg * EBC * 0.08) / Brouwsel (hl) per moutregel,
+  // + 1.75. Excel: Recept-voorblad!F30:F40.
+  function berekenMoutKleur() {
+    const moutRijen = ings.filter(i => i.rol === 'hoofdmout');
+    if (moutRijen.length === 0 || !r.brouwsel_hl) return null;
+    const totaalBijdrage = moutRijen.reduce((som, i) => {
+      const kg = i.hoeveelheid || 0;
+      const ebc = i.kleur_ebc || 0;
+      return som + (kg * ebc * 0.08) / r.brouwsel_hl;
+    }, 0);
+    return totaalBijdrage + 1.75;
+  }
+
   function hopSomHtml() {
     const hopRijen = ings.filter(i => i.rol === 'hopgift_kook' || i.rol === 'dry_hop');
     if (hopRijen.length === 0) return '<div class="empty">None added.</div>';
@@ -817,6 +830,8 @@ async function openDetail(id) {
       </tbody>
     </table>` : '<div class="empty">No revision history yet.</div>';
 
+  const moutKleur = berekenMoutKleur();
+
   container.innerHTML = `
     <h2 class="recipe-title">${escapeHtml(r.naam)}</h2>
     <div class="recipe-meta">
@@ -840,6 +855,7 @@ async function openDetail(id) {
 
     <div class="section-title">Malt &amp; Grains</div>
     ${ingTabelHtml(['hoofdmout'], false, false, false, true)}
+    <p style="margin-top:-4px; color: var(--tekst-grijs, #555);">Calculated color: <strong>${moutKleur !== null ? moutKleur.toFixed(2) + ' EBC' : '—'}</strong></p>
 
     <div class="section-title">Hops and Herbs</div>
     ${ingTabelHtml(['hopgift_kook', 'dry_hop'], true, true, true, false, true)}
