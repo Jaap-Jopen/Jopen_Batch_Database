@@ -322,7 +322,12 @@
 
       <div class="re-section">
         <h2>Additions Cellar</h2>
-        <div class="re-grid" style="margin-bottom:14px;">
+        <table class="re-ing-table">
+          <thead><tr><th>Ingredient</th><th>Amount</th><th>Unit</th><th>Timing</th><th>Order</th><th>Note</th><th></th></tr></thead>
+          <tbody id="re-ing-keldertoegift-tbody"></tbody>
+        </table>
+        <button type="button" class="re-btn secundair" data-tbody="re-ing-keldertoegift-tbody" data-roles="toegift_kelder" data-add-btn>+ Add cellar addition</button>
+        <div class="re-grid" style="margin-top:16px;">
           <div class="re-field wide">
             <label for="veld-kelder_toevoeging_dag">Cellar addition day</label>
             <input type="number" id="veld-kelder_toevoeging_dag" />
@@ -332,11 +337,6 @@
             <textarea id="veld-comment_verwerken"></textarea>
           </div>
         </div>
-        <table class="re-ing-table">
-          <thead><tr><th>Ingredient</th><th>Amount</th><th>Unit</th><th>Timing</th><th>Order</th><th>Note</th><th></th></tr></thead>
-          <tbody id="re-ing-keldertoegift-tbody"></tbody>
-        </table>
-        <button type="button" class="re-btn secundair" data-tbody="re-ing-keldertoegift-tbody" data-roles="toegift_kelder" data-add-btn>+ Add cellar addition</button>
       </div>
 
       <div class="re-section">
