@@ -1,0 +1,282 @@
+{
+ "dry_hop": {
+  "1": {
+   "naam": "Recept-voorblad!A58",
+   "hoeveelheid": "Recept-voorblad!E58",
+   "tijdstip": "Recept-voorblad!G58"
+  },
+  "2": {
+   "naam": "Recept-voorblad!A59",
+   "hoeveelheid": "Recept-voorblad!E59",
+   "tijdstip": "Recept-voorblad!G59"
+  },
+  "3": {
+   "naam": "Recept-voorblad!A60",
+   "hoeveelheid": "Recept-voorblad!E60",
+   "tijdstip": "Recept-voorblad!G60"
+  },
+  "4": {
+   "naam": "Recept-voorblad!A61",
+   "hoeveelheid": "Recept-voorblad!E61",
+   "tijdstip": "Recept-voorblad!G61"
+  },
+  "5": {
+   "naam": "Recept-voorblad!A62",
+   "hoeveelheid": "Recept-voorblad!E62",
+   "tijdstip": "Recept-voorblad!G62"
+  },
+  "6": {
+   "naam": "Recept-voorblad!A63",
+   "hoeveelheid": "Recept-voorblad!E63",
+   "tijdstip": "Recept-voorblad!G63"
+  }
+ },
+ "gist": {
+  "1": {
+   "hoeveelheid": "Recept-voorblad!G85",
+   "naam": "Recept-voorblad!A85"
+  },
+  "2": {
+   "hoeveelheid": "Recept-voorblad!G86",
+   "naam": "Recept-voorblad!A86"
+  }
+ },
+ "hopgift_kook": {
+  "1": {
+   "naam": "Recept-voorblad!A43",
+   "hdt": "Recept-voorblad!Q43",
+   "alpha_pct": "Recept-voorblad!D43",
+   "hoeveelheid": "Recept-voorblad!E43",
+   "tijdstip": "Recept-voorblad!G43"
+  },
+  "10": {
+   "naam": "Recept-voorblad!A52",
+   "hdt": "Recept-voorblad!Q52",
+   "alpha_pct": "Recept-voorblad!D52",
+   "hoeveelheid": "Recept-voorblad!E52",
+   "tijdstip": "Recept-voorblad!G52"
+  },
+  "11": {
+   "naam": "Recept-voorblad!A53",
+   "hdt": "Recept-voorblad!Q53",
+   "alpha_pct": "Recept-voorblad!D53",
+   "hoeveelheid": "Recept-voorblad!E53",
+   "tijdstip": "Recept-voorblad!G53"
+  },
+  "12": {
+   "naam": "Recept-voorblad!A54",
+   "hdt": "Recept-voorblad!Q54",
+   "alpha_pct": "Recept-voorblad!D54",
+   "hoeveelheid": "Recept-voorblad!E54",
+   "tijdstip": "Recept-voorblad!G54"
+  },
+  "13": {
+   "naam": "Recept-voorblad!A55",
+   "hdt": "Recept-voorblad!Q55",
+   "alpha_pct": "Recept-voorblad!D55",
+   "hoeveelheid": "Recept-voorblad!E55",
+   "tijdstip": "Recept-voorblad!G55"
+  },
+  "14": {
+   "naam": "Recept-voorblad!A56",
+   "hdt": "Recept-voorblad!Q56",
+   "alpha_pct": "Recept-voorblad!D56",
+   "hoeveelheid": "Recept-voorblad!E56",
+   "tijdstip": "Recept-voorblad!G56"
+  },
+  "15": {
+   "naam": "Recept-voorblad!A57",
+   "hdt": "Recept-voorblad!Q57",
+   "alpha_pct": "Recept-voorblad!D57",
+   "hoeveelheid": "Recept-voorblad!E57",
+   "tijdstip": "Recept-voorblad!G57"
+  },
+  "2": {
+   "naam": "Recept-voorblad!A44",
+   "hdt": "Recept-voorblad!Q44",
+   "alpha_pct": "Recept-voorblad!D44",
+   "hoeveelheid": "Recept-voorblad!E44",
+   "tijdstip": "Recept-voorblad!G44"
+  },
+  "3": {
+   "naam": "Recept-voorblad!A45",
+   "hdt": "Recept-voorblad!Q45",
+   "alpha_pct": "Recept-voorblad!D45",
+   "hoeveelheid": "Recept-voorblad!E45",
+   "tijdstip": "Recept-voorblad!G45"
+  },
+  "4": {
+   "naam": "Recept-voorblad!A46",
+   "hdt": "Recept-voorblad!Q46",
+   "alpha_pct": "Recept-voorblad!D46",
+   "hoeveelheid": "Recept-voorblad!E46",
+   "tijdstip": "Recept-voorblad!G46"
+  },
+  "5": {
+   "naam": "Recept-voorblad!A47",
+   "hdt": "Recept-voorblad!Q47",
+   "alpha_pct": "Recept-voorblad!D47",
+   "hoeveelheid": "Recept-voorblad!E47",
+   "tijdstip": "Recept-voorblad!G47"
+  },
+  "6": {
+   "naam": "Recept-voorblad!A48",
+   "hdt": "Recept-voorblad!Q48",
+   "alpha_pct": "Recept-voorblad!D48",
+   "hoeveelheid": "Recept-voorblad!E48",
+   "tijdstip": "Recept-voorblad!G48"
+  },
+  "7": {
+   "naam": "Recept-voorblad!A49",
+   "hdt": "Recept-voorblad!Q49",
+   "alpha_pct": "Recept-voorblad!D49",
+   "hoeveelheid": "Recept-voorblad!E49",
+   "tijdstip": "Recept-voorblad!G49"
+  },
+  "8": {
+   "naam": "Recept-voorblad!A50",
+   "hdt": "Recept-voorblad!Q50",
+   "alpha_pct": "Recept-voorblad!D50",
+   "hoeveelheid": "Recept-voorblad!E50",
+   "tijdstip": "Recept-voorblad!G50"
+  },
+  "9": {
+   "naam": "Recept-voorblad!A51",
+   "hdt": "Recept-voorblad!Q51",
+   "alpha_pct": "Recept-voorblad!D51",
+   "hoeveelheid": "Recept-voorblad!E51",
+   "tijdstip": "Recept-voorblad!G51"
+  }
+ },
+ "hoofdmout": {
+  "1": {
+   "naam": "Recept-voorblad!A30",
+   "hoeveelheid": "Recept-voorblad!D30",
+   "kleur_ebc": "Recept-voorblad!E30"
+  },
+  "10": {
+   "naam": "Recept-voorblad!A39",
+   "hoeveelheid": "Recept-voorblad!D39",
+   "kleur_ebc": "Recept-voorblad!E39"
+  },
+  "2": {
+   "naam": "Recept-voorblad!A31",
+   "hoeveelheid": "Recept-voorblad!D31",
+   "kleur_ebc": "Recept-voorblad!E31"
+  },
+  "3": {
+   "naam": "Recept-voorblad!A32",
+   "hoeveelheid": "Recept-voorblad!D32",
+   "kleur_ebc": "Recept-voorblad!E32"
+  },
+  "4": {
+   "naam": "Recept-voorblad!A33",
+   "hoeveelheid": "Recept-voorblad!D33",
+   "kleur_ebc": "Recept-voorblad!E33"
+  },
+  "5": {
+   "naam": "Recept-voorblad!A34",
+   "hoeveelheid": "Recept-voorblad!D34",
+   "kleur_ebc": "Recept-voorblad!E34"
+  },
+  "6": {
+   "naam": "Recept-voorblad!A35",
+   "hoeveelheid": "Recept-voorblad!D35",
+   "kleur_ebc": "Recept-voorblad!E35"
+  },
+  "7": {
+   "naam": "Recept-voorblad!A36",
+   "hoeveelheid": "Recept-voorblad!D36",
+   "kleur_ebc": "Recept-voorblad!E36"
+  },
+  "8": {
+   "naam": "Recept-voorblad!A37",
+   "hoeveelheid": "Recept-voorblad!D37",
+   "kleur_ebc": "Recept-voorblad!E37"
+  },
+  "9": {
+   "naam": "Recept-voorblad!A38",
+   "hoeveelheid": "Recept-voorblad!D38",
+   "kleur_ebc": "Recept-voorblad!E38"
+  }
+ },
+ "toegift_brouwerij": {
+  "1": {
+   "tijdstip": "Recept-voorblad!I73",
+   "hoeveelheid": "Recept-voorblad!E73",
+   "naam": "Recept-voorblad!A73"
+  },
+  "10": {
+   "tijdstip": "Recept-voorblad!I82",
+   "hoeveelheid": "Recept-voorblad!E82",
+   "naam": "Recept-voorblad!A82"
+  },
+  "2": {
+   "tijdstip": "Recept-voorblad!I74",
+   "hoeveelheid": "Recept-voorblad!E74",
+   "naam": "Recept-voorblad!A74"
+  },
+  "3": {
+   "tijdstip": "Recept-voorblad!I75",
+   "hoeveelheid": "Recept-voorblad!E75",
+   "naam": "Recept-voorblad!A75"
+  },
+  "4": {
+   "tijdstip": "Recept-voorblad!I76",
+   "hoeveelheid": "Recept-voorblad!E76",
+   "naam": "Recept-voorblad!A76"
+  },
+  "5": {
+   "tijdstip": "Recept-voorblad!I77",
+   "hoeveelheid": "Recept-voorblad!E77",
+   "naam": "Recept-voorblad!A77"
+  },
+  "6": {
+   "tijdstip": "Recept-voorblad!I78",
+   "hoeveelheid": "Recept-voorblad!E78",
+   "naam": "Recept-voorblad!A78"
+  },
+  "7": {
+   "tijdstip": "Recept-voorblad!I79",
+   "hoeveelheid": "Recept-voorblad!E79",
+   "naam": "Recept-voorblad!A79"
+  },
+  "8": {
+   "tijdstip": "Recept-voorblad!I80",
+   "hoeveelheid": "Recept-voorblad!E80",
+   "naam": "Recept-voorblad!A80"
+  },
+  "9": {
+   "tijdstip": "Recept-voorblad!I81",
+   "hoeveelheid": "Recept-voorblad!E81",
+   "naam": "Recept-voorblad!A81"
+  }
+ },
+ "toegift_kelder": {
+  "1": {
+   "tijdstip": "Recept-voorblad!I89",
+   "hoeveelheid": "Recept-voorblad!E89",
+   "naam": "Recept-voorblad!A89"
+  },
+  "2": {
+   "tijdstip": "Recept-voorblad!I90",
+   "hoeveelheid": "Recept-voorblad!E90",
+   "naam": "Recept-voorblad!A90"
+  },
+  "3": {
+   "tijdstip": "Recept-voorblad!I91",
+   "hoeveelheid": "Recept-voorblad!E91",
+   "naam": "Recept-voorblad!A91"
+  },
+  "4": {
+   "tijdstip": "Recept-voorblad!I92",
+   "hoeveelheid": "Recept-voorblad!E92",
+   "naam": "Recept-voorblad!A92"
+  },
+  "5": {
+   "tijdstip": "Recept-voorblad!I93",
+   "hoeveelheid": "Recept-voorblad!E93",
+   "naam": "Recept-voorblad!A93"
+  }
+ }
+}

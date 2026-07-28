@@ -1,0 +1,17 @@
+{
+  "name": "batchrapport-generator",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "generate": "node generate-batchrapport.js",
+    "test": "node test-fill.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.110.9",
+    "exceljs": "^4.4.0"
+  }
+}
