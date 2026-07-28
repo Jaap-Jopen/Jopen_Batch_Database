@@ -58,7 +58,7 @@
   .ing-titel { font-size: 32px; margin: 0 0 4px; }
   .ing-meta { font-family: var(--mono); font-size: 13px; color: #6b6355; margin-bottom: 24px; }
 
-  .ing-card { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 20px 24px; max-width: 480px; }
+  .ing-card { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 20px 24px; max-width: 560px; }
   .ing-kv { display: flex; justify-content: space-between; font-size: 14px; padding: 6px 0; border-bottom: 1px solid #ece8dc; }
   .ing-kv:last-child { border-bottom: none; }
   .ing-kv span:first-child { color: #6b6355; }
@@ -426,7 +426,7 @@ function toonNieuwFormulier() {
     <div class="ing-card">
       <div class="ing-edit-row">
         <label for="nieuw-naam">Name *</label>
-        <input type="text" id="nieuw-naam" required />
+        <input type="text" id="nieuw-naam" required style="width:280px; text-align:left;" />
       </div>
       <div class="ing-edit-row">
         <label for="nieuw-category_id">Category *</label>
@@ -440,7 +440,10 @@ function toonNieuwFormulier() {
       <div id="nieuw-extract_pct-rij">${veld('Extract %', 'nieuw-extract_pct', '%', 'number')}</div>
       <div id="nieuw-alpha_pct-rij">${veld('Alpha %', 'nieuw-alpha_pct', '%', 'number')}</div>
       <div id="nieuw-gistfactor-rij">${veld('Yeast factor', 'nieuw-gistfactor', '', 'number')}</div>
-      ${veld('Supplier', 'nieuw-leverancier')}
+      <div class="ing-edit-row">
+        <label for="nieuw-leverancier">Supplier</label>
+        <input type="text" id="nieuw-leverancier" style="width:280px; text-align:left;" />
+      </div>
       <div class="ing-edit-row">
         <label for="nieuw-status">Status</label>
         <select id="nieuw-status" style="width:160px;">
