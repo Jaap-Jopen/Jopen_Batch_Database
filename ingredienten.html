@@ -36,7 +36,10 @@
     text-align: left; font-family: var(--mono); font-size: 11px; text-transform: uppercase;
     letter-spacing: 0.08em; color: #6b6355; padding: 10px 14px; border-bottom: 2px solid var(--hop-dark);
   }
+  table.ing-tabel thead th.ing-sorteerbaar { cursor: pointer; user-select: none; white-space: nowrap; }
+  table.ing-tabel thead th.ing-sorteerbaar:hover { color: var(--hop-dark); }
   table.ing-tabel tbody td { padding: 12px 14px; border-bottom: 1px solid var(--line); font-size: 15px; }
+  table.ing-tabel tbody td.ing-tabel-getal { font-family: var(--mono); text-align: right; }
   table.ing-tabel tbody tr { cursor: pointer; }
   table.ing-tabel tbody tr:hover { background: #eef0e6; }
 
@@ -181,21 +184,48 @@ async function initIngredientenPagina() {
 
 document.getElementById('ing-nieuw-btn').addEventListener('click', toonNieuwFormulier);
 
+async function haalAlleRijenOp(query) {
+  const PAGINA = 1000;
+  let vanaf = 0;
+  let alles = [];
+  while (true) {
+    const { data, error } = await query.range(vanaf, vanaf + PAGINA - 1);
+    if (error) return { data: null, error };
+    alles = alles.concat(data || []);
+    if (!data || data.length < PAGINA) break;
+    vanaf += PAGINA;
+  }
+  return { data: alles, error: null };
+}
+
 async function laadIngredienten() {
   const container = document.getElementById('ing-list-container');
-  const { data, error } = await supabaseClient
-    .from('ingredients')
-    .select('id, naam, categorie, category_id, eenheid, prijs, extract_pct, alpha_pct, gistfactor, leverancier, status, ingredient_categories(name, uses_alpha_pct, uses_extract_pct, uses_gistfactor)')
-    .order('naam');
+  const [ingResult, usageResult] = await Promise.all([
+    supabaseClient
+      .from('ingredients')
+      .select('id, naam, categorie, category_id, eenheid, prijs, extract_pct, alpha_pct, gistfactor, leverancier, status, ingredient_categories(name, uses_alpha_pct, uses_extract_pct, uses_gistfactor)')
+      .order('naam'),
+    haalAlleRijenOp(supabaseClient.from('recipe_ingredients').select('ingredient_id, recipe_id')),
+  ]);
 
-  if (error) {
-    container.innerHTML = `<div class="ing-error">Error loading: ${error.message}</div>`;
+  if (ingResult.error) {
+    container.innerHTML = `<div class="ing-error">Error loading: ${ingResult.error.message}</div>`;
     return;
   }
 
-  alleIngredienten = data || [];
+  const receptenPerIngredient = {};
+  (usageResult.data || []).forEach(rij => {
+    if (rij.ingredient_id == null) return;
+    if (!receptenPerIngredient[rij.ingredient_id]) receptenPerIngredient[rij.ingredient_id] = new Set();
+    receptenPerIngredient[rij.ingredient_id].add(rij.recipe_id);
+  });
+
+  alleIngredienten = (ingResult.data || []).map(i => ({
+    ...i,
+    gebruikt_in_aantal: receptenPerIngredient[i.id] ? receptenPerIngredient[i.id].size : 0,
+  }));
   vulFilters(alleIngredienten);
-  renderIngLijst(alleIngredienten);
+  pasFiltersToe();
 }
 
 function vulFilters(ingredienten) {
@@ -230,6 +260,30 @@ function huidigeFilters() {
   };
 }
 
+let huidigeSortering = { kolom: 'naam', oplopend: true };
+let laatstGefilterd = [];
+
+const SORT_KOLOMMEN = {
+  naam: i => (i.naam || '').toLowerCase(),
+  categorie: i => (i.ingredient_categories?.name || i.categorie || '').toLowerCase(),
+  eenheid: i => (i.eenheid || '').toLowerCase(),
+  leverancier: i => (i.leverancier || '').toLowerCase(),
+  status: i => (i.status || '').toLowerCase(),
+  gebruikt_in_aantal: i => i.gebruikt_in_aantal || 0,
+};
+
+function pasSorteringToe(lijst) {
+  const { kolom, oplopend } = huidigeSortering;
+  const getWaarde = SORT_KOLOMMEN[kolom] || SORT_KOLOMMEN.naam;
+  const gesorteerd = [...lijst].sort((a, b) => {
+    const va = getWaarde(a), vb = getWaarde(b);
+    if (va < vb) return oplopend ? -1 : 1;
+    if (va > vb) return oplopend ? 1 : -1;
+    return 0;
+  });
+  return gesorteerd;
+}
+
 function pasFiltersToe() {
   const { zoek, categorie, status } = huidigeFilters();
   const gefilterd = alleIngredienten.filter(i => {
@@ -240,12 +294,27 @@ function pasFiltersToe() {
     const matchtStatus = !status || i.status === status;
     return matchtZoek && matchtCategorie && matchtStatus;
   });
-  renderIngLijst(gefilterd);
+  laatstGefilterd = gefilterd;
+  renderIngLijst(pasSorteringToe(gefilterd));
 }
 
 document.getElementById('ing-search').addEventListener('input', pasFiltersToe);
 document.getElementById('ing-filter-categorie').addEventListener('change', pasFiltersToe);
 document.getElementById('ing-filter-status').addEventListener('change', pasFiltersToe);
+
+function zetSortering(kolom) {
+  if (huidigeSortering.kolom === kolom) {
+    huidigeSortering.oplopend = !huidigeSortering.oplopend;
+  } else {
+    huidigeSortering = { kolom, oplopend: true };
+  }
+  renderIngLijst(pasSorteringToe(laatstGefilterd));
+}
+
+function sorteerPijl(kolom) {
+  if (huidigeSortering.kolom !== kolom) return '';
+  return huidigeSortering.oplopend ? ' &#9650;' : ' &#9660;';
+}
 
 function renderIngLijst(ingredienten) {
   const container = document.getElementById('ing-list-container');
@@ -264,14 +333,24 @@ function renderIngLijst(ingredienten) {
       <td>${escapeHtml(i.eenheid || '—')}</td>
       <td>${escapeHtml(i.leverancier || '—')}</td>
       <td><span class="status-pill status-${i.status || 'onbekend'}">${escapeHtml(statusLabel(i.status))}</span></td>
+      <td class="ing-tabel-getal">${i.gebruikt_in_aantal}</td>
     </tr>`).join('');
+
+  const kolommen = [
+    ['naam', 'Name'], ['categorie', 'Category'], ['eenheid', 'Unit'],
+    ['leverancier', 'Supplier'], ['status', 'Status'], ['gebruikt_in_aantal', 'Used in # recipes'],
+  ];
 
   container.innerHTML = `
     <table class="ing-tabel">
-      <thead><tr><th>Name</th><th>Category</th><th>Unit</th><th>Supplier</th><th>Status</th></tr></thead>
+      <thead><tr>${kolommen.map(([kolom, label]) =>
+        `<th class="ing-sorteerbaar${kolom === 'gebruikt_in_aantal' ? ' ing-tabel-getal' : ''}" data-kolom="${kolom}">${label}${sorteerPijl(kolom)}</th>`).join('')}</tr></thead>
       <tbody>${rijen}</tbody>
     </table>`;
 
+  container.querySelectorAll('thead th').forEach(th => {
+    th.addEventListener('click', () => zetSortering(th.dataset.kolom));
+  });
   container.querySelectorAll('tbody tr').forEach(tr => {
     tr.addEventListener('click', () => toonDetail(tr.dataset.id));
   });
