@@ -70,7 +70,7 @@
   }
   .re-comment-row { margin-bottom: 10px; }
   .re-comment-row label { display: block; font-family: var(--mono); font-size: 11px; color: #6b6355; margin-bottom: 4px; }
-  .re-comment-row input {
+  .re-comment-row input, .re-comment-row textarea {
     width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px;
     font-family: var(--serif); font-size: 14px; background: #fff;
   }
@@ -640,16 +640,7 @@ function renderBrouwSecties(containerId, secties, data) {
     <div class="re-full-span">
       <div class="re-subkop">Comments</div>
       <div class="re-comment-row">
-        <label for="veld-comment-1">Comment 1</label>
-        <input type="text" id="veld-comment-1" />
-      </div>
-      <div class="re-comment-row">
-        <label for="veld-comment-2">Comment 2</label>
-        <input type="text" id="veld-comment-2" />
-      </div>
-      <div class="re-comment-row">
-        <label for="veld-comment-3">Comment 3</label>
-        <input type="text" id="veld-comment-3" />
+        <textarea id="veld-comments" style="min-height:70px;"></textarea>
       </div>
     </div>
   `;
@@ -1078,9 +1069,7 @@ document.getElementById('re-kopieer-btn').addEventListener('click', async () => 
   renderVeldenGrid('re-kosten-grid', KOSTEN_FIELDS, kosten.data || {});
   vulExtraVeldenUit(ferm.data || {}, processtappen.data || {});
   const bronComments = (comments.data && comments.data.comments) || [];
-  document.getElementById('veld-comment-1').value = bronComments[0] || '';
-  document.getElementById('veld-comment-2').value = bronComments[1] || '';
-  document.getElementById('veld-comment-3').value = bronComments[2] || '';
+  document.getElementById('veld-comments').value = bronComments.join(' ');
 
   vulIngredientSectiesUit(ingredients.data || []);
 
@@ -1132,9 +1121,7 @@ async function laadBestaandRecept(id) {
   renderVeldenGrid('re-kosten-grid', KOSTEN_FIELDS, kosten.data || {});
   vulExtraVeldenUit(ferm.data || {}, processtappen.data || {});
   const bestaandeComments = (comments.data && comments.data.comments) || [];
-  document.getElementById('veld-comment-1').value = bestaandeComments[0] || '';
-  document.getElementById('veld-comment-2').value = bestaandeComments[1] || '';
-  document.getElementById('veld-comment-3').value = bestaandeComments[2] || '';
+  document.getElementById('veld-comments').value = bestaandeComments.join(' ');
 
   vulIngredientSectiesUit(ingredients.data || []);
 
@@ -1483,11 +1470,8 @@ async function schrijfGerelateerdeData(recipeId) {
   const { totalWpHop, totalDryHop } = berekenHopTotalen();
   processtappen.total_wp_hop = totalWpHop;
   processtappen.total_dry_hop = totalDryHop;
-  const comments = [
-    document.getElementById('veld-comment-1').value.trim(),
-    document.getElementById('veld-comment-2').value.trim(),
-    document.getElementById('veld-comment-3').value.trim(),
-  ].filter(c => c !== '');
+  const commentsTekst = document.getElementById('veld-comments').value.trim();
+  const comments = commentsTekst ? [commentsTekst] : [];
   const ingredientRegels = leesAlleIngredientRegels();
 
   const { error: specsErr } = await supabaseClient.from('recipe_specificaties').upsert({ recipe_id: recipeId, ...specs });
