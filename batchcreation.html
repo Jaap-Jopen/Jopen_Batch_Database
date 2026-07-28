@@ -125,15 +125,17 @@
       <h2>Recent batches</h2>
       <div class="bc-lijst-box">
         <table class="bc-lijst-table">
-          <thead><tr><th>Batch number</th><th>Recipe</th><th>Created</th></tr></thead>
-          <tbody id="bc-lijst-tbody"><tr><td colspan="3" class="bc-skeleton">Loading…</td></tr></tbody>
+          <thead><tr><th>Batch number</th><th>Recipe</th><th>Created</th><th></th></tr></thead>
+          <tbody id="bc-lijst-tbody"><tr><td colspan="4" class="bc-skeleton">Loading…</td></tr></tbody>
         </table>
       </div>
     </section>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="config.js"></script>
+  <script src="batchrapport-vullen.js"></script>
   <script src="nav.js"></script>
   <script>
     let alleRecepten = [];
@@ -261,14 +263,24 @@
         return;
       }
 
-      melding.textContent = 'Batch created.';
+      melding.textContent = 'Batch created — generating report…';
       melding.className = 'ok';
+      const batchnummerGemaakt = Number(batchnummerVal);
       document.getElementById('bc-recept-zoek').value = '';
       document.getElementById('bc-batchnummer').value = '';
       document.getElementById('bc-geselecteerd').style.display = 'none';
       geselecteerdRecipeId = null;
       werkMaakKnopBij();
       laadRecenteBatches();
+
+      try {
+        await genereerEnDownloadBatchrapport(supabaseClient, batchnummerGemaakt);
+        melding.textContent = 'Batch created and report downloaded.';
+      } catch (genErr) {
+        console.error(genErr);
+        melding.textContent = 'Batch created, but the report could not be generated: ' + genErr.message;
+        melding.className = 'fout';
+      }
     });
 
     // Standaard het laatst aangemaakte bovenaan (op aanmaaktijdstip, niet op
@@ -282,11 +294,11 @@
         .limit(50);
 
       if (error) {
-        tbody.innerHTML = `<tr><td colspan="3" style="color:#a33f2c;">Could not load batches: ${escapeHtml(error.message)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" style="color:#a33f2c;">Could not load batches: ${escapeHtml(error.message)}</td></tr>`;
         return;
       }
       if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="bc-skeleton">No batches created yet.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="bc-skeleton">No batches created yet.</td></tr>';
         return;
       }
       tbody.innerHTML = data.map(b => `
@@ -294,7 +306,26 @@
           <td>${escapeHtml(String(b.batchnummer))}</td>
           <td>${escapeHtml(b.naam)}</td>
           <td>${b.aangemaakt_op ? new Date(b.aangemaakt_op).toLocaleString() : '—'}</td>
+          <td><button type="button" class="bc-download-btn" data-batchnummer="${b.batchnummer}" style="background:none;border:1px solid var(--jopen-red);color:var(--jopen-red);border-radius:4px;padding:3px 10px;cursor:pointer;font-size:0.85em;">Download</button></td>
         </tr>`).join('');
+
+      tbody.querySelectorAll('.bc-download-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const nr = Number(btn.dataset.batchnummer);
+          const origineleTekst = btn.textContent;
+          btn.textContent = 'Generating…';
+          btn.disabled = true;
+          try {
+            await genereerEnDownloadBatchrapport(supabaseClient, nr);
+          } catch (err) {
+            console.error(err);
+            alert('Could not generate report: ' + err.message);
+          } finally {
+            btn.textContent = origineleTekst;
+            btn.disabled = false;
+          }
+        });
+      });
     }
 
     window.addEventListener('DOMContentLoaded', async () => {

@@ -177,6 +177,29 @@ a { color: var(--jopen-red); }
 
 /* --- Dashboard-tegels (index.html) --- */
 
+.jopen-groep { margin-bottom: 28px; }
+
+.jopen-groep-titel {
+  background: var(--jopen-red);
+  color: #ffffff;
+  font-size: 0.85em;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 10px 16px;
+  border-radius: 6px 6px 0 0;
+  margin: 0;
+}
+
+.jopen-groep .jopen-tegels {
+  background: #ffffff;
+  border: 1px solid #ddd;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  padding: 16px;
+  margin: 0;
+}
+
 .jopen-tegels {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
