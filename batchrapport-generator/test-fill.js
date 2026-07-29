@@ -1,7 +1,9 @@
-const ExcelJS = require('exceljs');
+const fs = require('fs');
+const JSZip = require('jszip');
+const { XlsxDirectWriter, StylesManager } = require('./xlsx-direct');
 const {
   vulScalaireVelden, vulWpKerkVelden, vulReceptnaamKruisVelden, vulIngredientRijen, vulRevisies,
-  vulFormaten, vulHopRendementEnEbu, zetHopGroepRanden, repareerRijCelMismatch,
+  vulFormaten, vulHopRendementEnEbu, zetHopGroepRanden,
 } = require('./generate-batchrapport');
 
 async function test() {
@@ -41,28 +43,37 @@ async function test() {
     batch: { batchnummer: 99999 },
   };
 
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.readFile('./Batchrapport_sjabloon.xlsx');
+  const templateBuffer = fs.readFileSync('./Batchrapport_sjabloon.xlsx');
+  const zip = await JSZip.loadAsync(templateBuffer);
+  const writer = new XlsxDirectWriter(zip);
+  await writer.init();
+  const stylesManager = new StylesManager(zip);
+  await stylesManager.init();
 
-  vulScalaireVelden(workbook, bundel, true);
-  vulWpKerkVelden(workbook, bundel, true);
-  vulReceptnaamKruisVelden(workbook, bundel, true);
-  vulIngredientRijen(workbook, bundel);
-  vulRevisies(workbook, bundel);
-  vulFormaten(workbook, bundel);
-  vulHopRendementEnEbu(workbook, bundel);
-  zetHopGroepRanden(workbook, bundel);
-  workbook.getWorksheet('Recept-voorblad').getCell('K3').value = bundel.batch.batchnummer;
-  workbook.getWorksheet('Recept-voorblad').getCell('Q1').value = bundel.recipes.short_name;
+  await vulScalaireVelden(writer, bundel, true);
+  await vulWpKerkVelden(writer, bundel, true);
+  await vulReceptnaamKruisVelden(writer, bundel, true);
+  await vulIngredientRijen(writer, bundel);
+  await vulRevisies(writer, bundel);
+  await vulFormaten(writer, bundel);
+  await vulHopRendementEnEbu(writer, bundel);
+  await zetHopGroepRanden(writer, stylesManager, bundel);
 
-  const ruweBuffer = await workbook.xlsx.writeBuffer();
-  const gerepareerdeBuffer = await repareerRijCelMismatch(ruweBuffer);
-  require('fs').writeFileSync('./output/TEST-batch.xlsx', gerepareerdeBuffer);
+  await writer.setCelWaarde('Recept-voorblad!K3', bundel.batch.batchnummer);
+  await writer.setCelWaarde('Recept-voorblad!Q1', bundel.recipes.short_name);
+
+  stylesManager.finalize();
+  await writer.finalize();
+  const outBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+  fs.writeFileSync('./output/TEST-batch.xlsx', outBuffer);
   console.log('Testbestand geschreven: ./output/TEST-batch.xlsx');
 
   // Meteen een paar cellen terug uitlezen ter controle
-  const ws = workbook.getWorksheet('Recept-voorblad');
-  const wsB = workbook.getWorksheet('Brouwen');
+  const ExcelJS = require('exceljs');
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.readFile('./output/TEST-batch.xlsx');
+  const ws = wb.getWorksheet('Recept-voorblad');
+  const wsB = wb.getWorksheet('Brouwen');
   console.log('C3 (naam bier):', ws.getCell('C3').value);
   console.log('F12 (origineel extract spec):', ws.getCell('F12').value);
   console.log('E12 (tolerantie, was string "0.5" -- moet nu getal 0.5 zijn):', ws.getCell('E12').value, typeof ws.getCell('E12').value);
@@ -70,7 +81,6 @@ async function test() {
   console.log('D43 (hop 1 alpha):', ws.getCell('D43').value);
   console.log('I43 (hop 1 rendement):', ws.getCell('I43').value);
   console.log('K43 (hop 1 EBU):', ws.getCell('K43').value);
-  console.log('K44 (hop 2 EBU, kooktijd 0):', ws.getCell('K44').value);
   console.log('K64 (totale bitterheid):', ws.getCell('K64').value);
   console.log('A30 (mout 1 naam):', ws.getCell('A30').value);
   console.log('D30 (mout 1 kg):', ws.getCell('D30').value);
@@ -79,12 +89,11 @@ async function test() {
   console.log('Brouwen!F8 (WP -> moet live formule zijn):', wsB.getCell('F8').value);
   console.log('Brouwen!F9 (WP -> recept_naam_software):', wsB.getCell('F9').value);
   console.log('Brouwen!F11 (altijd naam_special_bin):', wsB.getCell('F11').value);
-  console.log('Brouwen!M36 (Automatic dosing, Inmaischen Zuur):', wsB.getCell('M36').value);
-  console.log('Brouwen!N36 (Automatic dosing, Inmaischen Tannines):', wsB.getCell('N36').value);
-  console.log('A43 (Magnum, 45min, 1e van groep -> GEEN dikke rand):', JSON.stringify(ws.getCell('A43').border));
-  console.log('A44 (Saaz, 45min, laatste van groep -> WEL dikke rand):', JSON.stringify(ws.getCell('A44').border));
-  console.log('A45 (Citra CRYO, 0min, laatste rij -> WEL dikke rand):', JSON.stringify(ws.getCell('A45').border));
-  console.log('Brouwen!N8 (Gewenste stamwort, moet 16 zijn: 16 origineel extract + 0 correctie):', wsB.getCell('N8').value);
+  console.log('Brouwen!M36 (Automatic dosing):', wsB.getCell('M36').value);
+  console.log('Brouwen!N8 (Gewenste stamwort, moet 16 zijn):', wsB.getCell('N8').value);
+  console.log('A43 border (moet GEEN dikke rand):', JSON.stringify(ws.getCell('A43').border));
+  console.log('A44 border (moet WEL dikke rand, laatste 45min):', JSON.stringify(ws.getCell('A44').border));
+  console.log('A45 border (moet WEL dikke rand, 0min):', JSON.stringify(ws.getCell('A45').border));
 }
 
 test().catch(e => { console.error(e); process.exit(1); });

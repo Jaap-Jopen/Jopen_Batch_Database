@@ -8,6 +8,14 @@
  * mapping-bestanden in ./data), herberekent Hop-rendement/EBU en laat alle
  * overige formules in het sjabloon met rust.
  *
+ * Schrijft rechtstreeks in de ruwe sheet-XML (zie xlsx-direct.js) i.p.v. via
+ * ExcelJS' load/save-cyclus -- die bleek zelf meerdere dingen te breken die
+ * niets met onze eigen wijzigingen te maken hadden (rij/cel-mismatches, een
+ * verminkte Print Area, een foute sheetPr-elementvolgorde, een herbouwde
+ * stijlentabel). Door alleen de specifieke cellen te vervangen die we echt
+ * moeten invullen, en de rest van het bestand volledig ongemoeid te laten,
+ * kunnen die problemen niet meer optreden.
+ *
  * Gebruik:
  *   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node generate-batchrapport.js <batchnummer>
  *
@@ -15,15 +23,15 @@
  * config.js), dit script draait server-side/lokaal en moet buiten RLS om alle
  * receptdata kunnen lezen. Nooit deze key in een browser/frontend gebruiken.
  *
- * Output: ./output/batch-<batchnummer>.xlsx
+ * Output: ./output/<batchnummer> <naam> v<versie> <WP/prefix>.xlsx
  * -----------------------------------------------------------------------
  */
 
 const path = require('path');
 const fs = require('fs');
-const ExcelJS = require('exceljs');
 const JSZip = require('jszip');
 const { createClient } = require('@supabase/supabase-js');
+const { XlsxDirectWriter, StylesManager } = require('./xlsx-direct');
 
 const SCALAR_MAP = require('./data/scalar_field_map.json');
 const INGREDIENT_MAP = require('./data/ingredient_field_map.json');
@@ -39,7 +47,8 @@ const OUTPUT_DIR = path.join(__dirname, 'output');
 // EBU Berekening!T2:AF27 + Recept-voorblad!K43). Bewust hier gedupliceerd
 // i.p.v. gedeeld via een <script>-bestand, omdat dit script in Node draait
 // en de webpagina's in de browser — zie qua onderhoud: als de tabel ooit
-// verandert, moet dat op BEIDE plekken (hier en in de twee HTML-bestanden).
+// verandert, moet dat op ALLE drie plekken (hier, batchrapport-vullen.js,
+// en de twee HTML-bestanden).
 // ---------------------------------------------------------------------------
 const HOP_SG_BUCKETS = [1.02, 1.03, 1.04, 1.05, 1.06, 1.07, 1.08, 1.09, 1.10, 1.11, 1.12, 1.13];
 const HOP_RENDEMENT_TABEL = [
@@ -96,101 +105,6 @@ function bepaalHopEbu(gewichtGram, alphaPct, kooktijd, og, volumeKookHl) {
 // ---------------------------------------------------------------------------
 // Supabase ophalen
 // ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
-// Workaround voor een ExcelJS-bug: bij het opslaan van sheets met
-// (verticaal) samengevoegde cellen zet ExcelJS soms cellen in de verkeerde
-// <row>-container (bv. een cel met r="C33" belandt binnen <row r="32">).
-// Technisch ongeldige XML-semantiek die LibreOffice/ExcelJS zelf
-// stilzwijgend tolereren, maar waar Microsoft Excel op struikelt ("er zijn
-// problemen aangetroffen..."). Hersteld door na het opslaan de cel-rijnummers
-// gelijk te trekken aan hun daadwerkelijke <row>-container.
-// ---------------------------------------------------------------------------
-function kolomLetterNaarNummer(letters) {
-  let num = 0;
-  for (const ch of letters) num = num * 26 + (ch.charCodeAt(0) - 64);
-  return num;
-}
-function kolomNummerNaarLetter(num) {
-  let letters = '';
-  while (num > 0) {
-    const rest = (num - 1) % 26;
-    letters = String.fromCharCode(65 + rest) + letters;
-    num = Math.floor((num - 1) / 26);
-  }
-  return letters;
-}
-
-// ExcelJS herberekent <dimension> bij het opslaan op basis van cellen mét
-// waarde/formule, en telt leeg-maar-opgemaakte cellen (zoals een gestylede
-// marge-kolom A) niet mee. Daardoor kan de dimensie "smaller" worden dan de
-// daadwerkelijk aanwezige cellen (bv. B1:R103 terwijl er ook A-cellen met
-// alleen opmaak bestaan) -- Excel beschouwt dat als inconsistent en gooit
-// celinformatie buiten de dimensie weg. Hersteld door de dimensie opnieuw
-// te berekenen over ALLE aanwezige celverwijzingen, ongeacht inhoud.
-function repareerDimensie(xml) {
-  const alleCellen = [...xml.matchAll(/<c r="([A-Z]+)(\d+)"/g)];
-  if (alleCellen.length === 0) return xml;
-  let minCol = Infinity, maxCol = -Infinity, minRow = Infinity, maxRow = -Infinity;
-  for (const [, colLetters, rowStr] of alleCellen) {
-    const col = kolomLetterNaarNummer(colLetters);
-    const row = Number(rowStr);
-    if (col < minCol) minCol = col;
-    if (col > maxCol) maxCol = col;
-    if (row < minRow) minRow = row;
-    if (row > maxRow) maxRow = row;
-  }
-  const nieuweRef = `${kolomNummerNaarLetter(minCol)}${minRow}:${kolomNummerNaarLetter(maxCol)}${maxRow}`;
-  return xml.replace(/<dimension ref="[^"]*"\/>/, `<dimension ref="${nieuweRef}"/>`);
-}
-
-async function repareerRijCelMismatch(buffer) {
-  const zip = await JSZip.loadAsync(buffer);
-  const sheetFiles = Object.keys(zip.files).filter(f => /^xl\/worksheets\/sheet\d+\.xml$/.test(f));
-
-  for (const filePath of sheetFiles) {
-    let xml = await zip.file(filePath).async('string');
-    xml = xml.replace(/<row [^>]*r="(\d+)"[^>]*>([\s\S]*?)<\/row>/g, (heleMatch, rowNum, inhoud) => {
-      const nieuweInhoud = inhoud.replace(/(<c r="[A-Z]+)(\d+)(")/g, (m, prefix, celRij, suffix) => (
-        celRij !== rowNum ? prefix + rowNum + suffix : m
-      ));
-      return heleMatch.replace(inhoud, nieuweInhoud);
-    });
-
-    // Schema-volgorde in <sheetPr>: outlinePr moet vóór pageSetUpPr staan.
-    // ExcelJS voegt zijn eigen outlinePr altijd toe NA een al bestaande
-    // pageSetUpPr, wat Excel afkeurt. Hersteld door de twee om te wisselen
-    // waar ze samen voorkomen.
-    xml = xml.replace(/<sheetPr([^>]*)>([\s\S]*?)<\/sheetPr>/, (heleMatch, attrs, inhoud) => {
-      const pageSetUpMatch = inhoud.match(/<pageSetUpPr[^>]*\/>/);
-      const outlineMatch = inhoud.match(/<outlinePr[^>]*\/>/);
-      if (pageSetUpMatch && outlineMatch && inhoud.indexOf(pageSetUpMatch[0]) < inhoud.indexOf(outlineMatch[0])) {
-        const rest = inhoud.replace(pageSetUpMatch[0], '').replace(outlineMatch[0], '');
-        return `<sheetPr${attrs}>${outlineMatch[0]}${pageSetUpMatch[0]}${rest}</sheetPr>`;
-      }
-      return heleMatch;
-    });
-
-    zip.file(filePath, repareerDimensie(xml));
-  }
-
-  // Bekende ExcelJS-bug (exceljs/exceljs#664): bij defined names (o.a.
-  // Print_Area) verdwijnen de $-tekens vóór rijnummers bij het opslaan,
-  // bv. 'Recept-voorblad'!$A$1:$P$105 wordt $A1:$P105. Excel keurt zo'n
-  // halfslachtig-absolute referentie in een defined name af. Hersteld door
-  // elke $KOLOM-zonder-$-RIJ binnen <definedName>-content alsnog een $ te geven.
-  const workbookPath = 'xl/workbook.xml';
-  if (zip.file(workbookPath)) {
-    let wbXml = await zip.file(workbookPath).async('string');
-    wbXml = wbXml.replace(/<definedName([^>]*)>([\s\S]*?)<\/definedName>/g, (heleMatch, attrs, inhoud) => {
-      const nieuweInhoud = inhoud.replace(/\$([A-Z]+)(\d+)/g, '$$$1$$$2');
-      return `<definedName${attrs}>${nieuweInhoud}</definedName>`;
-    });
-    zip.file(workbookPath, wbXml);
-  }
-
-  return zip.generateAsync({ type: 'nodebuffer' });
-}
-
 async function haalBatchDataOp(supabase, batchnummer) {
   const { data: batch, error: batchErr } = await supabase
     .from('batches').select('*').eq('batchnummer', batchnummer).single();
@@ -235,40 +149,19 @@ async function haalBatchDataOp(supabase, batchnummer) {
 }
 
 // ---------------------------------------------------------------------------
-// Sjabloon vullen
+// Sjabloon vullen — alles via writer.setCelWaarde() (behoudt bestaande stijl)
 // ---------------------------------------------------------------------------
-// Postgres 'numeric'-kolommen komen via PostgREST/Supabase als STRING terug
-// (bv. "0.5"), niet als JS-getal -- om precisieverlies te voorkomen. Als je
-// zo'n string ongewijzigd in een cel zet, ziet Excel dat als tekst (met een
-// punt), niet als getal, en breekt elke formule die er verder op rekent.
-// Hier expliciet omzetten naar een echt getal zodra het er een is.
-function naarGetalIndienMogelijk(waarde) {
-  if (typeof waarde === 'string' && waarde.trim() !== '' && !Number.isNaN(Number(waarde))) {
-    return Number(waarde);
-  }
-  return waarde;
-}
-
-function schrijfCel(workbook, sheetCel, waarde) {
-  const [sheetNaam, cel] = sheetCel.split('!');
-  const ws = workbook.getWorksheet(sheetNaam);
-  if (!ws) { console.warn(`Onbekend tabblad: ${sheetNaam} (cel ${sheetCel})`); return; }
-  ws.getCell(cel).value = (waarde === undefined || waarde === null) ? null : naarGetalIndienMogelijk(waarde);
-}
-
-function vulScalaireVelden(workbook, bundel, isWP) {
+async function vulScalaireVelden(writer, bundel, isWP) {
   for (const veld of SCALAR_MAP) {
-    if (veld.wp_only && !isWP) continue; // WP-only veld, dit recept is niet WP -> leeg laten
+    if (veld.wp_only && !isWP) continue;
     const [tabel, kolom] = veld.db_veld.split('.');
     const bron = bundel[tabel];
     if (!bron) { console.warn(`Onbekende tabel in mapping: ${tabel} (${veld.key})`); continue; }
     const waarde = bron[kolom];
-    for (const loc of veld.locaties) schrijfCel(workbook, loc, waarde);
+    for (const loc of veld.locaties) await writer.setCelWaarde(loc, waarde);
   }
 }
 
-// Vestigingsafhankelijke (WP/Kerk) velden: 1 Excel-cel, 2 mogelijke bron-
-// kolommen afhankelijk van vestiging. isWP bepaalt welke kolom gebruikt wordt.
 const WP_KERK_VELDEN = [
   { cel: 'Brouwen!F10', wp: 'stort_special_bin_kg', kerk: 'maischwater' },
   { cel: 'Brouwen!F18', wp: 'volume_water_additie_terugkoeling', kerk: 'eindvolume_brouwsel' },
@@ -279,47 +172,37 @@ const WP_KERK_VELDEN = [
   { cel: 'Brouwen!I22', wp: 'kamers_mashfilter', kerk: 'lauterfactor' },
   { cel: 'Recept-voorblad!K9', wp: 'kamers_mashfilter', kerk: 'walsenmolen' },
 ];
-function vulWpKerkVelden(workbook, bundel, isWP) {
+async function vulWpKerkVelden(writer, bundel, isWP) {
   const bron = bundel.recipe_brouwspecificaties;
   for (const v of WP_KERK_VELDEN) {
-    schrijfCel(workbook, v.cel, bron[isWP ? v.wp : v.kerk]);
+    await writer.setCelWaarde(v.cel, bron[isWP ? v.wp : v.kerk]);
   }
 }
 
-// F8/F9/F11 in Brouwen wisselen van betekenis per vestiging (dit was eerder
-// verkeerd samengevoegd tot 1 mapping-regel per ongeluk):
-// - F8: WP -> live formule (Aantal brouwsels * Eindvolume brouwsel = "Totaal
-//   volume batch"), géén databasewaarde. Kerk -> Receptnaam Software.
+// F8/F9/F11 in Brouwen wisselen van betekenis per vestiging:
+// - F8: WP -> live formule (Aantal brouwsels * Eindvolume brouwsel). Kerk -> Receptnaam Software.
 // - F9: WP -> Receptnaam Software. Kerk -> Naam special bin storting.
-// - F11: altijd -> Naam special bin storting (ongeacht vestiging).
-function vulReceptnaamKruisVelden(workbook, bundel, isWP) {
+// - F11: altijd -> Naam special bin storting.
+// N8 (Gewenste stamwort) = Origineel extract + Stamwort correctie brouwhuis.
+async function vulReceptnaamKruisVelden(writer, bundel, isWP) {
   const bron = bundel.recipe_brouwspecificaties;
-  const ws = workbook.getWorksheet('Brouwen');
   if (isWP) {
-    ws.getCell('F8').value = { formula: "'Recept-voorblad'!G7*Brouwen!F19" };
-    ws.getCell('F9').value = bron.recept_naam_software ?? null;
+    await writer.setCelWaarde('Brouwen!F8', { formula: "'Recept-voorblad'!G7*Brouwen!F19" });
+    await writer.setCelWaarde('Brouwen!F9', bron.recept_naam_software ?? null);
   } else {
-    ws.getCell('F8').value = bron.recept_naam_software ?? null;
-    ws.getCell('F9').value = bron.naam_special_bin ?? null;
+    await writer.setCelWaarde('Brouwen!F8', bron.recept_naam_software ?? null);
+    await writer.setCelWaarde('Brouwen!F9', bron.naam_special_bin ?? null);
   }
-  ws.getCell('F11').value = bron.naam_special_bin ?? null;
+  await writer.setCelWaarde('Brouwen!F11', bron.naam_special_bin ?? null);
 
-  // Gewenste stamwort (N8) = Origineel extract + Stamwort correctie brouwhuis.
-  // Dat laatste veld heeft nog geen UI-invoerplek (staat sinds een eerdere
-  // sessie als open punt), dus is voorlopig meestal leeg/0 -- dan komt hier
-  // gewoon het Origineel extract zelf te staan totdat dat veld een plek
-  // krijgt in recept-invoer.html.
   const origineelExtract = bundel.recipe_specificaties.origineel_extract;
   const stamwortCorrectie = bron.stamwort_correctie_brouwhuis;
   if (origineelExtract !== null && origineelExtract !== undefined) {
-    ws.getCell('N8').value = Number(origineelExtract) + (stamwortCorrectie ? Number(stamwortCorrectie) : 0);
+    await writer.setCelWaarde('Brouwen!N8', Number(origineelExtract) + (stamwortCorrectie ? Number(stamwortCorrectie) : 0));
   }
 }
 
-// Zelfde sortering als sorteerHopHerbsRegels() in recept-invoer.html: hop(boil)
-// aflopend op kooktijd, dry hop in vaste volgorde warm/16c/0c. Zo staan de
-// toevoegingen per moment gegroepeerd, wat nodig is voor de dikke
-// scheidingslijnen die de gebruiker per groep wil zien.
+// Zelfde sortering als sorteerHopHerbsRegels() in recept-invoer.html.
 const DRY_HOP_VOLGORDE = ['warm', '16c', '0c'];
 function sorteerHopgiften(rijen, rol) {
   if (rol === 'hopgift_kook') {
@@ -331,7 +214,7 @@ function sorteerHopgiften(rijen, rol) {
   return rijen;
 }
 
-function vulIngredientRijen(workbook, bundel) {
+async function vulIngredientRijen(writer, bundel) {
   const rollen = ['hopgift_kook', 'dry_hop', 'hoofdmout', 'toegift_brouwerij', 'toegift_kelder', 'gist'];
   for (const rol of rollen) {
     const cellenPerRij = INGREDIENT_MAP[rol];
@@ -341,75 +224,157 @@ function vulIngredientRijen(workbook, bundel) {
       ? sorteerHopgiften(ongesorteerd, rol)
       : ongesorteerd.sort((a, b) => (a.volgorde ?? 0) - (b.volgorde ?? 0));
 
-    Object.keys(cellenPerRij).sort((a, b) => Number(a) - Number(b)).forEach((volgordeStr, i) => {
-      const regel = rijen[i]; // i-de regel van dit type, ongeacht de eigen 'volgorde'-waarde in de rij zelf
-      const cellen = cellenPerRij[volgordeStr];
-      if (!regel) { // geen ingrediënt op dit slot -> leeg laten
-        for (const attr in cellen) schrijfCel(workbook, cellen[attr], null);
-        return;
+    const slots = Object.keys(cellenPerRij).sort((a, b) => Number(a) - Number(b));
+    for (let i = 0; i < slots.length; i++) {
+      const regel = rijen[i];
+      const cellen = cellenPerRij[slots[i]];
+      if (!regel) {
+        for (const attr in cellen) await writer.setCelWaarde(cellen[attr], null);
+        continue;
       }
       for (const attr in cellen) {
-        let waarde;
-        if (attr === 'naam') waarde = bundel.ingredientNaam.get(regel.ingredient_id) || regel.notitie || null;
-        else waarde = regel[attr];
-        schrijfCel(workbook, cellen[attr], waarde);
+        const waarde = attr === 'naam'
+          ? (bundel.ingredientNaam.get(regel.ingredient_id) || regel.notitie || null)
+          : regel[attr];
+        await writer.setCelWaarde(cellen[attr], waarde);
       }
-    });
+    }
   }
 }
 
-function vulRevisies(workbook, bundel) {
-  bundel.recipe_revisies.forEach((rv, i) => {
+async function vulRevisies(writer, bundel) {
+  for (let i = 0; i < bundel.recipe_revisies.length; i++) {
+    const rv = bundel.recipe_revisies[i];
     const cellen = REVISIE_MAP[String(i + 1)];
-    if (!cellen) return;
-    if (cellen.versienummer) schrijfCel(workbook, cellen.versienummer, `${rv.versie_major}.${rv.versie_minor}`);
-    if (cellen.datum) schrijfCel(workbook, cellen.datum, rv.datum);
-    if (cellen.door) schrijfCel(workbook, cellen.door, rv.door);
-    if (cellen.wijziging) schrijfCel(workbook, cellen.wijziging, rv.wijziging);
-  });
+    if (!cellen) continue;
+    if (cellen.versienummer) await writer.setCelWaarde(cellen.versienummer, `${rv.versie_major}.${rv.versie_minor}`);
+    if (cellen.datum) await writer.setCelWaarde(cellen.datum, rv.datum);
+    if (cellen.door) await writer.setCelWaarde(cellen.door, rv.door);
+    if (cellen.wijziging) await writer.setCelWaarde(cellen.wijziging, rv.wijziging);
+  }
 }
 
-function vulFormaten(workbook, bundel) {
+async function vulFormaten(writer, bundel) {
   const gekozen = new Set(bundel.recipe_verpakking.formaten || []);
   for (const [naam, cel] of Object.entries(FORMATEN_MAP)) {
-    schrijfCel(workbook, cel, gekozen.has(naam) ? 'X' : null);
+    await writer.setCelWaarde(cel, gekozen.has(naam) ? 'X' : null);
   }
 }
 
 // Rendement%/EBU per hopgift (Recept-voorblad!I43:I57 / K43:K57) + Calculated
-// total EBU (K64). Deze cellen zijn NIET meer live-formules in het sjabloon
-// (die verwezen naar het verwijderde EBU Berekening-tabblad), dus hier
+// total EBU (K64). Deze cellen zijn geen live-formules meer in het sjabloon
+// (verwezen ooit naar het verwijderde EBU Berekening-tabblad), dus hier
 // herberekend met dezelfde logica als recept-invoer.html en als waarde geplakt.
-function vulHopRendementEnEbu(workbook, bundel) {
+async function vulHopRendementEnEbu(writer, bundel) {
   const og = bundel.recipe_specificaties.origineel_extract;
   const volumeKook = bundel.recipe_brouwspecificaties.volume_kook;
-  const ws = workbook.getWorksheet('Recept-voorblad');
 
-  const hopRijen = bundel.recipe_ingredients
-    .filter(r => r.rol === 'hopgift_kook')
-    .sort((a, b) => (a.volgorde ?? 0) - (b.volgorde ?? 0));
+  const hopRijen = sorteerHopgiften(bundel.recipe_ingredients.filter(r => r.rol === 'hopgift_kook'), 'hopgift_kook');
 
   let totaalEbu = 0;
   for (let i = 0; i < 15; i++) {
     const rij = 43 + i;
     const regel = hopRijen[i];
-    if (!regel) { ws.getCell(`I${rij}`).value = null; ws.getCell(`K${rij}`).value = null; continue; }
-
+    if (!regel) {
+      await writer.setCelWaarde(`Recept-voorblad!I${rij}`, null);
+      await writer.setCelWaarde(`Recept-voorblad!K${rij}`, null);
+      continue;
+    }
     const kooktijd = regel.tijdstip !== null && regel.tijdstip !== undefined && regel.tijdstip !== ''
       ? Number(regel.tijdstip) : null;
     const rendement = (kooktijd !== null && og) ? bepaalHopRendement(kooktijd, og) : null;
     const ebu = (kooktijd !== null && og) ? bepaalHopEbu(regel.hoeveelheid, regel.alpha_pct, kooktijd, og, volumeKook) : null;
 
-    ws.getCell(`I${rij}`).value = rendement !== null ? Number(rendement.toFixed(1)) : null;
-    ws.getCell(`K${rij}`).value = ebu !== null ? Number(ebu.toFixed(1)) : null;
+    await writer.setCelWaarde(`Recept-voorblad!I${rij}`, rendement !== null ? Number(rendement.toFixed(1)) : null);
+    await writer.setCelWaarde(`Recept-voorblad!K${rij}`, ebu !== null ? Number(ebu.toFixed(1)) : null);
     if (ebu !== null) totaalEbu += ebu;
   }
-  ws.getCell('K64').value = Number(totaalEbu.toFixed(1));
+  await writer.setCelWaarde('Recept-voorblad!K64', Number(totaalEbu.toFixed(1)));
+}
+
+function kolomNummerNaarLetter(num) {
+  let letters = '';
+  while (num > 0) {
+    const rest = (num - 1) % 26;
+    letters = String.fromCharCode(65 + rest) + letters;
+    num = Math.floor((num - 1) / 26);
+  }
+  return letters;
+}
+
+// Dikke scheidingslijn onder de laatste rij van elke groep met hetzelfde
+// toevoegmoment. Voegt via StylesManager een nieuwe stijl toe (zelfde stijl
+// als de cel al had, alleen de onderrand anders) i.p.v. de hele cel-stijl
+// te vervangen.
+async function zetHopGroepRanden(writer, stylesManager, bundel) {
+  async function randenVoorBlok(rijen, startRij, kolomVan, kolomTot) {
+    for (let i = 0; i < rijen.length; i++) {
+      const huidige = rijen[i];
+      const volgende = rijen[i + 1];
+      const laatsteVanGroep = !volgende || volgende.tijdstip !== huidige.tijdstip;
+      if (!laatsteVanGroep) continue;
+      const rijNr = startRij + i;
+      for (let col = kolomVan; col <= kolomTot; col++) {
+        const kolomLetter = kolomNummerNaarLetter(col);
+        const sheetCel = `Recept-voorblad!${kolomLetter}${rijNr}`;
+        const huidigeStijl = await writer.haalStijlIndexOp(sheetCel);
+        const nieuweStijl = stylesManager.voegDikkeOnderrandToe(huidigeStijl);
+        await writer.zetStijlIndex(sheetCel, nieuweStijl);
+      }
+    }
+  }
+
+  const hopRijen = sorteerHopgiften(bundel.recipe_ingredients.filter(r => r.rol === 'hopgift_kook'), 'hopgift_kook');
+  const dryHopRijen = sorteerHopgiften(bundel.recipe_ingredients.filter(r => r.rol === 'dry_hop'), 'dry_hop');
+
+  await randenVoorBlok(hopRijen, 43, 1, 17);
+  await randenVoorBlok(dryHopRijen, 58, 1, 17);
 }
 
 // ---------------------------------------------------------------------------
 // Hoofdlogica
 // ---------------------------------------------------------------------------
+async function genereerBatchrapportBuffer(bundel) {
+  const naam = bundel.recipes.naam || '';
+  const locatie = (bundel.recipes.locatie || '').toLowerCase();
+  const vestigingsBron = bundel.recipes.short_name || naam;
+  const isWP = locatie.includes('waarderpolder') || vestigingsBron.toUpperCase().startsWith('WP');
+
+  const templateBuffer = fs.readFileSync(TEMPLATE_PATH);
+  const zip = await JSZip.loadAsync(templateBuffer);
+
+  const writer = new XlsxDirectWriter(zip);
+  await writer.init();
+  const stylesManager = new StylesManager(zip);
+  await stylesManager.init();
+
+  await vulScalaireVelden(writer, bundel, isWP);
+  await vulWpKerkVelden(writer, bundel, isWP);
+  await vulReceptnaamKruisVelden(writer, bundel, isWP);
+  await vulIngredientRijen(writer, bundel);
+  await vulRevisies(writer, bundel);
+  await vulFormaten(writer, bundel);
+  await vulHopRendementEnEbu(writer, bundel);
+  await zetHopGroepRanden(writer, stylesManager, bundel);
+
+  await writer.setCelWaarde('Recept-voorblad!H3', 'Batch nr.:');
+  await writer.setCelWaarde('Recept-voorblad!K3', bundel.batch.batchnummer);
+  await writer.setCelWaarde('Recept-voorblad!Q1', vestigingsBron);
+
+  stylesManager.finalize();
+  await writer.finalize();
+  const buffer = await zip.generateAsync({ type: 'nodebuffer' });
+
+  const laatsteRevisie = bundel.recipe_revisies[0];
+  const versienummer = laatsteRevisie
+    ? `${laatsteRevisie.versie_major}.${laatsteRevisie.versie_minor}`
+    : `${bundel.recipes.versie_major ?? 1}.${bundel.recipes.versie_minor ?? 0}`;
+  const vestigingsPrefix = vestigingsBron.slice(0, 2);
+  const bestandsnaam = `${bundel.batch.batchnummer} ${naam} v${versienummer} ${vestigingsPrefix}.xlsx`;
+
+  return { buffer, bestandsnaam };
+}
+
 async function main() {
   const batchnummer = Number(process.argv[2]);
   if (!batchnummer) {
@@ -427,50 +392,12 @@ async function main() {
   console.log(`Batch ${batchnummer} ophalen...`);
   const bundel = await haalBatchDataOp(supabase, batchnummer);
 
-  const naam = bundel.recipes.naam || '';
-  const locatie = (bundel.recipes.locatie || '').toLowerCase();
-  // Het WP/Kerk-onderscheid zit in `short_name` (bv. "WP Mooie Nel"), niet in
-  // `naam` (bv. "Mooie Nel") -- dat laatste is nu de schone weergavenaam en
-  // draagt de WP-prefix niet meer per se. Q1 krijgt dezelfde waarde als de
-  // WP-detectie, want Brouwen!A1 (='Recept-voorblad'!Q1) voedt tientallen
-  // IF(LEFT(A1,2)="WP",...)-formules in Brouwen -- die moeten dus kloppen.
-  const vestigingsBron = bundel.recipes.short_name || naam;
-  const isWP = locatie.includes('waarderpolder') || vestigingsBron.toUpperCase().startsWith('WP');
-
-  console.log(`Sjabloon inladen (${isWP ? 'Waarderpolder' : 'Jopen Kerk'}-recept)...`);
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.readFile(TEMPLATE_PATH);
-
-  vulScalaireVelden(workbook, bundel, isWP);
-  vulWpKerkVelden(workbook, bundel, isWP);
-  vulReceptnaamKruisVelden(workbook, bundel, isWP);
-  vulIngredientRijen(workbook, bundel);
-  vulRevisies(workbook, bundel);
-  vulFormaten(workbook, bundel);
-  vulHopRendementEnEbu(workbook, bundel);
-  zetHopGroepRanden(workbook, bundel);
-
-  workbook.getWorksheet('Recept-voorblad').getCell('H3').value = 'Batch nr.:';
-  workbook.getWorksheet('Recept-voorblad').getCell('K3').value = bundel.batch.batchnummer;
-  workbook.getWorksheet('Recept-voorblad').getCell('Q1').value = vestigingsBron;
-
-  // Bestandsnaam volgens de oorspronkelijke VBA-macro:
-  //   K3 & " " & C3 & " v" & A101 & " " & Left(Q1,2) & ".xlsx"
-  // A101 is hier "recipe_revisies rij 1" (versienummer, zonder "v"-prefix --
-  // die voegt deze formule zelf toe); valt terug op recipes.versie_major/
-  // _minor als er nog geen revisiehistorie is.
-  const laatsteRevisie = bundel.recipe_revisies[0];
-  const versienummer = laatsteRevisie
-    ? `${laatsteRevisie.versie_major}.${laatsteRevisie.versie_minor}`
-    : `${bundel.recipes.versie_major ?? 1}.${bundel.recipes.versie_minor ?? 0}`;
-  const vestigingsPrefix = vestigingsBron.slice(0, 2);
-  const bestandsnaam = `${bundel.batch.batchnummer} ${naam} v${versienummer} ${vestigingsPrefix}.xlsx`;
+  console.log('Batchrapport genereren...');
+  const { buffer, bestandsnaam } = await genereerBatchrapportBuffer(bundel);
 
   if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   const outputPath = path.join(OUTPUT_DIR, bestandsnaam);
-  const ruweBuffer = await workbook.xlsx.writeBuffer();
-  const gerepareerdeBuffer = await repareerRijCelMismatch(ruweBuffer);
-  fs.writeFileSync(outputPath, gerepareerdeBuffer);
+  fs.writeFileSync(outputPath, buffer);
   console.log(`Klaar: ${outputPath}`);
 }
 
@@ -481,37 +408,8 @@ if (require.main === module) {
   });
 }
 
-// Dikke scheidingslijn onder de laatste rij van elke groep met hetzelfde
-// toevoegmoment (bv. alle 45-min hopgiften bij elkaar, dan een dikke lijn,
-// dan alle 0-min hopgiften). Werkt op de al gesorteerde (gegroepeerde) rijen.
-const DIKKE_RAND = { style: 'medium', color: { argb: 'FF000000' } };
-function zetHopGroepRanden(workbook, bundel) {
-  const ws = workbook.getWorksheet('Recept-voorblad');
-
-  function randenVoorBlok(rijen, startRij, kolomVan, kolomTot) {
-    for (let i = 0; i < rijen.length; i++) {
-      const huidige = rijen[i];
-      const volgende = rijen[i + 1];
-      const laatsteVanGroep = !volgende || volgende.tijdstip !== huidige.tijdstip;
-      if (!laatsteVanGroep) continue;
-      const rijNr = startRij + i;
-      for (let col = kolomVan; col <= kolomTot; col++) {
-        const cel = ws.getCell(rijNr, col);
-        cel.border = { ...cel.border, bottom: DIKKE_RAND };
-      }
-    }
-  }
-
-  const hopRijen = sorteerHopgiften(bundel.recipe_ingredients.filter(r => r.rol === 'hopgift_kook'), 'hopgift_kook');
-  const dryHopRijen = sorteerHopgiften(bundel.recipe_ingredients.filter(r => r.rol === 'dry_hop'), 'dry_hop');
-
-  // Kolom A t/m Q dekt de hele "Hops and Herbs"-tabelbreedte (Soort t/m HDT)
-  randenVoorBlok(hopRijen, 43, 1, 17);
-  randenVoorBlok(dryHopRijen, 58, 1, 17);
-}
-
 module.exports = {
   bepaalHopRendement, bepaalHopEbu, vulScalaireVelden, vulWpKerkVelden, vulReceptnaamKruisVelden,
   vulIngredientRijen, vulRevisies, vulFormaten, vulHopRendementEnEbu, zetHopGroepRanden,
-  repareerRijCelMismatch, haalBatchDataOp,
+  genereerBatchrapportBuffer, haalBatchDataOp,
 };
