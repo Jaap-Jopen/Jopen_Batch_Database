@@ -1,7 +1,7 @@
 const ExcelJS = require('exceljs');
 const {
   vulScalaireVelden, vulWpKerkVelden, vulReceptnaamKruisVelden, vulIngredientRijen, vulRevisies,
-  vulFormaten, vulHopRendementEnEbu, zetHopGroepRanden,
+  vulFormaten, vulHopRendementEnEbu, zetHopGroepRanden, repareerRijCelMismatch,
 } = require('./generate-batchrapport');
 
 async function test() {
@@ -55,7 +55,9 @@ async function test() {
   workbook.getWorksheet('Recept-voorblad').getCell('K3').value = bundel.batch.batchnummer;
   workbook.getWorksheet('Recept-voorblad').getCell('Q1').value = bundel.recipes.short_name;
 
-  await workbook.xlsx.writeFile('./output/TEST-batch.xlsx');
+  const ruweBuffer = await workbook.xlsx.writeBuffer();
+  const gerepareerdeBuffer = await repareerRijCelMismatch(ruweBuffer);
+  require('fs').writeFileSync('./output/TEST-batch.xlsx', gerepareerdeBuffer);
   console.log('Testbestand geschreven: ./output/TEST-batch.xlsx');
 
   // Meteen een paar cellen terug uitlezen ter controle

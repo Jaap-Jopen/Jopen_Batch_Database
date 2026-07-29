@@ -71,6 +71,27 @@ function bepaalHopEbu(gewichtGram, alphaPct, kooktijd, og, volumeKookHl) {
   return (gewichtGram * 1000) * (alphaPct / 100) * (rendementPct / 100) / volumeLiter;
 }
 
+// Zie generate-batchrapport.js voor uitleg over deze ExcelJS-bug (cellen
+// belanden soms in de verkeerde <row>-container bij samengevoegde cellen,
+// wat Microsoft Excel als "beschadigd" beschouwt). Gebruikt JSZip, dat
+// apart via CDN geladen moet zijn (zie head van deze pagina's HTML).
+async function brRepareerRijCelMismatch(buffer) {
+  const zip = await JSZip.loadAsync(buffer);
+  const sheetFiles = Object.keys(zip.files).filter(f => /^xl\/worksheets\/sheet\d+\.xml$/.test(f));
+
+  for (const filePath of sheetFiles) {
+    let xml = await zip.file(filePath).async('string');
+    xml = xml.replace(/<row [^>]*r="(\d+)"[^>]*>([\s\S]*?)<\/row>/g, (heleMatch, rowNum, inhoud) => {
+      const nieuweInhoud = inhoud.replace(/(<c r="[A-Z]+)(\d+)(")/g, (m, prefix, celRij, suffix) => (
+        celRij !== rowNum ? prefix + rowNum + suffix : m
+      ));
+      return heleMatch.replace(inhoud, nieuweInhoud);
+    });
+    zip.file(filePath, xml);
+  }
+  return zip.generateAsync({ type: 'blob' });
+}
+
 const BR_BASISPAD = 'batchrapport-generator/';
 
 async function brFetchJson(pad) {
@@ -341,8 +362,8 @@ async function genereerEnDownloadBatchrapport(supabase, batchnummer) {
   const vestigingsPrefix = vestigingsBron.slice(0, 2);
   const bestandsnaam = `${bundel.batch.batchnummer} ${naam} v${versienummer} ${vestigingsPrefix}.xlsx`;
 
-  const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const ruweBuffer = await workbook.xlsx.writeBuffer();
+  const blob = await brRepareerRijCelMismatch(ruweBuffer);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

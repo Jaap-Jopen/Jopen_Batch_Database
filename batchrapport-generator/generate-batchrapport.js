@@ -22,6 +22,7 @@
 const path = require('path');
 const fs = require('fs');
 const ExcelJS = require('exceljs');
+const JSZip = require('jszip');
 const { createClient } = require('@supabase/supabase-js');
 
 const SCALAR_MAP = require('./data/scalar_field_map.json');
@@ -95,6 +96,32 @@ function bepaalHopEbu(gewichtGram, alphaPct, kooktijd, og, volumeKookHl) {
 // ---------------------------------------------------------------------------
 // Supabase ophalen
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Workaround voor een ExcelJS-bug: bij het opslaan van sheets met
+// (verticaal) samengevoegde cellen zet ExcelJS soms cellen in de verkeerde
+// <row>-container (bv. een cel met r="C33" belandt binnen <row r="32">).
+// Technisch ongeldige XML-semantiek die LibreOffice/ExcelJS zelf
+// stilzwijgend tolereren, maar waar Microsoft Excel op struikelt ("er zijn
+// problemen aangetroffen..."). Hersteld door na het opslaan de cel-rijnummers
+// gelijk te trekken aan hun daadwerkelijke <row>-container.
+// ---------------------------------------------------------------------------
+async function repareerRijCelMismatch(buffer) {
+  const zip = await JSZip.loadAsync(buffer);
+  const sheetFiles = Object.keys(zip.files).filter(f => /^xl\/worksheets\/sheet\d+\.xml$/.test(f));
+
+  for (const filePath of sheetFiles) {
+    let xml = await zip.file(filePath).async('string');
+    xml = xml.replace(/<row [^>]*r="(\d+)"[^>]*>([\s\S]*?)<\/row>/g, (heleMatch, rowNum, inhoud) => {
+      const nieuweInhoud = inhoud.replace(/(<c r="[A-Z]+)(\d+)(")/g, (m, prefix, celRij, suffix) => (
+        celRij !== rowNum ? prefix + rowNum + suffix : m
+      ));
+      return heleMatch.replace(inhoud, nieuweInhoud);
+    });
+    zip.file(filePath, xml);
+  }
+  return zip.generateAsync({ type: 'nodebuffer' });
+}
+
 async function haalBatchDataOp(supabase, batchnummer) {
   const { data: batch, error: batchErr } = await supabase
     .from('batches').select('*').eq('batchnummer', batchnummer).single();
@@ -372,7 +399,9 @@ async function main() {
 
   if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   const outputPath = path.join(OUTPUT_DIR, bestandsnaam);
-  await workbook.xlsx.writeFile(outputPath);
+  const ruweBuffer = await workbook.xlsx.writeBuffer();
+  const gerepareerdeBuffer = await repareerRijCelMismatch(ruweBuffer);
+  fs.writeFileSync(outputPath, gerepareerdeBuffer);
   console.log(`Klaar: ${outputPath}`);
 }
 
@@ -414,5 +443,6 @@ function zetHopGroepRanden(workbook, bundel) {
 
 module.exports = {
   bepaalHopRendement, bepaalHopEbu, vulScalaireVelden, vulWpKerkVelden, vulReceptnaamKruisVelden,
-  vulIngredientRijen, vulRevisies, vulFormaten, vulHopRendementEnEbu, zetHopGroepRanden, haalBatchDataOp,
+  vulIngredientRijen, vulRevisies, vulFormaten, vulHopRendementEnEbu, zetHopGroepRanden,
+  repareerRijCelMismatch, haalBatchDataOp,
 };
