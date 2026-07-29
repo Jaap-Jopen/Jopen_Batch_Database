@@ -316,32 +316,34 @@ function kolomNummerNaarLetter(num) {
 // werk is).
 async function zetHopGroepRanden(writer, stylesManager, bundel) {
   async function zetRandOpRij(rijNr, kolomVan, kolomTot, stijl) {
-    const geziene_ankers = new Set();
     for (let col = kolomVan; col <= kolomTot; col++) {
       const kolomLetter = kolomNummerNaarLetter(col);
-      const ruweCel = `Recept-voorblad!${kolomLetter}${rijNr}`;
-      let sheetCel;
+      const sheetCel = `Recept-voorblad!${kolomLetter}${rijNr}`;
       try {
-        sheetCel = await writer.haalMergeAnker(ruweCel);
-      } catch (e) {
-        continue; // cel bestaat niet, ook niet als deel van een samenvoeging
-      }
-      if (geziene_ankers.has(sheetCel)) continue;
-      geziene_ankers.add(sheetCel);
-      try {
-        let huidigeStijl = await writer.haalStijlIndexOp(sheetCel);
+        let basisStijl;
+        if (await writer.celBestaat(sheetCel)) {
+          basisStijl = await writer.haalStijlIndexOp(sheetCel);
+        } else {
+          // Cel bestaat niet als eigen element (bv. binnen een samengevoegd
+          // bereik zoals A43:C43 -- alleen A43 bestaat echt). Gebruik de
+          // stijl van de ankercel als basis, en maak deze cel alsnog aan
+          // zodat hij zijn EIGEN rand krijgt: anders toont Excel voor deze
+          // positie geen rand, ook al hoort de cel bij de samenvoeging, en
+          // loopt de lijn niet door over de hele breedte.
+          const anker = await writer.haalMergeAnker(sheetCel);
+          basisStijl = await writer.haalStijlIndexOp(anker);
+        }
         // Bovenrand wissen (behalve de allereerste rij van de tabel, die
         // vormt de bovenrand van het hele blok): anders bepaalt Excel zelf
         // welke van twee concurrerende rand-specificaties (onze onderrand
-        // op de rij erboven vs. de oude "hair"-bovenrand hier) wint, en dat
-        // is niet per se wat we bedoelen.
+        // op de rij erboven vs. de oude "hair"-bovenrand hier) wint.
         if (rijNr !== 43) {
-          huidigeStijl = stylesManager.wisBovenrand(huidigeStijl);
+          basisStijl = stylesManager.wisBovenrand(basisStijl);
         }
-        const nieuweStijl = stylesManager.voegOnderrandToe(huidigeStijl, stijl);
-        await writer.zetStijlIndex(sheetCel, nieuweStijl);
+        const nieuweStijl = stylesManager.voegOnderrandToe(basisStijl, stijl);
+        await writer.zetOfMaakCelStijl(sheetCel, nieuweStijl);
       } catch (e) {
-        // onbekende/niet-bestaande cel -- overslaan
+        // onbekende/niet-bestaande cel of rij -- overslaan
       }
     }
   }

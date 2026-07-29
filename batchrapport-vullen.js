@@ -230,6 +230,35 @@ class XlsxDirectWriter {
     this.sheetXmlPerBestand[bestand] = xml.replace(cellPattern, `<c r="${cel}"${attrs}${match[2]}`);
   }
 
+  async celBestaat(sheetCel) {
+    const [sheetNaam, cel] = sheetCel.split('!');
+    const bestand = await this._laadSheetXml(sheetNaam);
+    const xml = this.sheetXmlPerBestand[bestand];
+    return new RegExp(`<c r="${cel}"[^>]*(?:/>|>)`).test(xml);
+  }
+
+  async zetOfMaakCelStijl(sheetCel, stijlIdx) {
+    const [sheetNaam, cel] = sheetCel.split('!');
+    const bestand = await this._laadSheetXml(sheetNaam);
+    if (await this.celBestaat(sheetCel)) {
+      await this.zetStijlIndex(sheetCel, stijlIdx);
+      return;
+    }
+    let xml = this.sheetXmlPerBestand[bestand];
+    const { col, row } = ontleedCelRef(cel);
+    const rowPattern = new RegExp(`(<row [^>]*r="${row}"[^>]*>)([\\s\\S]*?)(</row>)`);
+    const rowMatch = xml.match(rowPattern);
+    if (!rowMatch) throw new Error(`Rij ${row} bestaat niet in ${sheetNaam}`);
+    const inhoud = rowMatch[2];
+    const nieuweCel = `<c r="${cel}" s="${stijlIdx}"/>`;
+    let invoegPositie = inhoud.length;
+    for (const m of inhoud.matchAll(/<c r="([A-Z]+)(\d+)"/g)) {
+      if (kolomLetterNaarNummer(m[1]) > col) { invoegPositie = m.index; break; }
+    }
+    const nieuweInhoud = inhoud.slice(0, invoegPositie) + nieuweCel + inhoud.slice(invoegPositie);
+    this.sheetXmlPerBestand[bestand] = xml.replace(rowPattern, `$1${nieuweInhoud}$3`);
+  }
+
   async finalize() {
     for (const [bestand, xml] of Object.entries(this.sheetXmlPerBestand)) {
       this.zip.file(bestand, xml);
@@ -564,26 +593,23 @@ function kolomNummerNaarLetter(num) {
 
 async function brZetHopGroepRanden(writer, stylesManager, bundel) {
   async function zetRandOpRij(rijNr, kolomVan, kolomTot, stijl) {
-    const geziene_ankers = new Set();
     for (let col = kolomVan; col <= kolomTot; col++) {
-      const ruweCel = `Recept-voorblad!${kolomNummerNaarLetter(col)}${rijNr}`;
-      let sheetCel;
+      const sheetCel = `Recept-voorblad!${kolomNummerNaarLetter(col)}${rijNr}`;
       try {
-        sheetCel = await writer.haalMergeAnker(ruweCel);
-      } catch (e) {
-        continue;
-      }
-      if (geziene_ankers.has(sheetCel)) continue;
-      geziene_ankers.add(sheetCel);
-      try {
-        let huidigeStijl = await writer.haalStijlIndexOp(sheetCel);
-        if (rijNr !== 43) {
-          huidigeStijl = stylesManager.wisBovenrand(huidigeStijl);
+        let basisStijl;
+        if (await writer.celBestaat(sheetCel)) {
+          basisStijl = await writer.haalStijlIndexOp(sheetCel);
+        } else {
+          const anker = await writer.haalMergeAnker(sheetCel);
+          basisStijl = await writer.haalStijlIndexOp(anker);
         }
-        const nieuweStijl = stylesManager.voegOnderrandToe(huidigeStijl, stijl);
-        await writer.zetStijlIndex(sheetCel, nieuweStijl);
+        if (rijNr !== 43) {
+          basisStijl = stylesManager.wisBovenrand(basisStijl);
+        }
+        const nieuweStijl = stylesManager.voegOnderrandToe(basisStijl, stijl);
+        await writer.zetOfMaakCelStijl(sheetCel, nieuweStijl);
       } catch (e) {
-        // onbekende/niet-bestaande cel -- overslaan
+        // onbekende/niet-bestaande cel of rij -- overslaan
       }
     }
   }

@@ -204,6 +204,45 @@ class XlsxDirectWriter {
     this.sheetXmlPerBestand[bestand] = xml.replace(cellPattern, `<c r="${cel}"${attrs}${match[2]}`);
   }
 
+  /** Of een cel al als element bestaat in de sheet-XML. */
+  async celBestaat(sheetCel) {
+    const [sheetNaam, cel] = sheetCel.split('!');
+    const bestand = await this._laadSheetXml(sheetNaam);
+    const xml = this.sheetXmlPerBestand[bestand];
+    return new RegExp(`<c r="${cel}"[^>]*(?:/>|>)`).test(xml);
+  }
+
+  /**
+   * Zet cel `sheetCel` op stijlindex `stijlIdx` -- maakt de cel aan (leeg,
+   * met deze stijl) als hij nog niet bestaat. Nodig voor cellen binnen een
+   * samengevoegd bereik die geen eigen element hebben: zonder eigen element
+   * toont Excel voor DIE positie geen rand, ook al hoort de cel wel bij de
+   * samenvoeging (alleen de ankercel netjes gerand krijgen is dus niet
+   * genoeg om een doorlopende lijn over de hele breedte van de samenvoeging
+   * te tonen).
+   */
+  async zetOfMaakCelStijl(sheetCel, stijlIdx) {
+    const [sheetNaam, cel] = sheetCel.split('!');
+    const bestand = await this._laadSheetXml(sheetNaam);
+    if (await this.celBestaat(sheetCel)) {
+      await this.zetStijlIndex(sheetCel, stijlIdx);
+      return;
+    }
+    let xml = this.sheetXmlPerBestand[bestand];
+    const { col, row } = ontleedCelRef(cel);
+    const rowPattern = new RegExp(`(<row [^>]*r="${row}"[^>]*>)([\\s\\S]*?)(</row>)`);
+    const rowMatch = xml.match(rowPattern);
+    if (!rowMatch) throw new Error(`Rij ${row} bestaat niet in ${sheetNaam}`);
+    const inhoud = rowMatch[2];
+    const nieuweCel = `<c r="${cel}" s="${stijlIdx}"/>`;
+    let invoegPositie = inhoud.length;
+    for (const m of inhoud.matchAll(/<c r="([A-Z]+)(\d+)"/g)) {
+      if (kolomLetterNaarNummer(m[1]) > col) { invoegPositie = m.index; break; }
+    }
+    const nieuweInhoud = inhoud.slice(0, invoegPositie) + nieuweCel + inhoud.slice(invoegPositie);
+    this.sheetXmlPerBestand[bestand] = xml.replace(rowPattern, `$1${nieuweInhoud}$3`);
+  }
+
   /** Schrijft alle gewijzigde sheet-XML terug in de zip en levert de zip. */
   async finalize() {
     for (const [bestand, xml] of Object.entries(this.sheetXmlPerBestand)) {
