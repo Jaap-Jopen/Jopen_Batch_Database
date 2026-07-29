@@ -95,7 +95,7 @@ async function brRepareerRijCelMismatch(buffer) {
 const BR_BASISPAD = 'batchrapport-generator/';
 
 async function brFetchJson(pad) {
-  const res = await fetch(BR_BASISPAD + pad);
+  const res = await fetch(BR_BASISPAD + pad, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Kon ${pad} niet ophalen (${res.status})`);
   return res.json();
 }
@@ -323,7 +323,7 @@ async function genereerEnDownloadBatchrapport(supabase, batchnummer) {
     brFetchJson('data/ingredient_field_map.json'),
     brFetchJson('data/revisie_field_map.json'),
     brFetchJson('data/formaten_field_map.json'),
-    fetch(BR_BASISPAD + 'Batchrapport_sjabloon.xlsx').then(r => {
+    fetch(BR_BASISPAD + 'Batchrapport_sjabloon.xlsx', { cache: 'no-store' }).then(r => {
       if (!r.ok) throw new Error(`Kon sjabloon niet ophalen (${r.status})`);
       return r.arrayBuffer();
     }),
