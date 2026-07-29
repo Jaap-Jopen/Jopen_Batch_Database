@@ -89,6 +89,20 @@ async function brRepareerRijCelMismatch(buffer) {
     });
     zip.file(filePath, xml);
   }
+
+  // Bekende ExcelJS-bug (exceljs/exceljs#664): $-tekens vóór rijnummers
+  // verdwijnen in defined names (Print_Area) bij het opslaan. Zie
+  // generate-batchrapport.js voor uitleg.
+  const workbookPath = 'xl/workbook.xml';
+  if (zip.file(workbookPath)) {
+    let wbXml = await zip.file(workbookPath).async('string');
+    wbXml = wbXml.replace(/<definedName([^>]*)>([\s\S]*?)<\/definedName>/g, (heleMatch, attrs, inhoud) => {
+      const nieuweInhoud = inhoud.replace(/\$([A-Z]+)(\d+)/g, '$$$1$$$2');
+      return `<definedName${attrs}>${nieuweInhoud}</definedName>`;
+    });
+    zip.file(workbookPath, wbXml);
+  }
+
   return zip.generateAsync({ type: 'blob' });
 }
 

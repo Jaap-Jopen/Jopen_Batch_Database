@@ -119,6 +119,22 @@ async function repareerRijCelMismatch(buffer) {
     });
     zip.file(filePath, xml);
   }
+
+  // Bekende ExcelJS-bug (exceljs/exceljs#664): bij defined names (o.a.
+  // Print_Area) verdwijnen de $-tekens vóór rijnummers bij het opslaan,
+  // bv. 'Recept-voorblad'!$A$1:$P$105 wordt $A1:$P105. Excel keurt zo'n
+  // halfslachtig-absolute referentie in een defined name af. Hersteld door
+  // elke $KOLOM-zonder-$-RIJ binnen <definedName>-content alsnog een $ te geven.
+  const workbookPath = 'xl/workbook.xml';
+  if (zip.file(workbookPath)) {
+    let wbXml = await zip.file(workbookPath).async('string');
+    wbXml = wbXml.replace(/<definedName([^>]*)>([\s\S]*?)<\/definedName>/g, (heleMatch, attrs, inhoud) => {
+      const nieuweInhoud = inhoud.replace(/\$([A-Z]+)(\d+)/g, '$$$1$$$2');
+      return `<definedName${attrs}>${nieuweInhoud}</definedName>`;
+    });
+    zip.file(workbookPath, wbXml);
+  }
+
   return zip.generateAsync({ type: 'nodebuffer' });
 }
 
