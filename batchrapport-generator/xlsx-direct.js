@@ -33,11 +33,31 @@ function xmlEscape(tekst) {
     .replace(/\r?\n/g, ' ');
 }
 
+function kolomLetterNaarNummer(letters) {
+  let num = 0;
+  for (const ch of letters) num = num * 26 + (ch.charCodeAt(0) - 64);
+  return num;
+}
+function kolomNummerNaarLetter(num) {
+  let letters = '';
+  while (num > 0) {
+    const rest = (num - 1) % 26;
+    letters = String.fromCharCode(65 + rest) + letters;
+    num = Math.floor((num - 1) / 26);
+  }
+  return letters;
+}
+function ontleedCelRef(ref) {
+  const m = ref.match(/^([A-Z]+)(\d+)$/);
+  return { col: kolomLetterNaarNummer(m[1]), row: Number(m[2]) };
+}
+
 class XlsxDirectWriter {
   constructor(zip) {
     this.zip = zip;
     this.sheetXmlPerBestand = {}; // 'xl/worksheets/sheet1.xml' -> xml-string (gecached, wordt aan het eind teruggeschreven)
     this.sheetNaarBestand = null; // 'Recept-voorblad' -> 'xl/worksheets/sheet1.xml'
+    this._mergesPerBestand = {}; // 'xl/worksheets/sheet1.xml' -> [{c1,r1,c2,r2}, ...]
   }
 
   async init() {
@@ -69,6 +89,40 @@ class XlsxDirectWriter {
           : 'xl/' + target;           // relatief t.o.v. xl/_rels/../  (dus xl/)
       }
     }
+  }
+
+  /**
+   * Als `sheetCel` een niet-ankercel is binnen een samengevoegd bereik (bv.
+   * B43 binnen A43:C43), geeft dit de ankercel (linksboven, bv. A43) terug.
+   * Anders gewoon de cel zelf. Nodig omdat alleen de ankercel echt bestaat
+   * als element in de sheet-XML -- de rest van een samenvoeging heeft geen
+   * eigen `<c>`, dus geen eigen stijl om aan te passen.
+   */
+  async haalMergeAnker(sheetCel) {
+    const [sheetNaam, cel] = sheetCel.split('!');
+    const bestand = await this._laadSheetXml(sheetNaam);
+    if (!this._mergesPerBestand[bestand]) {
+      const xml = this.sheetXmlPerBestand[bestand];
+      const merges = [];
+      const m = xml.match(/<mergeCells count="\d+">([\s\S]*?)<\/mergeCells>/);
+      if (m) {
+        for (const refMatch of m[1].matchAll(/ref="([^"]+)"/g)) {
+          const [a, b] = refMatch[1].split(':');
+          const p1 = ontleedCelRef(a);
+          const p2 = b ? ontleedCelRef(b) : p1;
+          merges.push({ c1: Math.min(p1.col, p2.col), r1: Math.min(p1.row, p2.row), c2: Math.max(p1.col, p2.col), r2: Math.max(p1.row, p2.row) });
+        }
+      }
+      this._mergesPerBestand[bestand] = merges;
+    }
+    const { col, row } = ontleedCelRef(cel);
+    for (const mr of this._mergesPerBestand[bestand]) {
+      if (col >= mr.c1 && col <= mr.c2 && row >= mr.r1 && row <= mr.r2) {
+        if (col === mr.c1 && row === mr.r1) return sheetCel; // is zelf al de anker
+        return `${sheetNaam}!${kolomNummerNaarLetter(mr.c1)}${mr.r1}`;
+      }
+    }
+    return sheetCel;
   }
 
   async _laadSheetXml(sheetNaam) {
@@ -195,7 +249,13 @@ class StylesManager {
    * Geeft de stijlindex terug voor "dezelfde stijl als sourceStyleIdx, maar
    * met een dikke zwarte onderrand" (overige randen ongewijzigd).
    */
-  voegDikkeOnderrandToe(sourceStyleIdx) {
+  /**
+   * Geeft de stijlindex terug voor "dezelfde stijl als sourceStyleIdx, maar
+   * met een andere onderrand" (overige randen ongewijzigd). `stijl` is een
+   * OOXML-randstijl, bv. "medium" (toevoegmoment-grens) of "dotted" (basis-
+   * scheiding tussen losse rijen).
+   */
+  voegOnderrandToe(sourceStyleIdx, stijl = 'medium') {
     const cellXfsSectie = this._haalSectie('cellXfs');
     const xfs = this._splitsElementen(cellXfsSectie.inhoud, 'xf');
     const bronXf = xfs[sourceStyleIdx];
@@ -210,7 +270,7 @@ class StylesManager {
     // Nieuwe border: kopieer left/right/top/diagonal, vervang bottom
     const nieuweBorder = bronBorder.replace(
       /<bottom[^>]*\/>|<bottom[^>]*>[\s\S]*?<\/bottom>/,
-      '<bottom style="medium"><color rgb="FF000000"/></bottom>'
+      `<bottom style="${stijl}"><color rgb="FF000000"/></bottom>`
     ).replace(/^<border[^>]*>/, '<border>'); // eventuele diagonalUp/Down-attributen negeren we hier niet, laten we intact via de originele opening-tag hieronder
     // (bovenstaande vervanging van de opening-tag ongedaan maken als bronBorder attributen had)
     const openTagMatch = bronBorder.match(/^<border([^>]*)>/);

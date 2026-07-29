@@ -85,12 +85,54 @@ function xmlEscape(tekst) {
     .replace(/"/g, '&quot;')
     .replace(/\r?\n/g, ' ');
 }
+function kolomLetterNaarNummer(letters) {
+  let num = 0;
+  for (const ch of letters) num = num * 26 + (ch.charCodeAt(0) - 64);
+  return num;
+}
+function ontleedCelRef(ref) {
+  const m = ref.match(/^([A-Z]+)(\d+)$/);
+  return { col: kolomLetterNaarNummer(m[1]), row: Number(m[2]) };
+}
 
 class XlsxDirectWriter {
   constructor(zip) {
     this.zip = zip;
     this.sheetXmlPerBestand = {};
     this.sheetNaarBestand = null;
+    this._mergesPerBestand = {};
+  }
+
+  /**
+   * Als `sheetCel` een niet-ankercel is binnen een samengevoegd bereik, geeft
+   * dit de ankercel (linksboven) terug. Anders gewoon de cel zelf. Zie
+   * xlsx-direct.js voor de uitgebreide toelichting.
+   */
+  async haalMergeAnker(sheetCel) {
+    const [sheetNaam, cel] = sheetCel.split('!');
+    const bestand = await this._laadSheetXml(sheetNaam);
+    if (!this._mergesPerBestand[bestand]) {
+      const xml = this.sheetXmlPerBestand[bestand];
+      const merges = [];
+      const m = xml.match(/<mergeCells count="\d+">([\s\S]*?)<\/mergeCells>/);
+      if (m) {
+        for (const refMatch of m[1].matchAll(/ref="([^"]+)"/g)) {
+          const [a, b] = refMatch[1].split(':');
+          const p1 = ontleedCelRef(a);
+          const p2 = b ? ontleedCelRef(b) : p1;
+          merges.push({ c1: Math.min(p1.col, p2.col), r1: Math.min(p1.row, p2.row), c2: Math.max(p1.col, p2.col), r2: Math.max(p1.row, p2.row) });
+        }
+      }
+      this._mergesPerBestand[bestand] = merges;
+    }
+    const { col, row } = ontleedCelRef(cel);
+    for (const mr of this._mergesPerBestand[bestand]) {
+      if (col >= mr.c1 && col <= mr.c2 && row >= mr.r1 && row <= mr.r2) {
+        if (col === mr.c1 && row === mr.r1) return sheetCel;
+        return `${sheetNaam}!${kolomNummerNaarLetter(mr.c1)}${mr.r1}`;
+      }
+    }
+    return sheetCel;
   }
 
   async init() {
@@ -220,7 +262,7 @@ class StylesManager {
     return elementen;
   }
 
-  voegDikkeOnderrandToe(sourceStyleIdx) {
+  voegOnderrandToe(sourceStyleIdx, stijl = 'medium') {
     const cellXfsSectie = this._haalSectie('cellXfs');
     const xfs = this._splitsElementen(cellXfsSectie.inhoud, 'xf');
     const bronXf = xfs[sourceStyleIdx];
@@ -232,10 +274,14 @@ class StylesManager {
     const borders = this._splitsElementen(bordersSectie.inhoud, 'border');
     const bronBorder = borders[bronBorderId] || '<border><left/><right/><top/><bottom/><diagonal/></border>';
 
-    const nieuweBorder = bronBorder.replace(
+    const nieuweBorderRuw = bronBorder.replace(
       /<bottom[^>]*\/>|<bottom[^>]*>[\s\S]*?<\/bottom>/,
-      '<bottom style="medium"><color rgb="FF000000"/></bottom>'
-    );
+      `<bottom style="${stijl}"><color rgb="FF000000"/></bottom>`
+    ).replace(/^<border[^>]*>/, '<border>');
+    const openTagMatch = bronBorder.match(/^<border([^>]*)>/);
+    const nieuweBorder = openTagMatch
+      ? nieuweBorderRuw.replace('<border>', `<border${openTagMatch[1]}>`)
+      : nieuweBorderRuw;
 
     let nieuweBorderId = borders.findIndex(b => b === nieuweBorder);
     let bordersGewijzigd = false;
@@ -468,29 +514,45 @@ function kolomNummerNaarLetter(num) {
 }
 
 async function brZetHopGroepRanden(writer, stylesManager, bundel) {
-  async function randenVoorBlok(rijen, startRij, kolomVan, kolomTot) {
+  async function zetRandOpRij(rijNr, kolomVan, kolomTot, stijl) {
+    const geziene_ankers = new Set();
+    for (let col = kolomVan; col <= kolomTot; col++) {
+      const ruweCel = `Recept-voorblad!${kolomNummerNaarLetter(col)}${rijNr}`;
+      let sheetCel;
+      try {
+        sheetCel = await writer.haalMergeAnker(ruweCel);
+      } catch (e) {
+        continue;
+      }
+      if (geziene_ankers.has(sheetCel)) continue;
+      geziene_ankers.add(sheetCel);
+      try {
+        const huidigeStijl = await writer.haalStijlIndexOp(sheetCel);
+        const nieuweStijl = stylesManager.voegOnderrandToe(huidigeStijl, stijl);
+        await writer.zetStijlIndex(sheetCel, nieuweStijl);
+      } catch (e) {
+        // onbekende/niet-bestaande cel -- overslaan
+      }
+    }
+  }
+
+  for (let rij = 43; rij <= 63; rij++) {
+    await zetRandOpRij(rij, 1, 16, 'dotted');
+  }
+
+  async function dikkeRandenVoorBlok(rijen, startRij) {
     for (let i = 0; i < rijen.length; i++) {
       const huidige = rijen[i];
       const volgende = rijen[i + 1];
       const laatsteVanGroep = !volgende || volgende.tijdstip !== huidige.tijdstip;
       if (!laatsteVanGroep) continue;
-      const rijNr = startRij + i;
-      for (let col = kolomVan; col <= kolomTot; col++) {
-        const sheetCel = `Recept-voorblad!${kolomNummerNaarLetter(col)}${rijNr}`;
-        try {
-          const huidigeStijl = await writer.haalStijlIndexOp(sheetCel);
-          const nieuweStijl = stylesManager.voegDikkeOnderrandToe(huidigeStijl);
-          await writer.zetStijlIndex(sheetCel, nieuweStijl);
-        } catch (e) {
-          // Niet-ankercel binnen een samengevoegd bereik -- overslaan.
-        }
-      }
+      await zetRandOpRij(startRij + i, 1, 16, 'medium');
     }
   }
   const hopRijen = sorteerHopgiften(bundel.recipe_ingredients.filter(r => r.rol === 'hopgift_kook'), 'hopgift_kook');
   const dryHopRijen = sorteerHopgiften(bundel.recipe_ingredients.filter(r => r.rol === 'dry_hop'), 'dry_hop');
-  await randenVoorBlok(hopRijen, 43, 1, 16);
-  await randenVoorBlok(dryHopRijen, 58, 1, 16);
+  await dikkeRandenVoorBlok(hopRijen, 43);
+  await dikkeRandenVoorBlok(dryHopRijen, 58);
 }
 
 /**

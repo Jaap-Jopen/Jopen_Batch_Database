@@ -302,40 +302,65 @@ function kolomNummerNaarLetter(num) {
   return letters;
 }
 
-// Dikke scheidingslijn onder de laatste rij van elke groep met hetzelfde
-// toevoegmoment. Voegt via StylesManager een nieuwe stijl toe (zelfde stijl
-// als de cel al had, alleen de onderrand anders) i.p.v. de hele cel-stijl
-// te vervangen.
+// Randen in de Hops and Herbs-tabel (Recept-voorblad, rijen 43-63):
+// - Standaard een stippellijn onder elke rij (ook de nog ongebruikte
+//   hopslots), zodat losse toevoegingen binnen hetzelfde moment duidelijk
+//   maar licht gescheiden zijn.
+// - Een dikke lijn onder de laatste rij van elk daadwerkelijk toevoegmoment
+//   (overschrijft de stippellijn op die ene rij).
+// Kolommen 1-16 (A t/m P, de Print Area-breedte). Veel cellen in deze tabel
+// zijn samengevoegd (bv. A43:C43) -- alleen de ankercel bestaat echt als
+// element, dus we lossen elke kolompositie eerst op naar zijn ankercel en
+// ontdubbelen per rij (anders proberen we dezelfde cel meerdere keren aan
+// te passen, wat de laatst-gezette stijl gewoon overschrijft maar onnodig
+// werk is).
 async function zetHopGroepRanden(writer, stylesManager, bundel) {
-  async function randenVoorBlok(rijen, startRij, kolomVan, kolomTot) {
+  async function zetRandOpRij(rijNr, kolomVan, kolomTot, stijl) {
+    const geziene_ankers = new Set();
+    for (let col = kolomVan; col <= kolomTot; col++) {
+      const kolomLetter = kolomNummerNaarLetter(col);
+      const ruweCel = `Recept-voorblad!${kolomLetter}${rijNr}`;
+      let sheetCel;
+      try {
+        sheetCel = await writer.haalMergeAnker(ruweCel);
+      } catch (e) {
+        continue; // cel bestaat niet, ook niet als deel van een samenvoeging
+      }
+      if (geziene_ankers.has(sheetCel)) continue;
+      geziene_ankers.add(sheetCel);
+      try {
+        const huidigeStijl = await writer.haalStijlIndexOp(sheetCel);
+        const nieuweStijl = stylesManager.voegOnderrandToe(huidigeStijl, stijl);
+        await writer.zetStijlIndex(sheetCel, nieuweStijl);
+      } catch (e) {
+        // onbekende/niet-bestaande cel -- overslaan
+      }
+    }
+  }
+
+  // Basis: stippellijn onder elke rij in het volledige tabelbereik (ook de
+  // nog ongebruikte hopslots).
+  for (let rij = 43; rij <= 63; rij++) {
+    await zetRandOpRij(rij, 1, 16, 'dotted');
+  }
+
+  // Overschrijf met een dikke lijn op de laatste rij van elk daadwerkelijk
+  // toevoegmoment.
+  async function dikkeRandenVoorBlok(rijen, startRij) {
     for (let i = 0; i < rijen.length; i++) {
       const huidige = rijen[i];
       const volgende = rijen[i + 1];
       const laatsteVanGroep = !volgende || volgende.tijdstip !== huidige.tijdstip;
       if (!laatsteVanGroep) continue;
-      const rijNr = startRij + i;
-      for (let col = kolomVan; col <= kolomTot; col++) {
-        const kolomLetter = kolomNummerNaarLetter(col);
-        const sheetCel = `Recept-voorblad!${kolomLetter}${rijNr}`;
-        try {
-          const huidigeStijl = await writer.haalStijlIndexOp(sheetCel);
-          const nieuweStijl = stylesManager.voegDikkeOnderrandToe(huidigeStijl);
-          await writer.zetStijlIndex(sheetCel, nieuweStijl);
-        } catch (e) {
-          // Cel bestaat niet als eigen element (bv. een niet-ankercel binnen
-          // een samengevoegd bereik, zoals de "warm"-tijdstipcel bij dry hop
-          // rij 58, die G58:I58 beslaat). Geen rand nodig op een cel die er
-          // helemaal niet is -- gewoon overslaan.
-        }
-      }
+      await zetRandOpRij(startRij + i, 1, 16, 'medium');
     }
   }
 
   const hopRijen = sorteerHopgiften(bundel.recipe_ingredients.filter(r => r.rol === 'hopgift_kook'), 'hopgift_kook');
   const dryHopRijen = sorteerHopgiften(bundel.recipe_ingredients.filter(r => r.rol === 'dry_hop'), 'dry_hop');
 
-  await randenVoorBlok(hopRijen, 43, 1, 16);
-  await randenVoorBlok(dryHopRijen, 58, 1, 16);
+  await dikkeRandenVoorBlok(hopRijen, 43);
+  await dikkeRandenVoorBlok(dryHopRijen, 58);
 }
 
 // ---------------------------------------------------------------------------
