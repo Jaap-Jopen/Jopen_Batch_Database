@@ -62,7 +62,10 @@ serve(async (req) => {
     const { data: linkData, error: linkErr } = await adminClient.auth.admin.generateLink({
       type: "invite",
       email,
-      options: { data: { naam, rol } },
+      options: {
+        data: { naam, rol },
+        redirectTo: "https://jopen-bier.github.io/Jopen_Batch_Database/accept-invite.html",
+      },
     });
 
     if (linkErr || !linkData?.user) {
