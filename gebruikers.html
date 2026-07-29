@@ -55,7 +55,15 @@
         </select>
 
         <button type="submit">Send invite</button>
+        <button type="button" id="genereer-link-btn" style="background:none; border:1px solid var(--jopen-red); color:var(--jopen-red); margin-left:8px;">Generate link instead (no email)</button>
         <p id="invite-melding" class="jopen-form-melding"></p>
+
+        <div id="link-resultaat" style="display:none; margin-top:12px; padding:12px; background:#f7f7f5; border-radius:6px;">
+          <label style="display:block; font-size:0.8em; color:#6b6b6b; margin-bottom:4px;">
+            Invite link — copy this and send it yourself (e.g. via Outlook):
+          </label>
+          <input type="text" id="link-resultaat-veld" readonly style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:0.85em;" onclick="this.select()" />
+        </div>
       </form>
     </div>
   </main>
@@ -65,6 +73,45 @@
   <script src="nav.js"></script>
   <script>
     let huidigeGebruikerId = null;
+
+    document.getElementById('genereer-link-btn').addEventListener('click', async () => {
+      const email = document.getElementById('invite-email').value.trim();
+      const naam = document.getElementById('invite-naam').value.trim();
+      const rol = document.getElementById('invite-rol').value;
+      const melding = document.getElementById('invite-melding');
+      const resultaatDiv = document.getElementById('link-resultaat');
+
+      if (!email || !naam) {
+        melding.textContent = 'Fill in email address and name first.';
+        melding.className = 'jopen-form-melding fout';
+        return;
+      }
+
+      melding.textContent = 'Generating link…';
+      melding.className = 'jopen-form-melding';
+      resultaatDiv.style.display = 'none';
+
+      const { data, error } = await supabaseClient.functions.invoke('generate-invite-link', {
+        body: { email, naam, rol },
+      });
+
+      if (error || data?.error) {
+        let detail = data?.error || error.message;
+        try {
+          const body = await error.context.json();
+          if (body?.error) detail = body.error;
+        } catch (_) { /* geen JSON-body of geen error.context -- val terug op wat we al hadden */ }
+        melding.textContent = 'Could not generate link: ' + detail;
+        melding.className = 'jopen-form-melding fout';
+        return;
+      }
+
+      melding.textContent = `Link generated for ${email} — copy it below and send it yourself.`;
+      melding.className = 'jopen-form-melding ok';
+      document.getElementById('link-resultaat-veld').value = data.action_link;
+      resultaatDiv.style.display = 'block';
+      laadGebruikersLijst();
+    });
 
     async function laadGebruikersLijst() {
       const container = document.getElementById('gebruikers-lijst');
