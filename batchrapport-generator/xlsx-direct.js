@@ -44,17 +44,30 @@ class XlsxDirectWriter {
     const workbookXml = await this.zip.file('xl/workbook.xml').async('string');
     const relsXml = await this.zip.file('xl/_rels/workbook.xml.rels').async('string');
 
-    const sheetEntries = [...workbookXml.matchAll(/<sheet name="([^"]+)"[^>]*r:id="(rId\d+)"/g)]
-      .map(m => ({ naam: m[1], rId: m[2] }));
+    const sheetEntries = [...workbookXml.matchAll(/<sheet\b([^>]*)\/>/g)]
+      .map(m => {
+        const attrs = m[1];
+        const naam = attrs.match(/name="([^"]+)"/);
+        const rId = attrs.match(/r:id="(rId\d+)"/);
+        return naam && rId ? { naam: naam[1], rId: rId[1] } : null;
+      })
+      .filter(Boolean);
     const relMap = {};
-    for (const m of relsXml.matchAll(/<Relationship Id="(rId\d+)"[^>]*Target="([^"]+)"/g)) {
-      relMap[m[1]] = m[2];
+    for (const m of relsXml.matchAll(/<Relationship\b([^>]*)\/>/g)) {
+      const attrs = m[1];
+      const id = attrs.match(/Id="(rId\d+)"/);
+      const target = attrs.match(/Target="([^"]+)"/);
+      if (id && target) relMap[id[1]] = target[1];
     }
 
     this.sheetNaarBestand = {};
     for (const { naam, rId } of sheetEntries) {
       const target = relMap[rId]; // bv. 'worksheets/sheet1.xml'
-      if (target) this.sheetNaarBestand[naam] = 'xl/' + target.replace(/^\.?\/?/, '');
+      if (target) {
+        this.sheetNaarBestand[naam] = target.startsWith('/')
+          ? target.slice(1)           // absoluut pad, al t.o.v. package-root
+          : 'xl/' + target;           // relatief t.o.v. xl/_rels/../  (dus xl/)
+      }
     }
   }
 

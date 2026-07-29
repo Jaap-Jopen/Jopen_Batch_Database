@@ -317,9 +317,16 @@ async function zetHopGroepRanden(writer, stylesManager, bundel) {
       for (let col = kolomVan; col <= kolomTot; col++) {
         const kolomLetter = kolomNummerNaarLetter(col);
         const sheetCel = `Recept-voorblad!${kolomLetter}${rijNr}`;
-        const huidigeStijl = await writer.haalStijlIndexOp(sheetCel);
-        const nieuweStijl = stylesManager.voegDikkeOnderrandToe(huidigeStijl);
-        await writer.zetStijlIndex(sheetCel, nieuweStijl);
+        try {
+          const huidigeStijl = await writer.haalStijlIndexOp(sheetCel);
+          const nieuweStijl = stylesManager.voegDikkeOnderrandToe(huidigeStijl);
+          await writer.zetStijlIndex(sheetCel, nieuweStijl);
+        } catch (e) {
+          // Cel bestaat niet als eigen element (bv. een niet-ankercel binnen
+          // een samengevoegd bereik, zoals de "warm"-tijdstipcel bij dry hop
+          // rij 58, die G58:I58 beslaat). Geen rand nodig op een cel die er
+          // helemaal niet is -- gewoon overslaan.
+        }
       }
     }
   }
