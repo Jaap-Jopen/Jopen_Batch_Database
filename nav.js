@@ -9,6 +9,22 @@
 // verschijnt dan automatisch in de navigatiebalk van elke pagina.
 // ============================================================================
 
+// Pagina's die iedereen (ook uitgelogd) moet kunnen bereiken -- anders kan
+// niemand ooit meer inloggen of een uitnodiging accepteren.
+const JOPEN_PUBLIEKE_PAGINAS = ['login.html', 'accept-invite.html'];
+
+// Meteen (synchroon, dus vóór er ook maar iets van de rest van de pagina
+// zichtbaar wordt) een overlay tonen die de hele pagina afdekt, op de
+// publieke pagina's na. Wordt pas weer weggehaald zodra vereisIngelogd()
+// bevestigt dat er een sessie is -- bij geen sessie blijft de overlay
+// gewoon staan terwijl de pagina naar login.html doorstuurt.
+if (!JOPEN_PUBLIEKE_PAGINAS.includes(window.location.pathname.split('/').pop())) {
+  const overlay = document.createElement('div');
+  overlay.id = 'jopen-auth-overlay';
+  overlay.style.cssText = 'position:fixed; inset:0; background:#f4f4f2; z-index:99999;';
+  document.documentElement.appendChild(overlay);
+}
+
 const JOPEN_MODULES = [
   { naam: 'Home', href: 'index.html' },
   { naam: 'Recipes', href: 'receptoverzicht.html' },
@@ -18,6 +34,31 @@ const JOPEN_MODULES = [
   { naam: 'Settings', href: 'settings.html', adminOnly: true },
   { naam: 'Status', href: 'status.html', adminOnly: true },
 ];
+
+/**
+ * Stuurt direct door naar login.html als er geen ingelogde gebruiker is,
+ * behalve op de paar pagina's die per definitie ook zonder login bereikbaar
+ * moeten zijn. Haalt anders de overlay hierboven weer weg.
+ *
+ * Let op: dit is een UX-maatregel, geen beveiligingsgrens op zich -- de
+ * daadwerkelijke bescherming van gegevens loopt via RLS-policies in
+ * Supabase. Deze check voorkomt alleen dat de pagina's/navigatie zichtbaar
+ * zijn zonder in te loggen.
+ */
+async function vereisIngelogd() {
+  const huidigePagina = window.location.pathname.split('/').pop();
+  if (JOPEN_PUBLIEKE_PAGINAS.includes(huidigePagina)) return true;
+
+  const gebruiker = await getHuidigeGebruiker();
+  if (!gebruiker) {
+    const terugNaar = encodeURIComponent(huidigePagina + window.location.search);
+    window.location.replace(`login.html?redirect=${terugNaar}`);
+    return false;
+  }
+  const overlay = document.getElementById('jopen-auth-overlay');
+  if (overlay) overlay.remove();
+  return true;
+}
 
 function renderNav(huidigeGebruiker) {
   const container = document.getElementById('jopen-nav');
@@ -93,6 +134,9 @@ function escapeHtmlNav(str) {
 }
 
 async function initJopenNav() {
+  const magDoorgaan = await vereisIngelogd();
+  if (!magDoorgaan) return; // pagina stuurt door naar login.html, verder niets doen
+
   const gebruiker = await getHuidigeGebruiker();
   renderNav(gebruiker);
 

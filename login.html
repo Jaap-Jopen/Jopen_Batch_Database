@@ -33,6 +33,21 @@
   <script src="config.js"></script>
   <script src="nav.js"></script>
   <script>
+    function nieuweRedirectDoel() {
+      const params = new URLSearchParams(window.location.search);
+      const doel = params.get('redirect');
+      // Alleen een relatief pad binnen deze site toestaan (geen open redirect
+      // naar een externe site via een gemanipuleerde ?redirect=-parameter).
+      if (doel && !doel.startsWith('http') && !doel.startsWith('//')) return doel;
+      return 'index.html';
+    }
+
+    // Al ingelogd en toch op login.html beland? Meteen doorsturen.
+    (async () => {
+      const gebruiker = await getHuidigeGebruiker();
+      if (gebruiker) window.location.replace(nieuweRedirectDoel());
+    })();
+
     document.getElementById('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const email = document.getElementById('email').value;
@@ -53,7 +68,7 @@
         return;
       }
 
-      window.location.href = 'index.html';
+      window.location.href = nieuweRedirectDoel();
     });
   </script>
 </body>
