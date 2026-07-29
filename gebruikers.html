@@ -54,41 +54,21 @@
           <option value="admin">Admin</option>
         </select>
 
-        <button type="submit">Send invite</button>
-        <button type="button" id="genereer-link-btn" style="background:none; border:1px solid var(--jopen-red); color:var(--jopen-red); margin-left:8px;">Generate link instead (no email)</button>
+        <button type="button" id="genereer-link-btn">Create account</button>
         <p id="invite-melding" class="jopen-form-melding"></p>
 
         <div id="link-resultaat" style="display:none; margin-top:12px; padding:12px; background:#f7f7f5; border-radius:6px;">
-          <label style="display:block; font-size:0.8em; color:#6b6b6b; margin-bottom:4px;">Subject line:</label>
-          <input type="text" id="mail-onderwerp-veld" readonly value="You've been invited to the Jopen Batch Database" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:0.85em; margin-bottom:10px;" onclick="this.select()" />
-
-          <label style="display:block; font-size:0.8em; color:#6b6b6b; margin-bottom:4px;">Email text — click inside and press Ctrl+C (Cmd+C on Mac) to copy, or use the button below:</label>
-          <textarea id="mail-tekst-veld" readonly rows="9" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; font-size:0.85em; font-family:inherit; resize:vertical;" onclick="this.select()"></textarea>
-
-          <div style="margin-top:10px;">
-            <button type="button" id="kopieer-html-btn" style="background:var(--jopen-red); color:#fff; border:none; padding:8px 16px; border-radius:4px; cursor:pointer;">Copy formatted email (paste into Outlook)</button>
-            <span id="kopieer-html-melding" style="font-size:0.85em; margin-left:8px; color:#2f7d3c;"></span>
-          </div>
-          <p style="font-size:0.8em; color:#6b6b6b; margin:6px 0 12px 0;">
-            Copies the styled version (logo, red button) — open a new message in Outlook,
-            click in the body, and paste (Ctrl+V). If it pastes as plain text or looks wrong,
-            use one of the plain-text options below instead.
-          </p>
-
-          <div style="margin-top:10px;">
-            <button type="button" id="kopieer-mail-btn" style="background:none; border:1px solid var(--jopen-red); color:var(--jopen-red); padding:8px 16px; border-radius:4px; cursor:pointer;">Copy plain text</button>
-            <a id="mailto-link" href="#" style="display:inline-block; margin-left:8px; padding:8px 16px; border:1px solid var(--jopen-red); color:var(--jopen-red); border-radius:4px; text-decoration:none;">Open in your email app</a>
-            <span id="kopieer-melding" style="font-size:0.85em; margin-left:8px; color:#2f7d3c;"></span>
+          <div>
+            <a id="mailto-link" href="#" style="display:inline-block; padding:8px 16px; border:1px solid var(--jopen-red); color:var(--jopen-red); border-radius:4px; text-decoration:none;">Open Email</a>
+            <button type="button" id="kopieer-html-btn" style="background:var(--jopen-red); color:#fff; border:none; padding:8px 16px; border-radius:4px; cursor:pointer; margin-left:8px;">Copy Email content</button>
           </div>
           <p style="font-size:0.8em; color:#6b6b6b; margin:8px 0 0 0;">
-            "Open in your email app" opens a new message in your computer's default email
-            program (e.g. Outlook) with the recipient/subject/text already filled in, but
-            always as plain text — a mailto link can't carry formatting, that's a browser/
-            email limitation, not something we can fix here.
+            "Open Email" opens a new message in your computer's default email program (e.g. Outlook) with the recipient, subject and text already filled in.
           </p>
-
-          <label style="display:block; font-size:0.8em; color:#6b6b6b; margin:12px 0 4px 0;">Or just the bare link:</label>
-          <input type="text" id="link-resultaat-veld" readonly style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:0.85em;" onclick="this.select()" />
+          <p style="font-size:0.8em; color:#6b6b6b; margin:4px 0 0 0;">
+            "Copy Email content" copies the formatted email — open a new message yourself and paste (Ctrl+V) into the body.
+          </p>
+          <span id="kopieer-html-melding" style="display:block; font-size:0.85em; margin-top:6px; color:#2f7d3c;"></span>
         </div>
       </form>
     </div>
@@ -104,95 +84,33 @@
     // hier gedupliceerd zodat de pagina 'm direct kan invullen met de echte
     // link, zonder een los bestand te moeten fetchen. Pas je de e-mailtekst
     // aan in dat bestand, kopieer de wijziging dan ook hierheen.
-    const UITNODIGING_MAIL_HTML = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Jopen Batch Database invitation</title>
-</head>
-<body style="margin:0; padding:0; background-color:#f4f4f2; font-family:Arial, Helvetica, sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f2; padding:24px 0;">
-    <tr>
-      <td align="center">
-        <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:8px; overflow:hidden; border:1px solid #e5e5e0;">
+    // Zelfde tekst als supabase-invite-email-template.html (repo-root), maar
+    // hier bewust EENVOUDIGER opgezet (geen geneste tabellen, geen afgeronde
+    // hoeken): dit stuk wordt niet als echte e-mail verstuurd, maar in het
+    // klembord gezet om in een nieuw Outlook-bericht te PLAKKEN -- en dat
+    // plakken gaat via een heel andere (veel beperktere) weg dan een
+    // daadwerkelijk ontvangen HTML-mail. Complexere opmaak overleeft dat
+    // plakken vaak niet. __NAAM__/__LINK__ worden hieronder ingevuld.
+    const UITNODIGING_MAIL_HTML = `<div style="font-family:Arial, Helvetica, sans-serif; max-width:480px;">
+<img src="https://nrouqtxkeeoayqudkiud.supabase.co/storage/v1/object/public/Jopen%20art/Jopen%20logo.png" alt="Jopen" width="56" style="display:block; margin-bottom:16px;">
+<h2 style="color:#222222; margin:0 0 16px 0;">You've been invited to the Jopen Batch Database</h2>
+<p style="font-size:15px; line-height:1.5; color:#444444;">Hi __NAAM__,</p>
+<p style="font-size:15px; line-height:1.5; color:#444444;">Someone at Jopen Brouwerij has invited you to an account on the <b>Jopen Batch Database</b> &mdash; the internal system we use within the brewery for recipe management and batch reports.</p>
+<p><a href="__LINK__" style="background-color:#E0001D; color:#ffffff; padding:12px 24px; text-decoration:none; font-weight:bold; display:inline-block;">Create your account</a></p>
+<p style="font-size:13px; line-height:1.5; color:#777777;">Button not working? Copy this link into your browser instead:<br><a href="__LINK__" style="color:#E0001D;">__LINK__</a></p>
+<hr style="border:none; border-top:1px solid #eeeeee; margin:20px 0;">
+<p style="font-size:13px; line-height:1.5; color:#777777;"><b>Not phishing:</b> this email was sent because an administrator at Jopen Brouwerij added your email address to the Batch Database. If you weren't expecting this invitation, or you're unsure about the sender, please contact the person who invited you before clicking the button.</p>
+<p style="font-size:13px; line-height:1.5; color:#777777;">We will never ask you to share your password by email.</p>
+<p style="font-size:11px; color:#999999;">Jopen Batch Database &middot; internal system of Jopen Brouwerij (Haarlem)</p>
+</div>`;
 
-          <!-- Header with logo and red bar -->
-          <tr>
-            <td style="background-color:#E0001D; padding:20px 32px;" align="left">
-              <img src="https://nrouqtxkeeoayqudkiud.supabase.co/storage/v1/object/public/Jopen%20art/Jopen%20logo.png" alt="Jopen" width="48" height="48" style="display:block; border-radius:50%; background:#ffffff; padding:4px;">
-            </td>
-          </tr>
-
-          <!-- Body -->
-          <tr>
-            <td style="padding:32px;">
-              <h1 style="margin:0 0 16px 0; font-size:20px; color:#222222;">You've been invited to the Jopen Batch Database</h1>
-
-              <p style="margin:0 0 16px 0; font-size:15px; line-height:1.5; color:#444444;">
-                Someone at Jopen Brouwerij has invited you to an account on the
-                <strong>Jopen Batch Database</strong> — the internal system we use within
-                the brewery for recipe management and batch reports.
-              </p>
-
-              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 20px 0;">
-                <tr>
-                  <td style="background-color:#E0001D; border-radius:6px;">
-                    <a href="__LINK__" target="_blank" style="display:inline-block; padding:12px 28px; font-size:15px; font-weight:bold; color:#ffffff; text-decoration:none;">
-                      Create your account
-                    </a>
-                  </td>
-                </tr>
-              </table>
-
-              <p style="margin:0 0 20px 0; font-size:13px; line-height:1.5; color:#777777;">
-                Button not working? Copy this link into your browser instead:<br>
-                <a href="__LINK__" style="color:#E0001D; word-break:break-all;">__LINK__</a>
-              </p>
-
-              <hr style="border:none; border-top:1px solid #eeeeee; margin:24px 0;">
-
-              <p style="margin:0 0 8px 0; font-size:13px; line-height:1.5; color:#777777;">
-                <strong>Not phishing:</strong> this email was sent automatically because an
-                administrator at Jopen Brouwerij added your email address to the Batch
-                Database. If you weren't expecting this invitation, or you're unsure about
-                the sender, please contact the person who invited you before clicking
-                the button.
-              </p>
-              <p style="margin:0; font-size:13px; line-height:1.5; color:#777777;">
-                We will never ask you to share your password by email.
-              </p>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="background-color:#faf9f7; padding:16px 32px; font-size:11px; color:#999999;">
-              Jopen Batch Database · internal system of Jopen Brouwerij (Haarlem)<br>
-              This invitation is single-use and will expire after some time.
-            </td>
-          </tr>
-
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-
-    // Let op: dit template gebruikt hier __LINK__ als plekhouder (i.p.v.
-    // {{ .ConfirmationURL }} zoals in Supabase's eigen versie), want dit
-    // stuk wordt hier zelf al met de echte link ingevuld -- de
-    // {{ .ConfirmationURL }}-syntax is alleen voor de Supabase Dashboard-
-    // versie (supabase-invite-email-template.html), die wordt door
-    // Supabase's eigen sjabloonmotor ingevuld, niet door deze pagina.
-    function bouwUitnodigingMail(link) {
-      return UITNODIGING_MAIL_HTML.replaceAll('__LINK__', link);
+    function bouwUitnodigingMail(link, naam) {
+      return UITNODIGING_MAIL_HTML.replaceAll('__LINK__', link).replaceAll('__NAAM__', naam);
     }
 
-    function bouwPlatteTekstVersie(link) {
+    function bouwPlatteTekstVersie(link, naam) {
       return [
-        "You've been invited to the Jopen Batch Database",
+        `Hi ${naam},`,
         '',
         'Someone at Jopen Brouwerij has invited you to an account on the Jopen Batch Database',
         '— the internal system we use within the brewery for recipe management and batch reports.',
@@ -239,13 +157,11 @@
 
       const link = data.action_link;
       const onderwerp = "You've been invited to the Jopen Batch Database";
-      const platteTekst = bouwPlatteTekstVersie(link);
-      const emailHtml = bouwUitnodigingMail(link);
+      const platteTekst = bouwPlatteTekstVersie(link, naam);
+      const emailHtml = bouwUitnodigingMail(link, naam);
 
-      melding.textContent = `Link generated for ${email} — copy the formatted email below, or use one of the plain-text options.`;
+      melding.textContent = `Account created for ${email} — use the buttons below to send the invite yourself.`;
       melding.className = 'jopen-form-melding ok';
-      document.getElementById('link-resultaat-veld').value = link;
-      document.getElementById('mail-tekst-veld').value = platteTekst;
       document.getElementById('mailto-link').href =
         `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(onderwerp)}&body=${encodeURIComponent(platteTekst)}`;
       resultaatDiv.style.display = 'block';
@@ -260,21 +176,9 @@
               'text/plain': new Blob([platteTekst], { type: 'text/plain' }),
             }),
           ]);
-          kopieerMelding.textContent = 'Copied — now paste (Ctrl+V) into a new Outlook message.';
+          kopieerMelding.textContent = 'Copied — now paste (Ctrl+V) into a new email message.';
         } catch (e) {
-          kopieerMelding.textContent = 'Could not copy the formatted version in this browser — use the plain-text options below instead.';
-        }
-      };
-
-      document.getElementById('kopieer-mail-btn').onclick = async () => {
-        const kopieerMelding = document.getElementById('kopieer-melding');
-        try {
-          await navigator.clipboard.writeText(platteTekst);
-          kopieerMelding.textContent = 'Copied — paste into a new email message.';
-        } catch (e) {
-          const veld = document.getElementById('mail-tekst-veld');
-          veld.select();
-          kopieerMelding.textContent = 'Could not copy automatically — the text is now selected, press Ctrl+C.';
+          kopieerMelding.textContent = 'Could not copy in this browser — try "Open Email" instead.';
         }
       };
     });
@@ -409,51 +313,6 @@
       document.getElementById('admin-inhoud').style.display = 'block';
       laadGebruikersLijst();
     }
-
-    document.getElementById('invite-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const email = document.getElementById('invite-email').value.trim();
-      const naam = document.getElementById('invite-naam').value.trim();
-      const rol = document.getElementById('invite-rol').value;
-      const melding = document.getElementById('invite-melding');
-
-      melding.textContent = 'Sending invite…';
-      melding.className = 'jopen-form-melding';
-
-      // supabaseClient.functions.invoke() automatically sends the Authorization
-      // header of the currently logged-in user — no manual token needed.
-      const { data, error } = await supabaseClient.functions.invoke('invite-user', {
-        body: { email, naam, rol },
-      });
-
-      if (error) {
-        // supabase-js only gives a generic message on a non-2xx status
-        // ("Edge Function returned a non-2xx status code") in error.message.
-        // The real error message from our function is in the response body
-        // itself (error.context is the raw fetch Response) — we try to read
-        // that here so you don't have to check the Edge Function logs every time.
-        let detail = error.message;
-        try {
-          const body = await error.context.json();
-          if (body?.error) detail = body.error;
-        } catch (_) {
-          // response wasn't JSON, or context was missing — fall back to error.message
-        }
-        melding.textContent = 'Invite failed: ' + detail;
-        melding.className = 'jopen-form-melding fout';
-        return;
-      }
-      if (data?.error) {
-        melding.textContent = 'Invite failed: ' + data.error;
-        melding.className = 'jopen-form-melding fout';
-        return;
-      }
-
-      melding.textContent = `Invite sent to ${email}.`;
-      melding.className = 'jopen-form-melding ok';
-      document.getElementById('invite-form').reset();
-      laadGebruikersLijst();
-    });
 
     document.addEventListener('DOMContentLoaded', initGebruikersPagina);
   </script>
