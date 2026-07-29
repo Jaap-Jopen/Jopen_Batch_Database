@@ -472,8 +472,8 @@ async function brZetHopGroepRanden(writer, stylesManager, bundel) {
   }
   const hopRijen = sorteerHopgiften(bundel.recipe_ingredients.filter(r => r.rol === 'hopgift_kook'), 'hopgift_kook');
   const dryHopRijen = sorteerHopgiften(bundel.recipe_ingredients.filter(r => r.rol === 'dry_hop'), 'dry_hop');
-  await randenVoorBlok(hopRijen, 43, 1, 17);
-  await randenVoorBlok(dryHopRijen, 58, 1, 17);
+  await randenVoorBlok(hopRijen, 43, 1, 16);
+  await randenVoorBlok(dryHopRijen, 58, 1, 16);
 }
 
 /**
