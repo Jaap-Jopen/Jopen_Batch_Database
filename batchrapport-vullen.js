@@ -75,6 +75,37 @@ function bepaalHopEbu(gewichtGram, alphaPct, kooktijd, og, volumeKookHl) {
 // belanden soms in de verkeerde <row>-container bij samengevoegde cellen,
 // wat Microsoft Excel als "beschadigd" beschouwt). Gebruikt JSZip, dat
 // apart via CDN geladen moet zijn (zie head van deze pagina's HTML).
+function brKolomLetterNaarNummer(letters) {
+  let num = 0;
+  for (const ch of letters) num = num * 26 + (ch.charCodeAt(0) - 64);
+  return num;
+}
+function brKolomNummerNaarLetter(num) {
+  let letters = '';
+  while (num > 0) {
+    const rest = (num - 1) % 26;
+    letters = String.fromCharCode(65 + rest) + letters;
+    num = Math.floor((num - 1) / 26);
+  }
+  return letters;
+}
+// Zie generate-batchrapport.js voor uitleg.
+function brRepareerDimensie(xml) {
+  const alleCellen = [...xml.matchAll(/<c r="([A-Z]+)(\d+)"/g)];
+  if (alleCellen.length === 0) return xml;
+  let minCol = Infinity, maxCol = -Infinity, minRow = Infinity, maxRow = -Infinity;
+  for (const [, colLetters, rowStr] of alleCellen) {
+    const col = brKolomLetterNaarNummer(colLetters);
+    const row = Number(rowStr);
+    if (col < minCol) minCol = col;
+    if (col > maxCol) maxCol = col;
+    if (row < minRow) minRow = row;
+    if (row > maxRow) maxRow = row;
+  }
+  const nieuweRef = `${brKolomNummerNaarLetter(minCol)}${minRow}:${brKolomNummerNaarLetter(maxCol)}${maxRow}`;
+  return xml.replace(/<dimension ref="[^"]*"\/>/, `<dimension ref="${nieuweRef}"/>`);
+}
+
 async function brRepareerRijCelMismatch(buffer) {
   const zip = await JSZip.loadAsync(buffer);
   const sheetFiles = Object.keys(zip.files).filter(f => /^xl\/worksheets\/sheet\d+\.xml$/.test(f));
@@ -99,7 +130,7 @@ async function brRepareerRijCelMismatch(buffer) {
       return heleMatch;
     });
 
-    zip.file(filePath, xml);
+    zip.file(filePath, brRepareerDimensie(xml));
   }
 
   // Bekende ExcelJS-bug (exceljs/exceljs#664): $-tekens vóór rijnummers

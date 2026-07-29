@@ -105,6 +105,44 @@ function bepaalHopEbu(gewichtGram, alphaPct, kooktijd, og, volumeKookHl) {
 // problemen aangetroffen..."). Hersteld door na het opslaan de cel-rijnummers
 // gelijk te trekken aan hun daadwerkelijke <row>-container.
 // ---------------------------------------------------------------------------
+function kolomLetterNaarNummer(letters) {
+  let num = 0;
+  for (const ch of letters) num = num * 26 + (ch.charCodeAt(0) - 64);
+  return num;
+}
+function kolomNummerNaarLetter(num) {
+  let letters = '';
+  while (num > 0) {
+    const rest = (num - 1) % 26;
+    letters = String.fromCharCode(65 + rest) + letters;
+    num = Math.floor((num - 1) / 26);
+  }
+  return letters;
+}
+
+// ExcelJS herberekent <dimension> bij het opslaan op basis van cellen mét
+// waarde/formule, en telt leeg-maar-opgemaakte cellen (zoals een gestylede
+// marge-kolom A) niet mee. Daardoor kan de dimensie "smaller" worden dan de
+// daadwerkelijk aanwezige cellen (bv. B1:R103 terwijl er ook A-cellen met
+// alleen opmaak bestaan) -- Excel beschouwt dat als inconsistent en gooit
+// celinformatie buiten de dimensie weg. Hersteld door de dimensie opnieuw
+// te berekenen over ALLE aanwezige celverwijzingen, ongeacht inhoud.
+function repareerDimensie(xml) {
+  const alleCellen = [...xml.matchAll(/<c r="([A-Z]+)(\d+)"/g)];
+  if (alleCellen.length === 0) return xml;
+  let minCol = Infinity, maxCol = -Infinity, minRow = Infinity, maxRow = -Infinity;
+  for (const [, colLetters, rowStr] of alleCellen) {
+    const col = kolomLetterNaarNummer(colLetters);
+    const row = Number(rowStr);
+    if (col < minCol) minCol = col;
+    if (col > maxCol) maxCol = col;
+    if (row < minRow) minRow = row;
+    if (row > maxRow) maxRow = row;
+  }
+  const nieuweRef = `${kolomNummerNaarLetter(minCol)}${minRow}:${kolomNummerNaarLetter(maxCol)}${maxRow}`;
+  return xml.replace(/<dimension ref="[^"]*"\/>/, `<dimension ref="${nieuweRef}"/>`);
+}
+
 async function repareerRijCelMismatch(buffer) {
   const zip = await JSZip.loadAsync(buffer);
   const sheetFiles = Object.keys(zip.files).filter(f => /^xl\/worksheets\/sheet\d+\.xml$/.test(f));
@@ -132,7 +170,7 @@ async function repareerRijCelMismatch(buffer) {
       return heleMatch;
     });
 
-    zip.file(filePath, xml);
+    zip.file(filePath, repareerDimensie(xml));
   }
 
   // Bekende ExcelJS-bug (exceljs/exceljs#664): bij defined names (o.a.
