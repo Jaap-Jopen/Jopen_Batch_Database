@@ -82,6 +82,7 @@ async function test() {
   console.log('A43 (Magnum, 45min, 1e van groep -> GEEN dikke rand):', JSON.stringify(ws.getCell('A43').border));
   console.log('A44 (Saaz, 45min, laatste van groep -> WEL dikke rand):', JSON.stringify(ws.getCell('A44').border));
   console.log('A45 (Citra CRYO, 0min, laatste rij -> WEL dikke rand):', JSON.stringify(ws.getCell('A45').border));
+  console.log('Brouwen!N8 (Gewenste stamwort, moet 16 zijn: 16 origineel extract + 0 correctie):', wsB.getCell('N8').value);
 }
 
 test().catch(e => { console.error(e); process.exit(1); });

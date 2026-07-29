@@ -464,14 +464,6 @@
   "categorie": "water"
  },
  {
-  "key": "Stamwort correctie brouwhuis",
-  "locaties": [
-   "Brouwen!N8"
-  ],
-  "db_veld": "recipe_brouwspecificaties.stamwort_correctie_brouwhuis",
-  "categorie": "brouwspecificatie"
- },
- {
   "key": "T release, +/-",
   "locaties": [
    "Recept-voorblad!E23"

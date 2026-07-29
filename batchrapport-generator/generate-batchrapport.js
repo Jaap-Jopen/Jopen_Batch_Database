@@ -207,6 +207,17 @@ function vulReceptnaamKruisVelden(workbook, bundel, isWP) {
     ws.getCell('F9').value = bron.naam_special_bin ?? null;
   }
   ws.getCell('F11').value = bron.naam_special_bin ?? null;
+
+  // Gewenste stamwort (N8) = Origineel extract + Stamwort correctie brouwhuis.
+  // Dat laatste veld heeft nog geen UI-invoerplek (staat sinds een eerdere
+  // sessie als open punt), dus is voorlopig meestal leeg/0 -- dan komt hier
+  // gewoon het Origineel extract zelf te staan totdat dat veld een plek
+  // krijgt in recept-invoer.html.
+  const origineelExtract = bundel.recipe_specificaties.origineel_extract;
+  const stamwortCorrectie = bron.stamwort_correctie_brouwhuis;
+  if (origineelExtract !== null && origineelExtract !== undefined) {
+    ws.getCell('N8').value = Number(origineelExtract) + (stamwortCorrectie ? Number(stamwortCorrectie) : 0);
+  }
 }
 
 // Zelfde sortering als sorteerHopHerbsRegels() in recept-invoer.html: hop(boil)

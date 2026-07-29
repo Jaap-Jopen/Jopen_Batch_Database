@@ -178,6 +178,12 @@ function brVulReceptnaamKruisVelden(workbook, bundel, isWP) {
     ws.getCell('F9').value = bron.naam_special_bin ?? null;
   }
   ws.getCell('F11').value = bron.naam_special_bin ?? null;
+
+  const origineelExtract = bundel.recipe_specificaties.origineel_extract;
+  const stamwortCorrectie = bron.stamwort_correctie_brouwhuis;
+  if (origineelExtract !== null && origineelExtract !== undefined) {
+    ws.getCell('N8').value = Number(origineelExtract) + (stamwortCorrectie ? Number(stamwortCorrectie) : 0);
+  }
 }
 
 // Zelfde sortering als sorteerHopHerbsRegels() in recept-invoer.html.
