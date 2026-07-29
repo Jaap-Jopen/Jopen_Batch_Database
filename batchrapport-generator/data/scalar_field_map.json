@@ -384,15 +384,6 @@
   "categorie": "water"
  },
  {
-  "key": "Naam special bin storting / Naam recept Braukon",
-  "locaties": [
-   "Brouwen!F9",
-   "Brouwen!F11"
-  ],
-  "db_veld": "recipe_brouwspecificaties.naam_special_bin",
-  "categorie": "brouwspecificatie"
- },
- {
   "key": "Origineel extract +/-",
   "locaties": [
    "Recept-voorblad!E12"
@@ -447,15 +438,6 @@
   ],
   "db_veld": "recipe_water.ratio_cl_so4",
   "categorie": "water"
- },
- {
-  "key": "Receptnaam Software / Recept nummer Braukon",
-  "locaties": [
-   "Brouwen!F8",
-   "Brouwen!F9"
-  ],
-  "db_veld": "recipe_brouwspecificaties.recept_naam_software",
-  "categorie": "brouwspecificatie"
  },
  {
   "key": "Rest extract +/-",
@@ -770,5 +752,41 @@
   ],
   "db_veld": "recipe_brouwspecificaties.mash_verhogen4_tijd",
   "categorie": "brouwspecificatie"
+ },
+ {
+  "key": "Automatic dosing: Inmaischen Zuur [L]",
+  "locaties": [
+   "Brouwen!M36"
+  ],
+  "db_veld": "recipe_brouwspecificaties.inmaischen_zuur_l",
+  "categorie": "brouwspecificatie",
+  "wp_only": true
+ },
+ {
+  "key": "Automatic dosing: Inmaischen Tannines [L]",
+  "locaties": [
+   "Brouwen!N36"
+  ],
+  "db_veld": "recipe_brouwspecificaties.inmaischen_tannines_l",
+  "categorie": "brouwspecificatie",
+  "wp_only": true
+ },
+ {
+  "key": "Automatic dosing: Koken Zuur [L]",
+  "locaties": [
+   "Brouwen!M37"
+  ],
+  "db_veld": "recipe_brouwspecificaties.koken_zuur_l",
+  "categorie": "brouwspecificatie",
+  "wp_only": true
+ },
+ {
+  "key": "Automatic dosing: Inline sparge Zuur [L]",
+  "locaties": [
+   "Brouwen!M38"
+  ],
+  "db_veld": "recipe_brouwspecificaties.inline_sparge_zuur_l",
+  "categorie": "brouwspecificatie",
+  "wp_only": true
  }
 ]

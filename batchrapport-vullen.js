@@ -122,11 +122,21 @@ async function haalBatchDataOpBrowser(supabase, batchnummer) {
   };
 }
 
+// Zie generate-batchrapport.js voor uitleg: Postgres 'numeric'-kolommen komen
+// via PostgREST als string terug (bv "0.5"), en moeten als echt getal in de
+// cel komen, anders behandelt Excel het als tekst en breken formules erop.
+function brNaarGetalIndienMogelijk(waarde) {
+  if (typeof waarde === 'string' && waarde.trim() !== '' && !Number.isNaN(Number(waarde))) {
+    return Number(waarde);
+  }
+  return waarde;
+}
+
 function brSchrijfCel(workbook, sheetCel, waarde) {
   const [sheetNaam, cel] = sheetCel.split('!');
   const ws = workbook.getWorksheet(sheetNaam);
   if (!ws) { console.warn(`Onbekend tabblad: ${sheetNaam} (cel ${sheetCel})`); return; }
-  ws.getCell(cel).value = (waarde === undefined || waarde === null) ? null : waarde;
+  ws.getCell(cel).value = (waarde === undefined || waarde === null) ? null : brNaarGetalIndienMogelijk(waarde);
 }
 
 function brVulScalaireVelden(workbook, bundel, isWP, scalarMap) {
@@ -153,6 +163,21 @@ const WP_KERK_VELDEN = [
 function brVulWpKerkVelden(workbook, bundel, isWP) {
   const bron = bundel.recipe_brouwspecificaties;
   for (const v of WP_KERK_VELDEN) brSchrijfCel(workbook, v.cel, bron[isWP ? v.wp : v.kerk]);
+}
+
+// Zie generate-batchrapport.js voor uitleg: F8/F9/F11 in Brouwen wisselen
+// van betekenis per vestiging.
+function brVulReceptnaamKruisVelden(workbook, bundel, isWP) {
+  const bron = bundel.recipe_brouwspecificaties;
+  const ws = workbook.getWorksheet('Brouwen');
+  if (isWP) {
+    ws.getCell('F8').value = { formula: "'Recept-voorblad'!G7*Brouwen!F19" };
+    ws.getCell('F9').value = bron.recept_naam_software ?? null;
+  } else {
+    ws.getCell('F8').value = bron.recept_naam_software ?? null;
+    ws.getCell('F9').value = bron.naam_special_bin ?? null;
+  }
+  ws.getCell('F11').value = bron.naam_special_bin ?? null;
 }
 
 function brVulIngredientRijen(workbook, bundel, ingredientMap) {
@@ -252,6 +277,7 @@ async function genereerEnDownloadBatchrapport(supabase, batchnummer) {
 
   brVulScalaireVelden(workbook, bundel, isWP, scalarMap);
   brVulWpKerkVelden(workbook, bundel, isWP);
+  brVulReceptnaamKruisVelden(workbook, bundel, isWP);
   brVulIngredientRijen(workbook, bundel, ingredientMap);
   brVulRevisies(workbook, bundel, revisieMap);
   brVulFormaten(workbook, bundel, formatenMap);

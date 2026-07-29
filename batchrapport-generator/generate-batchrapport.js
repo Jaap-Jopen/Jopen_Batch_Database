@@ -141,11 +141,23 @@ async function haalBatchDataOp(supabase, batchnummer) {
 // ---------------------------------------------------------------------------
 // Sjabloon vullen
 // ---------------------------------------------------------------------------
+// Postgres 'numeric'-kolommen komen via PostgREST/Supabase als STRING terug
+// (bv. "0.5"), niet als JS-getal -- om precisieverlies te voorkomen. Als je
+// zo'n string ongewijzigd in een cel zet, ziet Excel dat als tekst (met een
+// punt), niet als getal, en breekt elke formule die er verder op rekent.
+// Hier expliciet omzetten naar een echt getal zodra het er een is.
+function naarGetalIndienMogelijk(waarde) {
+  if (typeof waarde === 'string' && waarde.trim() !== '' && !Number.isNaN(Number(waarde))) {
+    return Number(waarde);
+  }
+  return waarde;
+}
+
 function schrijfCel(workbook, sheetCel, waarde) {
   const [sheetNaam, cel] = sheetCel.split('!');
   const ws = workbook.getWorksheet(sheetNaam);
   if (!ws) { console.warn(`Onbekend tabblad: ${sheetNaam} (cel ${sheetCel})`); return; }
-  ws.getCell(cel).value = (waarde === undefined || waarde === null) ? null : waarde;
+  ws.getCell(cel).value = (waarde === undefined || waarde === null) ? null : naarGetalIndienMogelijk(waarde);
 }
 
 function vulScalaireVelden(workbook, bundel, isWP) {
@@ -176,6 +188,25 @@ function vulWpKerkVelden(workbook, bundel, isWP) {
   for (const v of WP_KERK_VELDEN) {
     schrijfCel(workbook, v.cel, bron[isWP ? v.wp : v.kerk]);
   }
+}
+
+// F8/F9/F11 in Brouwen wisselen van betekenis per vestiging (dit was eerder
+// verkeerd samengevoegd tot 1 mapping-regel per ongeluk):
+// - F8: WP -> live formule (Aantal brouwsels * Eindvolume brouwsel = "Totaal
+//   volume batch"), géén databasewaarde. Kerk -> Receptnaam Software.
+// - F9: WP -> Receptnaam Software. Kerk -> Naam special bin storting.
+// - F11: altijd -> Naam special bin storting (ongeacht vestiging).
+function vulReceptnaamKruisVelden(workbook, bundel, isWP) {
+  const bron = bundel.recipe_brouwspecificaties;
+  const ws = workbook.getWorksheet('Brouwen');
+  if (isWP) {
+    ws.getCell('F8').value = { formula: "'Recept-voorblad'!G7*Brouwen!F19" };
+    ws.getCell('F9').value = bron.recept_naam_software ?? null;
+  } else {
+    ws.getCell('F8').value = bron.recept_naam_software ?? null;
+    ws.getCell('F9').value = bron.naam_special_bin ?? null;
+  }
+  ws.getCell('F11').value = bron.naam_special_bin ?? null;
 }
 
 function vulIngredientRijen(workbook, bundel) {
@@ -289,6 +320,7 @@ async function main() {
 
   vulScalaireVelden(workbook, bundel, isWP);
   vulWpKerkVelden(workbook, bundel, isWP);
+  vulReceptnaamKruisVelden(workbook, bundel, isWP);
   vulIngredientRijen(workbook, bundel);
   vulRevisies(workbook, bundel);
   vulFormaten(workbook, bundel);
@@ -324,6 +356,6 @@ if (require.main === module) {
 }
 
 module.exports = {
-  bepaalHopRendement, bepaalHopEbu, vulScalaireVelden, vulWpKerkVelden,
+  bepaalHopRendement, bepaalHopEbu, vulScalaireVelden, vulWpKerkVelden, vulReceptnaamKruisVelden,
   vulIngredientRijen, vulRevisies, vulFormaten, vulHopRendementEnEbu, haalBatchDataOp,
 };

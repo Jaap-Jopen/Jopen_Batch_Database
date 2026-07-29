@@ -1,21 +1,23 @@
 const ExcelJS = require('exceljs');
 const {
-  vulScalaireVelden, vulWpKerkVelden, vulIngredientRijen, vulRevisies,
+  vulScalaireVelden, vulWpKerkVelden, vulReceptnaamKruisVelden, vulIngredientRijen, vulRevisies,
   vulFormaten, vulHopRendementEnEbu,
 } = require('./generate-batchrapport');
 
 async function test() {
   const bundel = {
-    recipes: { naam: 'Testbier IPA', bierstijl: 'IPA', locatie: 'Jopen Kerk', brouwsel_hl: 60, status: 'actief' },
-    recipe_specificaties: { origineel_extract: 16, origineel_extract_tol: 0.5, alcohol: 6.5, alcohol_tol: 0.3, kleur: 20, kleur_tol: 2, ph: 4.2 },
+    recipes: { naam: 'Testbier IPA', short_name: 'WP Testbier IPA', bierstijl: 'IPA', locatie: 'Waarderpolder', brouwsel_hl: 60, status: 'actief' },
+    recipe_specificaties: { origineel_extract: 16, origineel_extract_tol: '0.5', alcohol: 6.5, alcohol_tol: 0.3, kleur: 20, kleur_tol: 2, ph: 4.2 },
     recipe_fermentatie: { pitching_temp: 18, main_ferm_temp: 20, bier_risico: 'Standaard', bier_status: 'Standaard' },
     recipe_brouwspecificaties: {
       volume_kook: 62, verwacht_extract_begin_kook: 14, beluchting: 8,
+      recept_naam_software: 'BH_TestbierIPA_60hl', naam_special_bin: 'SB_TestbierIPA',
       stort_special_bin_kg: null, maischwater: 120, eindvolume_brouwsel: 60,
       sparging_1e: 30, eerste_afloop: 30, sparging_2e: 15, spoelwater: 15,
       sparging_3e: null, spoel_afloop: null, sparging_4e: null, totaal_gefiltreerd_volume: 60,
       kamers_mashfilter: null, lauterfactor: 1.02, walsenmolen: 'walsenmolen A',
       volume_water_additie_terugkoeling: null,
+      inmaischen_zuur_l: 2.5, inmaischen_tannines_l: 1.1, koken_zuur_l: 0.8, inline_sparge_zuur_l: 0.4,
     },
     recipe_water: { ca: 80, mg: 10, na: 15, cl: 60, so4: 120, ratio_cl_so4: 0.5, alkalinity: 40 },
     recipe_verpakking: { tht_fles_maanden: 6, formaten: ['24x33cl', '20L keykeg'] },
@@ -41,22 +43,25 @@ async function test() {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.readFile('./Batchrapport_sjabloon.xlsx');
 
-  vulScalaireVelden(workbook, bundel, false);
-  vulWpKerkVelden(workbook, bundel, false);
+  vulScalaireVelden(workbook, bundel, true);
+  vulWpKerkVelden(workbook, bundel, true);
+  vulReceptnaamKruisVelden(workbook, bundel, true);
   vulIngredientRijen(workbook, bundel);
   vulRevisies(workbook, bundel);
   vulFormaten(workbook, bundel);
   vulHopRendementEnEbu(workbook, bundel);
   workbook.getWorksheet('Recept-voorblad').getCell('K3').value = bundel.batch.batchnummer;
-  workbook.getWorksheet('Recept-voorblad').getCell('Q1').value = bundel.recipes.naam;
+  workbook.getWorksheet('Recept-voorblad').getCell('Q1').value = bundel.recipes.short_name;
 
   await workbook.xlsx.writeFile('./output/TEST-batch.xlsx');
   console.log('Testbestand geschreven: ./output/TEST-batch.xlsx');
 
   // Meteen een paar cellen terug uitlezen ter controle
   const ws = workbook.getWorksheet('Recept-voorblad');
+  const wsB = workbook.getWorksheet('Brouwen');
   console.log('C3 (naam bier):', ws.getCell('C3').value);
   console.log('F12 (origineel extract spec):', ws.getCell('F12').value);
+  console.log('E12 (tolerantie, was string "0.5" -- moet nu getal 0.5 zijn):', ws.getCell('E12').value, typeof ws.getCell('E12').value);
   console.log('A43 (hop 1 naam):', ws.getCell('A43').value);
   console.log('D43 (hop 1 alpha):', ws.getCell('D43').value);
   console.log('I43 (hop 1 rendement):', ws.getCell('I43').value);
@@ -67,6 +72,11 @@ async function test() {
   console.log('D30 (mout 1 kg):', ws.getCell('D30').value);
   console.log('F40 (calculated color bijdrage-som, live formule):', ws.getCell('F40').value);
   console.log('M40 (calculated color, live formule):', ws.getCell('M40').value);
+  console.log('Brouwen!F8 (WP -> moet live formule zijn):', wsB.getCell('F8').value);
+  console.log('Brouwen!F9 (WP -> recept_naam_software):', wsB.getCell('F9').value);
+  console.log('Brouwen!F11 (altijd naam_special_bin):', wsB.getCell('F11').value);
+  console.log('Brouwen!M36 (Automatic dosing, Inmaischen Zuur):', wsB.getCell('M36').value);
+  console.log('Brouwen!N36 (Automatic dosing, Inmaischen Tannines):', wsB.getCell('N36').value);
 }
 
 test().catch(e => { console.error(e); process.exit(1); });
