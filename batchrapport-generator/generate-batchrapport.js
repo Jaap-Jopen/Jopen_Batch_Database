@@ -329,7 +329,15 @@ async function zetHopGroepRanden(writer, stylesManager, bundel) {
       if (geziene_ankers.has(sheetCel)) continue;
       geziene_ankers.add(sheetCel);
       try {
-        const huidigeStijl = await writer.haalStijlIndexOp(sheetCel);
+        let huidigeStijl = await writer.haalStijlIndexOp(sheetCel);
+        // Bovenrand wissen (behalve de allereerste rij van de tabel, die
+        // vormt de bovenrand van het hele blok): anders bepaalt Excel zelf
+        // welke van twee concurrerende rand-specificaties (onze onderrand
+        // op de rij erboven vs. de oude "hair"-bovenrand hier) wint, en dat
+        // is niet per se wat we bedoelen.
+        if (rijNr !== 43) {
+          huidigeStijl = stylesManager.wisBovenrand(huidigeStijl);
+        }
         const nieuweStijl = stylesManager.voegOnderrandToe(huidigeStijl, stijl);
         await writer.zetStijlIndex(sheetCel, nieuweStijl);
       } catch (e) {

@@ -255,6 +255,62 @@ class StylesManager {
    * OOXML-randstijl, bv. "medium" (toevoegmoment-grens) of "dotted" (basis-
    * scheiding tussen losse rijen).
    */
+  /**
+   * Als voegOnderrandToe, maar dan voor de bovenrand -- gebruikt om de
+   * oorspronkelijke "hair"-bovenrand weg te halen zodat die niet in
+   * conflict komt met de onderrand die we op de rij erboven zetten (Excel
+   * kiest anders zelf welke van de twee concurrerende randspecificaties
+   * wint, wat niet per se is wat we bedoelen).
+   */
+  wisBovenrand(sourceStyleIdx) {
+    const cellXfsSectie = this._haalSectie('cellXfs');
+    const xfs = this._splitsElementen(cellXfsSectie.inhoud, 'xf');
+    const bronXf = xfs[sourceStyleIdx];
+    if (!bronXf) throw new Error(`Stijlindex ${sourceStyleIdx} bestaat niet`);
+    const borderIdMatch = bronXf.match(/borderId="(\d+)"/);
+    const bronBorderId = borderIdMatch ? Number(borderIdMatch[1]) : 0;
+
+    const bordersSectie = this._haalSectie('borders');
+    const borders = this._splitsElementen(bordersSectie.inhoud, 'border');
+    const bronBorder = borders[bronBorderId] || '<border><left/><right/><top/><bottom/><diagonal/></border>';
+
+    const nieuweBorderRuw = bronBorder.replace(
+      /<top[^>]*\/>|<top[^>]*>[\s\S]*?<\/top>/,
+      '<top/>'
+    ).replace(/^<border[^>]*>/, '<border>');
+    const openTagMatch = bronBorder.match(/^<border([^>]*)>/);
+    const nieuweBorder = openTagMatch
+      ? nieuweBorderRuw.replace('<border>', `<border${openTagMatch[1]}>`)
+      : nieuweBorderRuw;
+
+    let nieuweBorderId = borders.findIndex(b => b === nieuweBorder);
+    let bordersGewijzigd = false;
+    if (nieuweBorderId === -1) {
+      borders.push(nieuweBorder);
+      nieuweBorderId = borders.length - 1;
+      bordersGewijzigd = true;
+    }
+
+    const nieuweXf = bronXf.replace(/borderId="\d+"/, `borderId="${nieuweBorderId}"`);
+    let nieuweXfIdx = xfs.findIndex(x => x === nieuweXf);
+    let xfsGewijzigd = false;
+    if (nieuweXfIdx === -1) {
+      xfs.push(nieuweXf);
+      nieuweXfIdx = xfs.length - 1;
+      xfsGewijzigd = true;
+    }
+
+    if (bordersGewijzigd) {
+      const nieuweInhoud = borders.join('');
+      this.xml = this.xml.replace(bordersSectie.volledigeMatch, `<borders count="${borders.length}">${nieuweInhoud}</borders>`);
+    }
+    if (xfsGewijzigd) {
+      const nieuweInhoud = xfs.join('');
+      this.xml = this.xml.replace(cellXfsSectie.volledigeMatch, `<cellXfs count="${xfs.length}">${nieuweInhoud}</cellXfs>`);
+    }
+    return nieuweXfIdx;
+  }
+
   voegOnderrandToe(sourceStyleIdx, stijl = 'medium') {
     const cellXfsSectie = this._haalSectie('cellXfs');
     const xfs = this._splitsElementen(cellXfsSectie.inhoud, 'xf');
