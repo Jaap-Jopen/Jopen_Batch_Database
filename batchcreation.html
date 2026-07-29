@@ -141,6 +141,7 @@
     let alleRecepten = [];
     let geselecteerdRecipeId = null;
     let magAanmaken = false;
+    let magVerwijderen = false;
 
     function escapeHtml(str) {
       const div = document.createElement('div');
@@ -309,7 +310,7 @@
           <td>${escapeHtml(b.naam)}</td>
           <td>${b.aangemaakt_op ? new Date(b.aangemaakt_op).toLocaleString() : '—'}</td>
           <td>${escapeHtml(b.gebruikers?.naam || '—')}</td>
-          <td><button type="button" class="bc-download-btn" data-batchnummer="${b.batchnummer}" style="background:none;border:1px solid var(--jopen-red);color:var(--jopen-red);border-radius:4px;padding:3px 10px;cursor:pointer;font-size:0.85em;">Download</button></td>
+          <td><button type="button" class="bc-download-btn" data-batchnummer="${b.batchnummer}" style="background:none;border:1px solid var(--jopen-red);color:var(--jopen-red);border-radius:4px;padding:3px 10px;cursor:pointer;font-size:0.85em;">Download</button>${magVerwijderen ? `<button type="button" class="bc-verwijder-btn" data-batchnummer="${b.batchnummer}" style="background:none;border:1px solid #a33f2c;color:#a33f2c;border-radius:4px;padding:3px 10px;cursor:pointer;font-size:0.85em;margin-left:6px;">Delete</button>` : ''}</td>
         </tr>`).join('');
 
       tbody.querySelectorAll('.bc-download-btn').forEach(btn => {
@@ -329,11 +330,27 @@
           }
         });
       });
+
+      tbody.querySelectorAll('.bc-verwijder-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const nr = Number(btn.dataset.batchnummer);
+          if (!confirm(`Delete batch ${nr}? This cannot be undone.`)) return;
+          btn.disabled = true;
+          const { error } = await supabaseClient.from('batches').delete().eq('batchnummer', nr);
+          if (error) {
+            alert('Could not delete batch: ' + error.message);
+            btn.disabled = false;
+            return;
+          }
+          laadRecenteBatches();
+        });
+      });
     }
 
     window.addEventListener('DOMContentLoaded', async () => {
       const gebruiker = await getHuidigeGebruiker();
       magAanmaken = magBewerken(gebruiker);
+      magVerwijderen = gebruiker?.rol === 'admin';
       document.getElementById('bc-geen-rechten').style.display = magAanmaken ? 'none' : 'block';
       document.getElementById('bc-formulier').style.display = magAanmaken ? 'block' : 'none';
 
