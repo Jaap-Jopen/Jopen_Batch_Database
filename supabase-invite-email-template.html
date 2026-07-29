@@ -1,0 +1,97 @@
+<!--
+  Supabase "Invite user" e-mailtemplate voor Jopen Batch Database.
+
+  GEBRUIK: plak de HTML hieronder (alles tussen de <!DOCTYPE...> en de
+  laatste </html>) in Supabase Dashboard → Authentication → Email Templates
+  → tabblad "Invite user" → HTML-veld. Onderwerpregel: zie voorstel onderaan
+  dit bestand.
+
+  Zonder eigen SMTP komt de mail nog steeds van Supabase's eigen
+  verzendadres (niet van bv. @jopenbier.nl) -- dat kun je pas veranderen
+  zodra je SMTP-toegang hebt (Authentication → SMTP Settings). De inhoud
+  hieronder is er wel al op gericht om zo duidelijk mogelijk te maken dat
+  het een legitieme, verwachte uitnodiging is, ook al staat er nog geen
+  eigen domein achter.
+-->
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Uitnodiging Jopen Batch Database</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f4f4f2; font-family:Arial, Helvetica, sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f2; padding:24px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:8px; overflow:hidden; border:1px solid #e5e5e0;">
+
+          <!-- Kop met logo en rode balk -->
+          <tr>
+            <td style="background-color:#E0001D; padding:20px 32px;" align="left">
+              <img src="https://jopen-bier.github.io/Jopen_Batch_Database/jopen-logo.png" alt="Jopen" width="48" height="48" style="display:block; border-radius:50%; background:#ffffff; padding:4px;">
+            </td>
+          </tr>
+
+          <!-- Inhoud -->
+          <tr>
+            <td style="padding:32px;">
+              <h1 style="margin:0 0 16px 0; font-size:20px; color:#222222;">Je bent uitgenodigd voor de Jopen Batch Database</h1>
+
+              <p style="margin:0 0 16px 0; font-size:15px; line-height:1.5; color:#444444;">
+                Iemand van Jopen Brouwerij heeft je uitgenodigd voor een account op de
+                <strong>Jopen Batch Database</strong> — het interne systeem voor receptbeheer
+                en batchrapporten dat we binnen de brouwerij gebruiken.
+              </p>
+
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 20px 0;">
+                <tr>
+                  <td style="background-color:#E0001D; border-radius:6px;">
+                    <a href="{{ .ConfirmationURL }}" target="_blank" style="display:inline-block; padding:12px 28px; font-size:15px; font-weight:bold; color:#ffffff; text-decoration:none;">
+                      Account aanmaken
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0 0 20px 0; font-size:13px; line-height:1.5; color:#777777;">
+                Werkt de knop niet? Kopieer dan deze link naar je browser:<br>
+                <a href="{{ .ConfirmationURL }}" style="color:#E0001D; word-break:break-all;">{{ .ConfirmationURL }}</a>
+              </p>
+
+              <hr style="border:none; border-top:1px solid #eeeeee; margin:24px 0;">
+
+              <p style="margin:0 0 8px 0; font-size:13px; line-height:1.5; color:#777777;">
+                <strong>Geen phishing:</strong> deze e-mail is automatisch verstuurd doordat
+                een beheerder van Jopen Brouwerij je e-mailadres heeft toegevoegd aan de
+                Batch Database. Verwachtte je deze uitnodiging niet, of twijfel je aan de
+                afzender? Neem dan contact op met degene die je heeft uitgenodigd voordat je
+                op de knop klikt.
+              </p>
+              <p style="margin:0; font-size:13px; line-height:1.5; color:#777777;">
+                We vragen je nooit om je wachtwoord per e-mail te delen.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Voettekst -->
+          <tr>
+            <td style="background-color:#faf9f7; padding:16px 32px; font-size:11px; color:#999999;">
+              Jopen Batch Database · intern systeem van Jopen Brouwerij (Haarlem)<br>
+              Deze uitnodiging is eenmalig en verloopt na verloop van tijd.
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+
+<!--
+  Voorgestelde onderwerpregel (los in te vullen in het "Subject heading"-veld
+  boven de HTML-editor):
+
+    Uitnodiging voor de Jopen Batch Database
+-->
