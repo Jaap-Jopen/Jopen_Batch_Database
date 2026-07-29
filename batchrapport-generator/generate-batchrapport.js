@@ -209,14 +209,30 @@ function vulReceptnaamKruisVelden(workbook, bundel, isWP) {
   ws.getCell('F11').value = bron.naam_special_bin ?? null;
 }
 
+// Zelfde sortering als sorteerHopHerbsRegels() in recept-invoer.html: hop(boil)
+// aflopend op kooktijd, dry hop in vaste volgorde warm/16c/0c. Zo staan de
+// toevoegingen per moment gegroepeerd, wat nodig is voor de dikke
+// scheidingslijnen die de gebruiker per groep wil zien.
+const DRY_HOP_VOLGORDE = ['warm', '16c', '0c'];
+function sorteerHopgiften(rijen, rol) {
+  if (rol === 'hopgift_kook') {
+    return [...rijen].sort((a, b) => (parseFloat(b.tijdstip) || -Infinity) - (parseFloat(a.tijdstip) || -Infinity));
+  }
+  if (rol === 'dry_hop') {
+    return [...rijen].sort((a, b) => DRY_HOP_VOLGORDE.indexOf(a.tijdstip) - DRY_HOP_VOLGORDE.indexOf(b.tijdstip));
+  }
+  return rijen;
+}
+
 function vulIngredientRijen(workbook, bundel) {
   const rollen = ['hopgift_kook', 'dry_hop', 'hoofdmout', 'toegift_brouwerij', 'toegift_kelder', 'gist'];
   for (const rol of rollen) {
     const cellenPerRij = INGREDIENT_MAP[rol];
     if (!cellenPerRij) continue;
-    const rijen = bundel.recipe_ingredients
-      .filter(r => r.rol === rol)
-      .sort((a, b) => (a.volgorde ?? 0) - (b.volgorde ?? 0));
+    const ongesorteerd = bundel.recipe_ingredients.filter(r => r.rol === rol);
+    const rijen = (rol === 'hopgift_kook' || rol === 'dry_hop')
+      ? sorteerHopgiften(ongesorteerd, rol)
+      : ongesorteerd.sort((a, b) => (a.volgorde ?? 0) - (b.volgorde ?? 0));
 
     Object.keys(cellenPerRij).sort((a, b) => Number(a) - Number(b)).forEach((volgordeStr, i) => {
       const regel = rijen[i]; // i-de regel van dit type, ongeacht de eigen 'volgorde'-waarde in de rij zelf
@@ -325,6 +341,7 @@ async function main() {
   vulRevisies(workbook, bundel);
   vulFormaten(workbook, bundel);
   vulHopRendementEnEbu(workbook, bundel);
+  zetHopGroepRanden(workbook, bundel);
 
   workbook.getWorksheet('Recept-voorblad').getCell('H3').value = 'Batch nr.:';
   workbook.getWorksheet('Recept-voorblad').getCell('K3').value = bundel.batch.batchnummer;
@@ -355,7 +372,36 @@ if (require.main === module) {
   });
 }
 
+// Dikke scheidingslijn onder de laatste rij van elke groep met hetzelfde
+// toevoegmoment (bv. alle 45-min hopgiften bij elkaar, dan een dikke lijn,
+// dan alle 0-min hopgiften). Werkt op de al gesorteerde (gegroepeerde) rijen.
+const DIKKE_RAND = { style: 'medium', color: { argb: 'FF000000' } };
+function zetHopGroepRanden(workbook, bundel) {
+  const ws = workbook.getWorksheet('Recept-voorblad');
+
+  function randenVoorBlok(rijen, startRij, kolomVan, kolomTot) {
+    for (let i = 0; i < rijen.length; i++) {
+      const huidige = rijen[i];
+      const volgende = rijen[i + 1];
+      const laatsteVanGroep = !volgende || volgende.tijdstip !== huidige.tijdstip;
+      if (!laatsteVanGroep) continue;
+      const rijNr = startRij + i;
+      for (let col = kolomVan; col <= kolomTot; col++) {
+        const cel = ws.getCell(rijNr, col);
+        cel.border = { ...cel.border, bottom: DIKKE_RAND };
+      }
+    }
+  }
+
+  const hopRijen = sorteerHopgiften(bundel.recipe_ingredients.filter(r => r.rol === 'hopgift_kook'), 'hopgift_kook');
+  const dryHopRijen = sorteerHopgiften(bundel.recipe_ingredients.filter(r => r.rol === 'dry_hop'), 'dry_hop');
+
+  // Kolom A t/m Q dekt de hele "Hops and Herbs"-tabelbreedte (Soort t/m HDT)
+  randenVoorBlok(hopRijen, 43, 1, 17);
+  randenVoorBlok(dryHopRijen, 58, 1, 17);
+}
+
 module.exports = {
   bepaalHopRendement, bepaalHopEbu, vulScalaireVelden, vulWpKerkVelden, vulReceptnaamKruisVelden,
-  vulIngredientRijen, vulRevisies, vulFormaten, vulHopRendementEnEbu, haalBatchDataOp,
+  vulIngredientRijen, vulRevisies, vulFormaten, vulHopRendementEnEbu, zetHopGroepRanden, haalBatchDataOp,
 };

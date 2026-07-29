@@ -1,7 +1,7 @@
 const ExcelJS = require('exceljs');
 const {
   vulScalaireVelden, vulWpKerkVelden, vulReceptnaamKruisVelden, vulIngredientRijen, vulRevisies,
-  vulFormaten, vulHopRendementEnEbu,
+  vulFormaten, vulHopRendementEnEbu, zetHopGroepRanden,
 } = require('./generate-batchrapport');
 
 async function test() {
@@ -26,6 +26,7 @@ async function test() {
     recipe_ingredients: [
       { rol: 'hopgift_kook', volgorde: 1, ingredient_id: 1, alpha_pct: 12.8, hoeveelheid: 5000, tijdstip: '45', hdt: 1 },
       { rol: 'hopgift_kook', volgorde: 2, ingredient_id: 2, alpha_pct: 24.5, hoeveelheid: 5000, tijdstip: '0', hdt: null },
+      { rol: 'hopgift_kook', volgorde: 3, ingredient_id: 7, alpha_pct: 10, hoeveelheid: 1000, tijdstip: '45', hdt: 1 },
       { rol: 'dry_hop', volgorde: 1, ingredient_id: 3, hoeveelheid: 7500, tijdstip: '16c' },
       { rol: 'hoofdmout', volgorde: 1, ingredient_id: 4, hoeveelheid: 800, kleur_ebc: 5 },
       { rol: 'hoofdmout', volgorde: 2, ingredient_id: 5, hoeveelheid: 100, kleur_ebc: 900 },
@@ -35,7 +36,7 @@ async function test() {
       { versie_major: 2, versie_minor: 0, datum: '2026-01-15', door: 'Jaap', wijziging: 'Major revision test' },
     ],
     ingredientNaam: new Map([
-      [1, 'Magnum'], [2, 'Citra CRYO'], [3, 'Cascade'], [4, 'Pilsmout'], [5, 'Chocolate malt'], [6, 'US-05'],
+      [1, 'Magnum'], [2, 'Citra CRYO'], [3, 'Cascade'], [4, 'Pilsmout'], [5, 'Chocolate malt'], [6, 'US-05'], [7, 'Saaz'],
     ]),
     batch: { batchnummer: 99999 },
   };
@@ -50,6 +51,7 @@ async function test() {
   vulRevisies(workbook, bundel);
   vulFormaten(workbook, bundel);
   vulHopRendementEnEbu(workbook, bundel);
+  zetHopGroepRanden(workbook, bundel);
   workbook.getWorksheet('Recept-voorblad').getCell('K3').value = bundel.batch.batchnummer;
   workbook.getWorksheet('Recept-voorblad').getCell('Q1').value = bundel.recipes.short_name;
 
@@ -77,6 +79,9 @@ async function test() {
   console.log('Brouwen!F11 (altijd naam_special_bin):', wsB.getCell('F11').value);
   console.log('Brouwen!M36 (Automatic dosing, Inmaischen Zuur):', wsB.getCell('M36').value);
   console.log('Brouwen!N36 (Automatic dosing, Inmaischen Tannines):', wsB.getCell('N36').value);
+  console.log('A43 (Magnum, 45min, 1e van groep -> GEEN dikke rand):', JSON.stringify(ws.getCell('A43').border));
+  console.log('A44 (Saaz, 45min, laatste van groep -> WEL dikke rand):', JSON.stringify(ws.getCell('A44').border));
+  console.log('A45 (Citra CRYO, 0min, laatste rij -> WEL dikke rand):', JSON.stringify(ws.getCell('A45').border));
 }
 
 test().catch(e => { console.error(e); process.exit(1); });

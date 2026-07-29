@@ -180,14 +180,27 @@ function brVulReceptnaamKruisVelden(workbook, bundel, isWP) {
   ws.getCell('F11').value = bron.naam_special_bin ?? null;
 }
 
+// Zelfde sortering als sorteerHopHerbsRegels() in recept-invoer.html.
+const DRY_HOP_VOLGORDE = ['warm', '16c', '0c'];
+function brSorteerHopgiften(rijen, rol) {
+  if (rol === 'hopgift_kook') {
+    return [...rijen].sort((a, b) => (parseFloat(b.tijdstip) || -Infinity) - (parseFloat(a.tijdstip) || -Infinity));
+  }
+  if (rol === 'dry_hop') {
+    return [...rijen].sort((a, b) => DRY_HOP_VOLGORDE.indexOf(a.tijdstip) - DRY_HOP_VOLGORDE.indexOf(b.tijdstip));
+  }
+  return rijen;
+}
+
 function brVulIngredientRijen(workbook, bundel, ingredientMap) {
   const rollen = ['hopgift_kook', 'dry_hop', 'hoofdmout', 'toegift_brouwerij', 'toegift_kelder', 'gist'];
   for (const rol of rollen) {
     const cellenPerRij = ingredientMap[rol];
     if (!cellenPerRij) continue;
-    const rijen = bundel.recipe_ingredients
-      .filter(r => r.rol === rol)
-      .sort((a, b) => (a.volgorde ?? 0) - (b.volgorde ?? 0));
+    const ongesorteerd = bundel.recipe_ingredients.filter(r => r.rol === rol);
+    const rijen = (rol === 'hopgift_kook' || rol === 'dry_hop')
+      ? brSorteerHopgiften(ongesorteerd, rol)
+      : ongesorteerd.sort((a, b) => (a.volgorde ?? 0) - (b.volgorde ?? 0));
 
     Object.keys(cellenPerRij).sort((a, b) => Number(a) - Number(b)).forEach((volgordeStr, i) => {
       const regel = rijen[i];
@@ -201,6 +214,32 @@ function brVulIngredientRijen(workbook, bundel, ingredientMap) {
       }
     });
   }
+}
+
+// Dikke scheidingslijn onder de laatste rij van elke groep met hetzelfde
+// toevoegmoment. Zie generate-batchrapport.js voor uitleg.
+const BR_DIKKE_RAND = { style: 'medium', color: { argb: 'FF000000' } };
+function brZetHopGroepRanden(workbook, bundel) {
+  const ws = workbook.getWorksheet('Recept-voorblad');
+
+  function randenVoorBlok(rijen, startRij, kolomVan, kolomTot) {
+    for (let i = 0; i < rijen.length; i++) {
+      const huidige = rijen[i];
+      const volgende = rijen[i + 1];
+      const laatsteVanGroep = !volgende || volgende.tijdstip !== huidige.tijdstip;
+      if (!laatsteVanGroep) continue;
+      const rijNr = startRij + i;
+      for (let col = kolomVan; col <= kolomTot; col++) {
+        const cel = ws.getCell(rijNr, col);
+        cel.border = { ...cel.border, bottom: BR_DIKKE_RAND };
+      }
+    }
+  }
+
+  const hopRijen = brSorteerHopgiften(bundel.recipe_ingredients.filter(r => r.rol === 'hopgift_kook'), 'hopgift_kook');
+  const dryHopRijen = brSorteerHopgiften(bundel.recipe_ingredients.filter(r => r.rol === 'dry_hop'), 'dry_hop');
+  randenVoorBlok(hopRijen, 43, 1, 17);
+  randenVoorBlok(dryHopRijen, 58, 1, 17);
 }
 
 function brVulRevisies(workbook, bundel, revisieMap) {
@@ -282,6 +321,7 @@ async function genereerEnDownloadBatchrapport(supabase, batchnummer) {
   brVulRevisies(workbook, bundel, revisieMap);
   brVulFormaten(workbook, bundel, formatenMap);
   brVulHopRendementEnEbu(workbook, bundel);
+  brZetHopGroepRanden(workbook, bundel);
 
   workbook.getWorksheet('Recept-voorblad').getCell('K3').value = bundel.batch.batchnummer;
   workbook.getWorksheet('Recept-voorblad').getCell('Q1').value = vestigingsBron;
