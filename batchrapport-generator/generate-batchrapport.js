@@ -117,6 +117,21 @@ async function repareerRijCelMismatch(buffer) {
       ));
       return heleMatch.replace(inhoud, nieuweInhoud);
     });
+
+    // Schema-volgorde in <sheetPr>: outlinePr moet vóór pageSetUpPr staan.
+    // ExcelJS voegt zijn eigen outlinePr altijd toe NA een al bestaande
+    // pageSetUpPr, wat Excel afkeurt. Hersteld door de twee om te wisselen
+    // waar ze samen voorkomen.
+    xml = xml.replace(/<sheetPr([^>]*)>([\s\S]*?)<\/sheetPr>/, (heleMatch, attrs, inhoud) => {
+      const pageSetUpMatch = inhoud.match(/<pageSetUpPr[^>]*\/>/);
+      const outlineMatch = inhoud.match(/<outlinePr[^>]*\/>/);
+      if (pageSetUpMatch && outlineMatch && inhoud.indexOf(pageSetUpMatch[0]) < inhoud.indexOf(outlineMatch[0])) {
+        const rest = inhoud.replace(pageSetUpMatch[0], '').replace(outlineMatch[0], '');
+        return `<sheetPr${attrs}>${outlineMatch[0]}${pageSetUpMatch[0]}${rest}</sheetPr>`;
+      }
+      return heleMatch;
+    });
+
     zip.file(filePath, xml);
   }
 
