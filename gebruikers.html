@@ -79,6 +79,7 @@
   <script src="nav.js"></script>
   <script>
     let huidigeGebruikerId = null;
+    let huidigeGebruikerNaam = null;
 
     // Zelfde HTML als supabase-invite-email-template.html (repo-root) --
     // hier gedupliceerd zodat de pagina 'm direct kan invullen met de echte
@@ -95,31 +96,34 @@
 <img src="https://nrouqtxkeeoayqudkiud.supabase.co/storage/v1/object/public/Jopen%20art/Jopen%20logo.png" alt="Jopen" width="56" style="display:block; margin-bottom:16px;">
 <h2 style="color:#222222; margin:0 0 16px 0;">You've been invited to the Jopen Batch Database</h2>
 <p style="font-size:15px; line-height:1.5; color:#444444;">Hi __NAAM__,</p>
-<p style="font-size:15px; line-height:1.5; color:#444444;">Someone at Jopen Brouwerij has invited you to an account on the <b>Jopen Batch Database</b> &mdash; the internal system we use within the brewery for recipe management and batch reports.</p>
+<p style="font-size:15px; line-height:1.5; color:#444444;">__UITNODIGER__ has invited you to an account on the <b>Jopen Batch Database</b> &mdash; the internal system we use within the brewery for recipe management and batch reports.</p>
 <p><a href="__LINK__" style="background-color:#E0001D; color:#ffffff; padding:12px 24px; text-decoration:none; font-weight:bold; display:inline-block;">Create your account</a></p>
 <p style="font-size:13px; line-height:1.5; color:#777777;">Button not working? Copy this link into your browser instead:<br><a href="__LINK__" style="color:#E0001D;">__LINK__</a></p>
 <hr style="border:none; border-top:1px solid #eeeeee; margin:20px 0;">
-<p style="font-size:13px; line-height:1.5; color:#777777;"><b>Not phishing:</b> this email was sent because an administrator at Jopen Brouwerij added your email address to the Batch Database. If you weren't expecting this invitation, or you're unsure about the sender, please contact the person who invited you before clicking the button.</p>
+<p style="font-size:13px; line-height:1.5; color:#777777;"><b>Not phishing:</b> this email was sent because __UITNODIGER__ (an administrator at Jopen Brouwerij) added your email address to the Batch Database. If you weren't expecting this invitation, or you're unsure about the sender, please contact __UITNODIGER__ before clicking the button.</p>
 <p style="font-size:13px; line-height:1.5; color:#777777;">We will never ask you to share your password by email.</p>
 <p style="font-size:11px; color:#999999;">Jopen Batch Database &middot; internal system of Jopen Brouwerij (Haarlem)</p>
 </div>`;
 
-    function bouwUitnodigingMail(link, naam) {
-      return UITNODIGING_MAIL_HTML.replaceAll('__LINK__', link).replaceAll('__NAAM__', naam);
+    function bouwUitnodigingMail(link, naam, uitnodiger) {
+      return UITNODIGING_MAIL_HTML
+        .replaceAll('__LINK__', link)
+        .replaceAll('__NAAM__', naam)
+        .replaceAll('__UITNODIGER__', uitnodiger);
     }
 
-    function bouwPlatteTekstVersie(link, naam) {
+    function bouwPlatteTekstVersie(link, naam, uitnodiger) {
       return [
         `Hi ${naam},`,
         '',
-        'Someone at Jopen Brouwerij has invited you to an account on the Jopen Batch Database',
+        `${uitnodiger} has invited you to an account on the Jopen Batch Database`,
         '— the internal system we use within the brewery for recipe management and batch reports.',
         '',
         'Create your account: ' + link,
         '',
-        'Not phishing: this email was sent because an administrator at Jopen Brouwerij added your',
-        'email address to the Batch Database. If you were not expecting this, contact the person',
-        'who invited you before clicking the link. We will never ask you to share your password by email.',
+        `Not phishing: this email was sent because ${uitnodiger} (an administrator at Jopen Brouwerij)`,
+        'added your email address to the Batch Database. If you were not expecting this, contact',
+        `${uitnodiger} before clicking the link. We will never ask you to share your password by email.`,
       ].join('\n');
     }
 
@@ -157,8 +161,9 @@
 
       const link = data.action_link;
       const onderwerp = "You've been invited to the Jopen Batch Database";
-      const platteTekst = bouwPlatteTekstVersie(link, naam);
-      const emailHtml = bouwUitnodigingMail(link, naam);
+      const uitnodiger = huidigeGebruikerNaam || 'An administrator at Jopen Brouwerij';
+      const platteTekst = bouwPlatteTekstVersie(link, naam, uitnodiger);
+      const emailHtml = bouwUitnodigingMail(link, naam, uitnodiger);
 
       melding.textContent = `Account created for ${email} — use the buttons below to send the invite yourself.`;
       melding.className = 'jopen-form-melding ok';
@@ -310,6 +315,7 @@
       }
 
       huidigeGebruikerId = gebruiker.id;
+      huidigeGebruikerNaam = gebruiker.naam;
       document.getElementById('admin-inhoud').style.display = 'block';
       laadGebruikersLijst();
     }
