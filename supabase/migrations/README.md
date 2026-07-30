@@ -49,3 +49,7 @@ productie-wijziging zodra dit gepusht wordt.
   `recipes`, gevuld via een ronde kleurenselectie in `recept-invoer.html`,
   gebruikt om geplande brouwsels in `brouwplanning.html` sneller herkenbaar
   te maken.
+- `20260730194612_create_eenheden_tabel.sql` — `eenheden`-tabel, beheerbaar
+  via Settings → Units. Eerste stap richting het vervangen van het vrije
+  tekstveld "Unit" op receptregels door een vaste keuzelijst — die omzetting
+  zelf moet nog gebeuren.
