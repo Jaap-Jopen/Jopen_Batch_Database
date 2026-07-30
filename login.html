@@ -44,6 +44,22 @@
 
       <p id="reset-melding" class="jopen-form-melding"></p>
     </form>
+
+    <div id="reset-bevestiging" style="display:none; margin-top:24px; max-width:400px; padding:16px 20px; background:#f0f7f1; border:1px solid #cfe8d3; border-radius:6px;">
+      <h2 style="font-size:1.1em; margin-top:0; color:#2f7d3c;">Check your email</h2>
+      <p style="margin:0 0 10px 0;">
+        If that email address has an account, a password reset link is on its way from
+        <b>Supabase</b> (sent by <code>noreply@mail.app.supabase.io</code>).
+      </p>
+      <p style="margin:0 0 10px 0;">
+        That email looks quite plain (no logo, generic layout) — that's expected, it's the
+        underlying login system sending it directly, not Jopen itself.
+      </p>
+      <p style="margin:0; font-size:0.85em; color:#555;">
+        Don't see it after a few minutes? Check your spam/junk folder.
+      </p>
+      <button type="button" id="reset-opnieuw-btn" style="margin-top:14px; background:none; border:1px solid #ccc; color:#555;">Back to login</button>
+    </div>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -123,8 +139,15 @@
         return;
       }
 
-      melding.textContent = `If ${email} has an account, a reset link has been sent.`;
-      melding.className = 'jopen-form-melding ok';
+      document.getElementById('reset-form').style.display = 'none';
+      document.getElementById('reset-bevestiging').style.display = 'block';
+    });
+
+    document.getElementById('reset-opnieuw-btn').addEventListener('click', () => {
+      document.getElementById('reset-bevestiging').style.display = 'none';
+      document.getElementById('login-form').style.display = 'block';
+      document.getElementById('reset-melding').textContent = '';
+      document.getElementById('reset-form').reset();
     });
   </script>
 </body>
