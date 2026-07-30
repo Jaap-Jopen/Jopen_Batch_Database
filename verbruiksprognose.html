@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jopen — Consumption forecast</title>
+<link rel="stylesheet" href="jopen-shared.css">
+<style>
+  main.vp-main { max-width: 1000px; margin: 0 auto; padding: 24px; }
+
+  .vp-toolbar {
+    display: flex; align-items: center; gap: 14px; margin-bottom: 18px; flex-wrap: wrap;
+    background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 14px 16px;
+  }
+  .vp-toolbar label { font-size: 0.85em; color: #6b6b6b; display: block; margin-bottom: 3px; }
+  .vp-toolbar select, .vp-toolbar input {
+    padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.95em; width: 90px;
+  }
+  .vp-toolbar .vp-veld { display: flex; flex-direction: column; }
+  .vp-samenvatting { font-size: 0.85em; color: #6b6b6b; margin-left: auto; }
+
+  .vp-filter-tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .vp-filter-tabs button {
+    padding: 6px 14px; border-radius: 16px; border: 1px solid #ccc; background: #fff;
+    font-size: 0.85em; cursor: pointer;
+  }
+  .vp-filter-tabs button.actief { background: var(--jopen-red); color: #fff; border-color: var(--jopen-red); }
+
+  .vp-groep { margin-bottom: 18px; background: #fff; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
+  .vp-groep-titel {
+    background: #f7f7f5; padding: 9px 14px; font-weight: 600; font-size: 0.9em;
+    border-bottom: 1px solid #eee;
+  }
+  table.vp-tabel { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+  table.vp-tabel th, table.vp-tabel td { text-align: left; padding: 8px 14px; border-bottom: 1px solid #eee; }
+  table.vp-tabel th { color: #6b6b6b; font-weight: 600; font-size: 0.85em; }
+  table.vp-tabel tr.vp-rij-ingredient { cursor: pointer; }
+  table.vp-tabel tr.vp-rij-ingredient:hover { background: var(--jopen-red-tint); }
+  .vp-detail-rij { display: none; background: #fafafa; }
+  .vp-detail-rij td { padding: 6px 14px 10px 30px; font-size: 0.88em; color: #555; }
+  .vp-detail-rij ul { margin: 4px 0 0 0; padding-left: 18px; }
+  .vp-leeg { padding: 24px; text-align: center; color: #999; }
+  .vp-skeleton { color: #bbb; padding: 20px; }
+</style>
+</head>
+<body>
+
+  <div id="jopen-nav"></div>
+
+  <main class="vp-main">
+    <h1 style="margin-bottom:2px;">Consumption forecast</h1>
+    <p class="jopen-subtitel" style="margin-top:0;">Raw material requirements based on the brew planning, for a chosen week range.</p>
+
+    <div class="vp-toolbar">
+      <div class="vp-veld">
+        <label for="vp-jaar">Year</label>
+        <select id="vp-jaar"></select>
+      </div>
+      <div class="vp-veld">
+        <label for="vp-van">From week</label>
+        <input type="number" id="vp-van" min="1" max="53" value="1" />
+      </div>
+      <div class="vp-veld">
+        <label for="vp-tot">To week</label>
+        <input type="number" id="vp-tot" min="1" max="53" value="12" />
+      </div>
+      <div class="vp-samenvatting" id="vp-samenvatting">—</div>
+    </div>
+
+    <div class="vp-filter-tabs" id="vp-filter-tabs">
+      <button type="button" class="actief" data-rol="alle">All</button>
+      <button type="button" data-rol="hoofdmout">Malt &amp; grains</button>
+      <button type="button" data-rol="hopgift_kook">Hops (boil)</button>
+      <button type="button" data-rol="dry_hop">Hops (dry hop)</button>
+      <button type="button" data-rol="toegift_brouwerij">Brewing additions</button>
+      <button type="button" data-rol="gist">Yeast</button>
+      <button type="button" data-rol="toegift_kelder">Cellar additions</button>
+    </div>
+
+    <div id="vp-resultaat">
+      <div class="vp-skeleton">Select a week range to calculate.</div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="nav.js"></script>
+  <script>
+    const ROL_LABEL = {
+      hoofdmout: 'Malt & grains',
+      hopgift_kook: 'Hops (boil)',
+      dry_hop: 'Hops (dry hop)',
+      toegift_brouwerij: 'Brewing additions',
+      gist: 'Yeast',
+      toegift_kelder: 'Cellar additions',
+    };
+    const ROL_VOLGORDE = ['hoofdmout', 'hopgift_kook', 'dry_hop', 'toegift_brouwerij', 'gist', 'toegift_kelder'];
+
+    let huidigJaar = new Date().getFullYear();
+    let actieveRolFilter = 'alle';
+    let laatsteResultaat = null; // { perRol: { rol: [{ingredientId, naam, eenheid, totaal, perRecept:[{naam,brouwsels,hoeveelheid}]}] }, aantalBrouwsels, aantalRecepten }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str ?? '';
+      return div.innerHTML;
+    }
+
+    function isoWeeksInYear(jaar) {
+      const d = new Date(Date.UTC(jaar, 0, 1));
+      const dow = d.getUTCDay() || 7;
+      const isLeap = (jaar % 4 === 0 && jaar % 100 !== 0) || jaar % 400 === 0;
+      return dow === 4 || (dow === 3 && isLeap) ? 53 : 52;
+    }
+
+    function vulJaarSelector() {
+      const select = document.getElementById('vp-jaar');
+      const dit = new Date().getFullYear();
+      for (let j = dit - 1; j <= dit + 2; j++) {
+        const opt = document.createElement('option');
+        opt.value = j; opt.textContent = j;
+        if (j === huidigJaar) opt.selected = true;
+        select.appendChild(opt);
+      }
+    }
+
+    // ------------------------------------------------------------------
+    // Berekening
+    // ------------------------------------------------------------------
+    async function berekenPrognose() {
+      const jaar = Number(document.getElementById('vp-jaar').value);
+      const van = Number(document.getElementById('vp-van').value);
+      const tot = Number(document.getElementById('vp-tot').value);
+      const resultaatEl = document.getElementById('vp-resultaat');
+
+      if (!van || !tot || van < 1 || tot > 53 || van > tot) {
+        resultaatEl.innerHTML = '<div class="vp-leeg">Enter a valid week range (from ≤ to).</div>';
+        return;
+      }
+
+      resultaatEl.innerHTML = '<div class="vp-skeleton">Calculating…</div>';
+      huidigJaar = jaar;
+
+      // 1. Geplande brouwsels in het gekozen bereik
+      const { data: planning, error: planErr } = await supabaseClient
+        .from('brew_planning')
+        .select('recipe_id, aantal_brouwsels')
+        .eq('iso_year', jaar)
+        .gte('week_number', van)
+        .lte('week_number', tot);
+
+      if (planErr) {
+        resultaatEl.innerHTML = `<div class="vp-leeg">Could not load brew planning: ${escapeHtml(planErr.message)}</div>`;
+        return;
+      }
+      if (!planning || planning.length === 0) {
+        document.getElementById('vp-samenvatting').textContent = 'No brews planned in this range.';
+        resultaatEl.innerHTML = '<div class="vp-leeg">No brews planned in the selected week range.</div>';
+        return;
+      }
+
+      // Brouwsels per recept optellen (een recept kan in meerdere weken/groepen
+      // binnen het bereik gepland staan).
+      const brouwselsPerRecept = {};
+      planning.forEach(p => {
+        brouwselsPerRecept[p.recipe_id] = (brouwselsPerRecept[p.recipe_id] || 0) + Number(p.aantal_brouwsels);
+      });
+      const receptIds = Object.keys(brouwselsPerRecept).map(Number);
+
+      // 2. Receptregels (ingrediënten) van al die recepten in één keer ophalen
+      const { data: ingredientRegels, error: ingErr } = await supabaseClient
+        .from('recipe_ingredients')
+        .select('recipe_id, rol, ingredient_id, hoeveelheid, eenheid')
+        .in('recipe_id', receptIds);
+
+      if (ingErr) {
+        resultaatEl.innerHTML = `<div class="vp-leeg">Could not load recipe ingredients: ${escapeHtml(ingErr.message)}</div>`;
+        return;
+      }
+
+      // 3. Namen van recepten en ingrediënten erbij (voor weergave)
+      const [{ data: recepten }, { data: ingredienten }] = await Promise.all([
+        supabaseClient.from('recipes').select('id, naam, short_name').in('id', receptIds),
+        supabaseClient.from('ingredients').select('id, naam').in(
+          'id', [...new Set((ingredientRegels || []).map(r => r.ingredient_id).filter(x => x != null))]
+        ),
+      ]);
+      const receptNaamMap = {};
+      (recepten || []).forEach(r => { receptNaamMap[r.id] = r.short_name || r.naam; });
+      const ingredientNaamMap = {};
+      (ingredienten || []).forEach(i => { ingredientNaamMap[i.id] = i.naam; });
+
+      // 4. Optellen: per rol -> per ingredient -> totaal + per-recept-detail
+      const perRol = {};
+      (ingredientRegels || []).forEach(regel => {
+        if (regel.ingredient_id == null || regel.hoeveelheid == null) return;
+        const brouwsels = brouwselsPerRecept[regel.recipe_id] || 0;
+        if (brouwsels === 0) return;
+
+        const rol = regel.rol || 'overig';
+        if (!perRol[rol]) perRol[rol] = {};
+        const key = `${regel.ingredient_id}|${regel.eenheid || ''}`;
+        if (!perRol[rol][key]) {
+          perRol[rol][key] = {
+            ingredientId: regel.ingredient_id,
+            naam: ingredientNaamMap[regel.ingredient_id] || `#${regel.ingredient_id}`,
+            eenheid: regel.eenheid || '',
+            totaal: 0,
+            perRecept: {},
+          };
+        }
+        const bijdrage = Number(regel.hoeveelheid) * brouwsels;
+        perRol[rol][key].totaal += bijdrage;
+
+        const receptNaam = receptNaamMap[regel.recipe_id] || `#${regel.recipe_id}`;
+        if (!perRol[rol][key].perRecept[receptNaam]) perRol[rol][key].perRecept[receptNaam] = 0;
+        perRol[rol][key].perRecept[receptNaam] += bijdrage;
+      });
+
+      laatsteResultaat = {
+        perRol,
+        aantalBrouwsels: Object.values(brouwselsPerRecept).reduce((a, b) => a + b, 0),
+        aantalRecepten: receptIds.length,
+      };
+
+      document.getElementById('vp-samenvatting').textContent =
+        `${laatsteResultaat.aantalRecepten} recipe(s) · ${laatsteResultaat.aantalBrouwsels} brew(s) planned in wk ${van}–${tot}`;
+
+      renderResultaat();
+    }
+
+    // ------------------------------------------------------------------
+    // Renderen
+    // ------------------------------------------------------------------
+    function renderResultaat() {
+      const resultaatEl = document.getElementById('vp-resultaat');
+      if (!laatsteResultaat) return;
+
+      const rollenTeTonen = actieveRolFilter === 'alle' ? ROL_VOLGORDE : [actieveRolFilter];
+      let html = '';
+      let ietsGetoond = false;
+
+      rollenTeTonen.forEach(rol => {
+        const ingredientenVanRol = laatsteResultaat.perRol[rol];
+        if (!ingredientenVanRol || Object.keys(ingredientenVanRol).length === 0) return;
+        ietsGetoond = true;
+
+        const rijen = Object.values(ingredientenVanRol).sort((a, b) => b.totaal - a.totaal);
+
+        html += `
+          <div class="vp-groep">
+            <div class="vp-groep-titel">${ROL_LABEL[rol] || rol}</div>
+            <table class="vp-tabel">
+              <thead><tr><th>Ingredient</th><th>Total needed</th></tr></thead>
+              <tbody>
+                ${rijen.map((r, i) => `
+                  <tr class="vp-rij-ingredient" data-detail="detail-${rol}-${i}">
+                    <td>${escapeHtml(r.naam)}</td>
+                    <td>${formatGetal(r.totaal)}${r.eenheid ? ' ' + escapeHtml(r.eenheid) : ''}</td>
+                  </tr>
+                  <tr class="vp-detail-rij" id="detail-${rol}-${i}">
+                    <td colspan="2">
+                      Per recipe:
+                      <ul>
+                        ${Object.entries(r.perRecept).map(([naam, hoev]) =>
+                          `<li>${escapeHtml(naam)}: ${formatGetal(hoev)}${r.eenheid ? ' ' + escapeHtml(r.eenheid) : ''}</li>`
+                        ).join('')}
+                      </ul>
+                    </td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>`;
+      });
+
+      if (!ietsGetoond) {
+        resultaatEl.innerHTML = '<div class="vp-leeg">Nothing in this category for the selected weeks.</div>';
+        return;
+      }
+
+      resultaatEl.innerHTML = html;
+      resultaatEl.querySelectorAll('.vp-rij-ingredient').forEach(tr => {
+        tr.addEventListener('click', () => {
+          const detail = document.getElementById(tr.dataset.detail);
+          if (detail) detail.style.display = detail.style.display === 'table-row' ? 'none' : 'table-row';
+        });
+      });
+    }
+
+    function formatGetal(n) {
+      // Nette weergave: geen overbodige decimalen, max 2.
+      return Math.round(n * 100) / 100;
+    }
+
+    // ------------------------------------------------------------------
+    // Init
+    // ------------------------------------------------------------------
+    document.getElementById('vp-filter-tabs').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-rol]');
+      if (!btn) return;
+      document.querySelectorAll('#vp-filter-tabs button').forEach(b => b.classList.remove('actief'));
+      btn.classList.add('actief');
+      actieveRolFilter = btn.dataset.rol;
+      renderResultaat();
+    });
+
+    ['vp-jaar', 'vp-van', 'vp-tot'].forEach(id => {
+      document.getElementById(id).addEventListener('change', berekenPrognose);
+    });
+
+    (async function init() {
+      const ok = await vereisIngelogd();
+      if (!ok) return;
+      vulJaarSelector();
+
+      // Standaard: huidige week t/m 8 weken vooruit, binnen het huidige jaar.
+      const nuJaar = new Date().getFullYear();
+      const nuWeek = (() => {
+        const d = new Date();
+        const jan4 = new Date(d.getFullYear(), 0, 4);
+        const dagNr = (d.getDay() + 6) % 7;
+        d.setDate(d.getDate() - dagNr + 3);
+        const jan4Dag = (jan4.getDay() + 6) % 7;
+        jan4.setDate(jan4.getDate() - jan4Dag + 3);
+        return 1 + Math.round((d - jan4) / (7 * 24 * 3600 * 1000));
+      })();
+      document.getElementById('vp-jaar').value = nuJaar;
+      document.getElementById('vp-van').value = Math.max(1, nuWeek);
+      document.getElementById('vp-tot').value = Math.min(isoWeeksInYear(nuJaar), nuWeek + 8);
+
+      await berekenPrognose();
+    })();
+  </script>
+</body>
+</html>

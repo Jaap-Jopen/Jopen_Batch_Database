@@ -31,6 +31,7 @@ const JOPEN_MODULES = [
   { naam: 'Ingredients', href: 'ingredienten.html' },
   { naam: 'Batch Creation', href: 'batchcreation.html' },
   { naam: 'Brewing planning', href: 'brouwplanning.html' },
+  { naam: 'Consumption forecast', href: 'verbruiksprognose.html' },
   { naam: 'Users', href: 'gebruikers.html', adminOnly: true },
   { naam: 'Settings', href: 'settings.html', adminOnly: true },
   { naam: 'Status', href: 'status.html', adminOnly: true },
