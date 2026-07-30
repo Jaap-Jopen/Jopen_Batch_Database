@@ -45,3 +45,7 @@ productie-wijziging zodra dit gepusht wordt.
   wijzigingslog op `brew_planning` via trigger (`brew_planning_geschiedenis`
   + leesbare view `brew_planning_wijzigingen`), zodat later te herleiden is
   hoe vaak/wanneer de planning nog wordt bijgesteld.
+- `20260730191029_recipes_kleur_kolom.sql` — vrij tekstveld `kleur` op
+  `recipes`, gevuld via een ronde kleurenselectie in `recept-invoer.html`,
+  gebruikt om geplande brouwsels in `brouwplanning.html` sneller herkenbaar
+  te maken.
