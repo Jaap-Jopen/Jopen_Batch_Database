@@ -86,24 +86,27 @@
     // link, zonder een los bestand te moeten fetchen. Pas je de e-mailtekst
     // aan in dat bestand, kopieer de wijziging dan ook hierheen.
     // Zelfde tekst als supabase-invite-email-template.html (repo-root), maar
-    // hier bewust EENVOUDIGER opgezet (geen geneste tabellen, geen afgeronde
-    // hoeken): dit stuk wordt niet als echte e-mail verstuurd, maar in het
-    // klembord gezet om in een nieuw Outlook-bericht te PLAKKEN -- en dat
-    // plakken gaat via een heel andere (veel beperktere) weg dan een
-    // daadwerkelijk ontvangen HTML-mail. Complexere opmaak overleeft dat
-    // plakken vaak niet. __NAAM__/__LINK__ worden hieronder ingevuld.
+    // hier bewust EENVOUDIGER opgezet: geen geneste paginabrede tabel, geen
+    // afgeronde hoeken -- dit stuk wordt niet als echte e-mail verstuurd,
+    // maar in het klembord gezet om in een nieuw Outlook-bericht te PLAKKEN,
+    // en dat plakken gaat via een heel andere (veel beperktere) weg dan een
+    // daadwerkelijk ontvangen HTML-mail. Alleen de knop staat wel in 1 kleine
+    // tabelcel: achtergrondkleur op een <a> zelf overleefde het plakken niet
+    // (kwam er als kale onderstreepte link uit), op een tabelcel wel.
+    // __NAAM__/__LINK__/__UITNODIGER__ worden hieronder ingevuld.
     const UITNODIGING_MAIL_HTML = `<div style="font-family:Arial, Helvetica, sans-serif; max-width:480px;">
-<img src="https://nrouqtxkeeoayqudkiud.supabase.co/storage/v1/object/public/Jopen%20art/Jopen%20logo.png" alt="Jopen" width="56" style="display:block; margin-bottom:16px;">
+<img src="https://nrouqtxkeeoayqudkiud.supabase.co/storage/v1/object/public/Jopen%20art/Jopen%20logo.png" alt="Jopen" width="56" style="display:block; margin-bottom:10px;">
+<div style="background-color:#E0001D; height:4px; width:64px; margin-bottom:18px; font-size:0; line-height:0;">&nbsp;</div>
 <h2 style="color:#222222; margin:0 0 16px 0;">You've been invited to the Jopen Batch Database</h2>
 <p style="font-size:15px; line-height:1.5; color:#444444;">Hi __NAAM__,</p>
 <p style="font-size:15px; line-height:1.5; color:#444444;">__UITNODIGER__ has invited you to an account on the <b>Jopen Batch Database</b> &mdash; the internal system we use within the brewery for recipe management and batch reports.</p>
-<p><a href="__LINK__" style="background-color:#E0001D; color:#ffffff; padding:12px 24px; text-decoration:none; font-weight:bold; display:inline-block;">Create your account</a></p>
+<table cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 16px 0;"><tr><td style="background-color:#E0001D; text-align:center;"><a href="__LINK__" style="display:block; padding:12px 28px; color:#ffffff; font-weight:bold; font-size:15px; text-decoration:none;">Create your account</a></td></tr></table>
 <p style="font-size:13px; line-height:1.5; color:#777777;">Button not working? Copy this link into your browser instead:<br><a href="__LINK__" style="color:#E0001D;">__LINK__</a></p>
 <hr style="border:none; border-top:1px solid #eeeeee; margin:20px 0;">
 <p style="font-size:13px; line-height:1.5; color:#777777;"><b>Not phishing:</b> this email was sent because __UITNODIGER__ (an administrator at Jopen Brouwerij) added your email address to the Batch Database. If you weren't expecting this invitation, or you're unsure about the sender, please contact __UITNODIGER__ before clicking the button.</p>
 <p style="font-size:13px; line-height:1.5; color:#777777;">We will never ask you to share your password by email.</p>
 <p style="font-size:13px; line-height:1.5; color:#777777;">One more heads-up: if you ever use "Forgot password" to reset your password, that email will look much plainer than this one (sent from noreply@mail.app.supabase.io, no logo). That's expected &mdash; it's the underlying system sending it directly, not us.</p>
-<p style="font-size:11px; color:#999999;">Jopen Batch Database &middot; internal system of Jopen Brouwerij (Haarlem)</p>
+<p style="font-size:11px; color:#999999; border-top:1px solid #eeeeee; padding-top:10px;">Jopen Batch Database &middot; internal system of Jopen Brouwerij (Haarlem)</p>
 </div>`;
 
     function bouwUitnodigingMail(link, naam, uitnodiger) {
