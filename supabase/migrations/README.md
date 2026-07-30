@@ -30,3 +30,18 @@ productie-wijziging zodra dit gepusht wordt.
   dit is de eerste via deze map getrackte migratie, het schema van vóór deze
   datum (recepten, ingrediënten, gebruikers, enz.) is niet met terugwerkende
   kracht hierin opgenomen.
+- `20260729133833_ph_maische_start_koken_naar_tekst.sql` — pH-kolommen van
+  `numeric` naar `text` (bereikwaarden zoals "5,4 - 5,5" konden anders niet
+  opgeslagen worden).
+- `20260729134446_batches_delete_admin_policy.sql` — DELETE-policy op
+  `batches`, alleen voor admins.
+- `20260730173801_create_brouwplanning_en_capaciteit.sql` — Fase Geel,
+  jaarplanning: `brew_plan_group`-enum (jk/wp_60hl/wp_120hl/wp_320hl),
+  `brew_capacity` (wekelijks max aantal brouwsels, twee niveaus: jk en wp-totaal)
+  en `brew_planning` (geplande brouwsels per week/groep/recept). RLS staat nu
+  bewust open voor elke ingelogde gebruiker (geen rolonderscheid) — dat volgt
+  later via een rollen-rechtenscherm.
+- `20260730173855_create_brew_planning_geschiedenis.sql` — automatische
+  wijzigingslog op `brew_planning` via trigger (`brew_planning_geschiedenis`
+  + leesbare view `brew_planning_wijzigingen`), zodat later te herleiden is
+  hoe vaak/wanneer de planning nog wordt bijgesteld.
