@@ -58,11 +58,17 @@ a { color: var(--jopen-red); }
   display: block;
 }
 
-.jopen-nav-links {
-  display: flex;
-  gap: 16px;
-  flex: 1;
+.jopen-nav-links { display: flex; gap: 4px; flex: 1; align-items: center; }
+
+.jopen-nav-categorie-wrap { position: relative; }
+
+.jopen-nav-categorie-btn {
+  background: transparent; border: none; color: #fce3e5; cursor: pointer;
+  font-size: 1em; font-family: inherit; padding: 6px 8px; display: flex; align-items: center; gap: 5px;
 }
+.jopen-nav-categorie-btn:hover { color: #ffffff; text-decoration: underline; }
+.jopen-nav-categorie-btn.actief { color: #ffffff; border-bottom: 2px solid #ffffff; }
+.jopen-nav-categorie-caret { font-size: 0.7em; opacity: 0.85; }
 
 .jopen-nav-link {
   color: #fce3e5;

@@ -25,16 +25,31 @@ if (!JOPEN_PUBLIEKE_PAGINAS.includes(window.location.pathname.split('/').pop()))
   document.documentElement.appendChild(overlay);
 }
 
-const JOPEN_MODULES = [
-  { naam: 'Home', href: 'index.html' },
-  { naam: 'Recipes', href: 'receptoverzicht.html' },
-  { naam: 'Ingredients', href: 'ingredienten.html' },
-  { naam: 'Batch Creation', href: 'batchcreation.html' },
-  { naam: 'Brewing planning', href: 'brouwplanning.html' },
-  { naam: 'Consumption forecast', href: 'verbruiksprognose.html' },
-  { naam: 'Users', href: 'gebruikers.html', adminOnly: true },
-  { naam: 'Settings', href: 'settings.html', adminOnly: true },
-  { naam: 'Status', href: 'status.html', adminOnly: true },
+// Zelfde indeling als de homepage-tegels (index.html), zodat de navigatiebalk
+// niet blijft groeien met losse links naarmate er modules bijkomen. Nieuwe
+// module toevoegen? Voeg 'm toe aan de juiste groep hieronder (of maak een
+// nieuwe groep als het ergens anders bij hoort) -- verschijnt dan automatisch
+// als item in de bijbehorende dropdown.
+const JOPEN_MODULE_GROEPEN = [
+  { naam: 'Batches', items: [
+      { naam: 'Batch Creation', href: 'batchcreation.html' },
+  ]},
+  { naam: 'Planning', items: [
+      { naam: 'Brewing planning', href: 'brouwplanning.html' },
+      { naam: 'Consumption forecast', href: 'verbruiksprognose.html' },
+  ]},
+  { naam: 'Databases', items: [
+      { naam: 'Recipes', href: 'receptoverzicht.html' },
+      { naam: 'Ingredients', href: 'ingredienten.html' },
+  ]},
+];
+
+// Admin-only pagina's blijven in het gebruikersmenu rechts (account-achtig
+// van aard, geen inhoudelijke module) -- zie renderNav().
+const JOPEN_ADMIN_PAGINAS = [
+  { naam: 'Users', href: 'gebruikers.html' },
+  { naam: 'Settings', href: 'settings.html' },
+  { naam: 'Status', href: 'status.html' },
 ];
 
 /**
@@ -69,15 +84,25 @@ function renderNav(huidigeGebruiker) {
   const huidigePagina = window.location.pathname.split('/').pop();
   const isAdmin = huidigeGebruiker?.rol === 'admin';
 
-  const links = JOPEN_MODULES
-    .filter(m => !m.adminOnly)
-    .map(m => {
+  const categorieenHtml = JOPEN_MODULE_GROEPEN.map((groep, i) => {
+    const bevatActieve = groep.items.some(m => m.href === huidigePagina);
+    const itemsHtml = groep.items.map(m => {
       const isActief = m.href === huidigePagina;
-      return `<a href="${m.href}" class="jopen-nav-link${isActief ? ' actief' : ''}">${m.naam}</a>`;
+      return `<a href="${m.href}" class="jopen-nav-dropdown-item${isActief ? ' actief' : ''}">${m.naam}</a>`;
     }).join('');
+    return `
+      <div class="jopen-nav-categorie-wrap">
+        <button type="button" class="jopen-nav-categorie-btn${bevatActieve ? ' actief' : ''}" data-categorie-idx="${i}">
+          ${groep.naam} <span class="jopen-nav-categorie-caret">&#9662;</span>
+        </button>
+        <div class="jopen-nav-dropdown jopen-nav-categorie-menu" data-categorie-idx="${i}" style="display:none;">
+          ${itemsHtml}
+        </div>
+      </div>`;
+  }).join('');
 
   const adminLinksHtml = isAdmin
-    ? JOPEN_MODULES.filter(m => m.adminOnly).map(m => {
+    ? JOPEN_ADMIN_PAGINAS.map(m => {
         const isActief = m.href === huidigePagina;
         return `<a href="${m.href}" class="jopen-nav-dropdown-item${isActief ? ' actief' : ''}">${m.naam}</a>`;
       }).join('')
@@ -99,11 +124,11 @@ function renderNav(huidigeGebruiker) {
 
   container.innerHTML = `
     <nav class="jopen-nav">
-      <div class="jopen-nav-merk">
+      <a href="index.html" class="jopen-nav-merk" style="text-decoration:none; color:inherit;">
         <span class="jopen-nav-logo-wrap"><img src="jopen-logo.png" alt="Jopen" class="jopen-nav-logo" /></span>
         Jopen
-      </div>
-      <div class="jopen-nav-links">${links}</div>
+      </a>
+      <div class="jopen-nav-links">${categorieenHtml}</div>
       <div class="jopen-nav-rechts">${rechterkant}</div>
     </nav>
   `;
@@ -111,22 +136,42 @@ function renderNav(huidigeGebruiker) {
   const uitlogBtn = document.getElementById('jopen-uitloggen-btn');
   if (uitlogBtn) uitlogBtn.addEventListener('click', uitloggen);
 
+  // Alle open dropdowns (categorieën + gebruikersmenu) sluiten, op een
+  // eventuele uitzondering na -- gebruikt bij het openen van een nieuwe.
+  function sluitAlleMenus(exceptEl) {
+    document.querySelectorAll('.jopen-nav-categorie-menu').forEach(menu => {
+      if (menu !== exceptEl) menu.style.display = 'none';
+    });
+    const gebruikerMenu = document.getElementById('jopen-gebruiker-menu');
+    if (gebruikerMenu && gebruikerMenu !== exceptEl) gebruikerMenu.style.display = 'none';
+  }
+
+  container.querySelectorAll('.jopen-nav-categorie-btn').forEach(btn => {
+    const idx = btn.dataset.categorieIdx;
+    const menu = container.querySelector(`.jopen-nav-categorie-menu[data-categorie-idx="${idx}"]`);
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const wasOpen = menu.style.display !== 'none';
+      sluitAlleMenus();
+      menu.style.display = wasOpen ? 'none' : 'block';
+    });
+  });
+
   const gebruikerBtn = document.getElementById('jopen-gebruiker-btn');
   const gebruikerMenu = document.getElementById('jopen-gebruiker-menu');
   if (gebruikerBtn && gebruikerMenu) {
     gebruikerBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      gebruikerMenu.style.display = gebruikerMenu.style.display === 'none' ? 'block' : 'none';
-    });
-    document.addEventListener('click', (e) => {
-      if (!gebruikerMenu.contains(e.target) && e.target !== gebruikerBtn) {
-        gebruikerMenu.style.display = 'none';
-      }
-    });
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') gebruikerMenu.style.display = 'none';
+      const wasOpen = gebruikerMenu.style.display !== 'none';
+      sluitAlleMenus();
+      gebruikerMenu.style.display = wasOpen ? 'none' : 'block';
     });
   }
+
+  document.addEventListener('click', () => sluitAlleMenus());
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') sluitAlleMenus();
+  });
 }
 
 function escapeHtmlNav(str) {
