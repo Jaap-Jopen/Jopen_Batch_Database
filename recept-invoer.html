@@ -65,6 +65,23 @@
   }
   .re-subkop:first-child { margin-top: 0; }
   .re-full-span { column-span: all; margin-top: 8px; }
+  .re-kleur-picker { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }
+  .re-kleur-swatch {
+    width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent;
+    cursor: pointer; padding: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12);
+  }
+  .re-kleur-swatch.geselecteerd { border-color: #1f1f1f; }
+  .re-kleur-swatch.re-kleur-geen {
+    background: #fff repeating-linear-gradient(45deg, #ddd 0 2px, transparent 2px 6px);
+  }
+  .re-kleur-custom-wrap { position: relative; width: 28px; height: 28px; }
+  .re-kleur-custom-wrap input[type="color"] {
+    position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; padding: 0; border: none;
+  }
+  .re-kleur-custom-wrap .re-kleur-custom-swatch {
+    position: absolute; inset: 0; border-radius: 50%; border: 2px dashed #999; pointer-events: none;
+    display: flex; align-items: center; justify-content: center; font-size: 13px; color: #999;
+  }
   .re-badge-field label { font-weight: 700; }
   .re-badge-field input {
     border: 2px solid var(--line);
@@ -210,6 +227,11 @@
           <div class="re-field re-badge-field">
             <label for="veld-bier_status">Beer status</label>
             <input type="text" id="veld-bier_status" />
+          </div>
+          <div class="re-field wide">
+            <label>Color <span style="text-transform:none; font-weight:normal;">(used in brewing planning)</span></label>
+            <div class="re-kleur-picker" id="re-kleur-picker"></div>
+            <input type="hidden" id="veld-kleur" />
           </div>
         </div>
         <div id="re-laatste-revisie" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
@@ -1091,6 +1113,7 @@ function leesBasisgegevens() {
     locatie: document.getElementById('veld-locatie').value.trim() || null,
     brouwsel_hl: brouwselVal === '' ? null : Number(brouwselVal),
     status: document.getElementById('veld-status').value,
+    kleur: document.getElementById('veld-kleur').value.trim() || null,
   };
 }
 
@@ -1129,6 +1152,77 @@ function initBadgeKleuren() {
   statusVeld.addEventListener('input', () => pasBadgeKleurToe(statusVeld, BIER_STATUS_KLEUREN));
 }
 initBadgeKleuren();
+
+// ----------------------------------------------------------------------
+// Receptkleur -- ronde kleurenselectie, gebruikt om geplande brouwsels in
+// brouwplanning.html sneller herkenbaar te maken.
+// ----------------------------------------------------------------------
+const RECEPT_KLEUREN_PALET = [
+  '#E0001D', '#F97316', '#F59E0B', '#EAB308', '#84CC16', '#22C55E',
+  '#10B981', '#14B8A6', '#06B6D4', '#3B82F6', '#6366F1', '#8B5CF6',
+  '#A855F7', '#EC4899', '#78350F', '#6B7280',
+];
+
+function initKleurenPicker() {
+  const container = document.getElementById('re-kleur-picker');
+  const verborgenVeld = document.getElementById('veld-kleur');
+
+  const geenBtn = document.createElement('button');
+  geenBtn.type = 'button';
+  geenBtn.className = 're-kleur-swatch re-kleur-geen';
+  geenBtn.title = 'No color';
+  geenBtn.dataset.kleur = '';
+  container.appendChild(geenBtn);
+
+  RECEPT_KLEUREN_PALET.forEach(hex => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 're-kleur-swatch';
+    btn.style.background = hex;
+    btn.dataset.kleur = hex;
+    container.appendChild(btn);
+  });
+
+  const customWrap = document.createElement('label');
+  customWrap.className = 're-kleur-custom-wrap';
+  customWrap.title = 'Custom color';
+  customWrap.innerHTML = `<input type="color" id="re-kleur-custom-input" value="#888888" />
+    <span class="re-kleur-custom-swatch">+</span>`;
+  container.appendChild(customWrap);
+
+  function markeerGeselecteerd(hex) {
+    container.querySelectorAll('.re-kleur-swatch').forEach(el => {
+      el.classList.toggle('geselecteerd', el.dataset.kleur.toLowerCase() === (hex || '').toLowerCase());
+    });
+  }
+
+  container.querySelectorAll('.re-kleur-swatch').forEach(btn => {
+    btn.addEventListener('click', () => {
+      verborgenVeld.value = btn.dataset.kleur;
+      markeerGeselecteerd(btn.dataset.kleur);
+    });
+  });
+
+  document.getElementById('re-kleur-custom-input').addEventListener('input', (e) => {
+    verborgenVeld.value = e.target.value;
+    markeerGeselecteerd(null); // geen paletswatch actief; het kleurvlakje van de custom-input toont zelf de keuze
+  });
+
+  // Zet de picker in de juiste stand voor een gegeven waarde (leeg / palet / custom).
+  window.zetKleurPicker = function (hex) {
+    verborgenVeld.value = hex || '';
+    if (hex && RECEPT_KLEUREN_PALET.some(p => p.toLowerCase() === hex.toLowerCase())) {
+      markeerGeselecteerd(hex);
+    } else if (hex) {
+      document.getElementById('re-kleur-custom-input').value = hex;
+      markeerGeselecteerd(null);
+    } else {
+      markeerGeselecteerd('');
+    }
+  };
+}
+initKleurenPicker();
+window.zetKleurPicker('');
 
 // Vult de velden die buiten hun "eigen" param-grid zijn geplaatst: Beer
 // risk/status (in General, uit recipe_fermentatie) en de dry-hop-notities/
@@ -1281,6 +1375,7 @@ document.getElementById('re-kopieer-btn').addEventListener('click', async () => 
   document.getElementById('veld-locatie').value = bron.locatie || '';
   document.getElementById('veld-brouwsel_hl').value = bron.brouwsel_hl ?? '';
   document.getElementById('veld-status').value = 'concept';
+  window.zetKleurPicker(bron.kleur || '');
 
   renderParamGrid('re-specs-grid', SPECS_FIELDS, specs.data || {});
   renderParamGrid('re-ferm-grid', FERM_FIELDS, ferm.data || {});
@@ -1333,6 +1428,7 @@ async function laadBestaandRecept(id) {
   document.getElementById('veld-locatie').value = bestaandRecept.locatie || '';
   document.getElementById('veld-brouwsel_hl').value = bestaandRecept.brouwsel_hl ?? '';
   document.getElementById('veld-status').value = bestaandRecept.status || 'concept';
+  window.zetKleurPicker(bestaandRecept.kleur || '');
 
   renderParamGrid('re-specs-grid', SPECS_FIELDS, specs.data || {});
   renderParamGrid('re-ferm-grid', FERM_FIELDS, ferm.data || {});

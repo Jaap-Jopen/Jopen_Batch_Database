@@ -9,24 +9,18 @@
 <title>Jopen — Brewing planning</title>
 <link rel="stylesheet" href="jopen-shared.css">
 <style>
-  main.bp-main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+  main.bp-main { max-width: 1150px; margin: 0 auto; padding: 24px; }
 
-  .bp-toolbar {
-    display: flex; align-items: center; gap: 14px; margin-bottom: 16px; flex-wrap: wrap;
-  }
-  .bp-toolbar select {
-    padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.95em;
-  }
-  .bp-legenda {
-    font-size: 0.82em; color: #6b6b6b; display: flex; gap: 14px; flex-wrap: wrap; margin-left: auto;
-  }
+  .bp-toolbar { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; flex-wrap: wrap; }
+  .bp-toolbar select { padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.95em; }
+  .bp-legenda { font-size: 0.82em; color: #6b6b6b; display: flex; gap: 14px; flex-wrap: wrap; margin-left: auto; }
   .bp-legenda span { display: inline-flex; align-items: center; gap: 5px; }
   .bp-legenda .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
   .bp-legenda .dot.prio { background: #b8860b; }
   .bp-legenda .dot.over { background: #a33f2c; }
 
   .bp-scroll {
-    position: relative; max-height: 74vh; overflow-y: auto;
+    position: relative; max-height: 76vh; overflow-y: auto;
     border: 1px solid #ddd; border-radius: 8px; background: #fff;
   }
   .bp-koprij {
@@ -39,81 +33,93 @@
   .bp-weekblok { padding: 12px; border-bottom: 1px solid #eee; }
   .bp-weekblok:last-child { border-bottom: none; }
 
-  .bp-weekkop {
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px;
-  }
+  /* Volgorde in de weekbalk (van links naar rechts): week - dagen -
+     WP +Brews - WP huidig/max - JK +Brews - JK huidig/max. */
+  .bp-weekkop { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
   .bp-weeknr { font-weight: bold; }
   .bp-weekdatum { font-size: 0.85em; color: #6b6b6b; }
-  .bp-cap {
-    font-size: 0.82em; color: #6b6b6b; display: flex; align-items: center; gap: 4px;
+  .bp-add-inline {
+    font-size: 0.8em; padding: 4px 10px; background: #fff; border: 1px solid #ccc;
+    border-radius: 14px; cursor: pointer; white-space: nowrap;
   }
+  .bp-add-inline:hover { border-color: var(--jopen-red); color: var(--jopen-red); }
+  .bp-cap { font-size: 0.82em; color: #6b6b6b; display: flex; align-items: center; gap: 4px; }
+  .bp-cap.over { color: #a33f2c; font-weight: 600; }
   .bp-cap input {
-    width: 46px; padding: 2px 5px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.95em;
+    width: 42px; padding: 2px 5px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.95em;
   }
 
   .bp-kolommen { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
 
-  .bp-col {
-    background: #f7f7f5; border-radius: 8px; padding: 8px;
-  }
+  .bp-col { background: #f7f7f5; border-radius: 8px; padding: 8px; }
   .bp-col.over { background: #fbeae6; border: 1px solid #e3a692; }
-  .bp-col-teller { font-size: 0.78em; color: #6b6b6b; margin-bottom: 6px; }
-  .bp-col.over .bp-col-teller { color: #a33f2c; font-weight: 600; }
+  .bp-col-teller { font-size: 0.75em; color: #999; margin-bottom: 6px; }
 
   .bp-item {
-    background: #fff; border: 1px solid #e2e2de; border-radius: 6px;
-    padding: 5px 8px; margin-bottom: 4px; font-size: 0.82em;
-    display: flex; justify-content: space-between; align-items: center;
-    cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    border: 1px solid #e2e2de; border-radius: 6px;
+    padding: 6px 8px; margin-bottom: 4px; font-size: 0.82em;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 4px;
+    cursor: pointer; word-break: break-word;
   }
   .bp-item:hover { border-color: var(--jopen-red); }
-  .bp-item .bp-prio-ster { color: #b8860b; flex-shrink: 0; margin-left: 4px; font-size: 0.95em; }
-
-  .bp-add-btn {
-    width: 100%; font-size: 0.8em; padding: 4px; margin-top: 2px;
-    background: #fff; border: 1px solid #ccc; border-radius: 5px; cursor: pointer;
-  }
-  .bp-add-btn:hover { border-color: var(--jopen-red); color: var(--jopen-red); }
-
-  .bp-wp-banner {
-    grid-column: 2 / span 3; display: flex; align-items: center; gap: 8px;
-    font-size: 0.82em; color: #6b6b6b; margin-top: 2px;
-  }
-  .bp-wp-banner.over { color: #a33f2c; font-weight: 600; }
-  .bp-wp-banner button { margin-left: auto; font-size: 0.85em; padding: 4px 12px; }
+  .bp-item .bp-item-tekst { line-height: 1.3; }
+  .bp-item .bp-prio-ster { color: #b8860b; flex-shrink: 0; font-size: 1.5em; line-height: 1; }
 
   /* --- Modal (add / edit) --- */
   .bp-modal-overlay {
     display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35);
-    z-index: 200; align-items: flex-start; justify-content: center; padding-top: 8vh;
+    z-index: 200; align-items: flex-start; justify-content: center; padding-top: 6vh; overflow-y: auto;
   }
   .bp-modal-overlay.open { display: flex; }
   .bp-modal {
-    background: #fff; border-radius: 10px; padding: 20px 22px; width: 420px; max-width: 92vw;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+    background: #fff; border-radius: 10px; padding: 20px 22px; width: 620px; max-width: 94vw;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.25); margin-bottom: 6vh;
   }
   .bp-modal h3 { margin: 0 0 14px 0; font-size: 1.05em; color: var(--jopen-red); }
   .bp-modal label {
     display: block; font-size: 0.78em; text-transform: uppercase; letter-spacing: 0.03em;
-    color: #6b6b6b; margin: 12px 0 4px 0;
+    color: #6b6b6b; margin: 14px 0 4px 0;
   }
   .bp-modal input[type="text"], .bp-modal input[type="number"], .bp-modal select {
-    width: 100%; padding: 7px 9px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.95em;
+    padding: 7px 9px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.95em;
   }
-  .bp-modal-recept-resultaten {
+
+  .bp-weken-helper {
+    display: flex; align-items: center; gap: 6px; font-size: 0.85em; color: #444; flex-wrap: wrap; margin-bottom: 8px;
+  }
+  .bp-weken-helper input { width: 50px !important; }
+  .bp-weken-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 5px;
+    max-height: 150px; overflow-y: auto; border: 1px solid #eee; border-radius: 6px; padding: 8px;
+  }
+  .bp-week-chip {
+    text-align: center; font-size: 0.78em; padding: 4px 0; border-radius: 4px; border: 1px solid #ddd;
+    cursor: pointer; user-select: none;
+  }
+  .bp-week-chip.gekozen { background: var(--jopen-red); color: #fff; border-color: var(--jopen-red); }
+
+  #bp-modal-bieren-rijen { display: flex; flex-direction: column; gap: 6px; }
+  .bp-bier-rij { display: flex; align-items: center; gap: 6px; }
+  .bp-bier-zoekwrap { position: relative; flex: 1 1 auto; min-width: 0; }
+  .bp-bier-zoekwrap input { width: 100%; }
+  .bp-bier-resultaten {
+    position: absolute; z-index: 10; top: 100%; left: 0; right: 0; background: #fff;
     border: 1px solid #ccc; border-top: none; border-radius: 0 0 6px 6px;
     max-height: 160px; overflow-y: auto; display: none;
   }
-  .bp-modal-recept-resultaten div { padding: 6px 9px; cursor: pointer; font-size: 0.9em; }
-  .bp-modal-recept-resultaten div:hover { background: var(--jopen-red-tint); }
-  .bp-modal-hl { font-size: 0.85em; color: #6b6b6b; margin-top: 6px; }
-  .bp-modal-prio-row {
-    display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 0.9em;
+  .bp-bier-resultaten div { padding: 6px 9px; cursor: pointer; font-size: 0.9em; }
+  .bp-bier-resultaten div:hover { background: var(--jopen-red-tint); }
+  .bp-bier-brouwsels { width: 64px !important; flex: none; }
+  .bp-bier-hl { width: 68px; flex: none; font-size: 0.78em; color: #6b6b6b; }
+  .bp-bier-verwijder {
+    flex: none; background: #fff; border: 1px solid #ccc; border-radius: 6px; width: 28px; height: 28px;
+    cursor: pointer; color: #a33f2c; font-size: 1em; line-height: 1;
   }
+  .bp-bier-verwijder:hover { background: #fbeae6; }
+
+  .bp-modal-prio-row { display: flex; align-items: center; gap: 8px; margin-top: 16px; font-size: 0.9em; }
   .bp-modal-knoppen { display: flex; gap: 8px; margin-top: 20px; align-items: center; }
-  .bp-modal-knoppen button {
-    padding: 8px 16px; border-radius: 6px; font-size: 0.9em; cursor: pointer;
-  }
+  .bp-modal-knoppen button { padding: 8px 16px; border-radius: 6px; font-size: 0.9em; cursor: pointer; }
   .bp-btn-save { background: var(--jopen-red); color: #fff; border: none; }
   .bp-btn-save:hover { background: var(--jopen-red-dark); }
   .bp-btn-cancel { background: #fff; border: 1px solid #ccc; }
@@ -129,7 +135,7 @@
 
   <main class="bp-main">
     <h1 style="margin-bottom:2px;">Brewing planning</h1>
-    <p class="jopen-subtitel" style="margin-top:0;">Long-term brew schedule per week — JK, WP 60HL, WP 120HL and WP 320HL.</p>
+    <p class="jopen-subtitel" style="margin-top:0;">Long-term brew schedule per week — WP 60HL, WP 120HL, WP 320HL and JK.</p>
 
     <div class="bp-toolbar">
       <label for="bp-jaar" style="font-size:0.9em; color:#6b6b6b;">Year</label>
@@ -142,10 +148,10 @@
 
     <div class="bp-scroll" id="bp-scroll">
       <div class="bp-koprij">
+        <div>WP 60HL</div>
+        <div>WP 120HL</div>
+        <div>WP 320HL</div>
         <div>JK</div>
-        <div>WP 60HL (&lt;80 hl)</div>
-        <div>WP 120HL (80&ndash;140 hl)</div>
-        <div>WP 320HL (&gt;140 hl)</div>
       </div>
       <div id="bp-weken-container">
         <div style="padding:20px; color:#999;">Loading…</div>
@@ -156,20 +162,30 @@
   <!-- ============================== MODAL ============================== -->
   <div class="bp-modal-overlay" id="bp-modal-overlay">
     <div class="bp-modal">
-      <h3 id="bp-modal-titel">Add brew</h3>
+      <h3 id="bp-modal-titel">Add brews</h3>
 
-      <div id="bp-modal-recept-veld">
-        <label>Recipe (short name)</label>
-        <input type="text" id="bp-modal-recept-zoek" autocomplete="off" placeholder="Search…" />
-        <div class="bp-modal-recept-resultaten" id="bp-modal-recept-resultaten"></div>
+      <!-- Add-mode: meerdere weken tegelijk kiezen -->
+      <div id="bp-modal-weken-sectie">
+        <label>Weeks</label>
+        <div class="bp-weken-helper">
+          <span>Every</span><input type="number" id="bp-weken-interval" min="1" value="1" />
+          <span>week(s), starting wk</span><input type="number" id="bp-weken-start" min="1" max="53" />
+          <span>&times;</span><input type="number" id="bp-weken-aantal" min="1" value="1" />
+          <button type="button" id="bp-weken-toepassen" class="bp-add-inline">Apply</button>
+          <button type="button" id="bp-weken-wissen" class="bp-add-inline">Clear</button>
+        </div>
+        <div class="bp-weken-grid" id="bp-weken-grid"></div>
       </div>
 
-      <label>Number of brews</label>
-      <input type="number" id="bp-modal-brouwsels" min="0" step="0.5" value="1" />
-      <div class="bp-modal-hl" id="bp-modal-hl-preview">= — hl</div>
+      <!-- Edit-mode: één specifieke week -->
+      <div id="bp-modal-week-enkel-sectie" style="display:none;">
+        <label for="bp-modal-week">Week</label>
+        <input type="number" id="bp-modal-week" min="1" max="53" style="width:100px;" />
+      </div>
 
-      <label for="bp-modal-week">Week</label>
-      <input type="number" id="bp-modal-week" min="1" max="53" />
+      <label>Beers</label>
+      <div id="bp-modal-bieren-rijen"></div>
+      <button type="button" id="bp-modal-nog-een-bier" class="bp-add-inline" style="margin-top:8px;">+ add another beer</button>
 
       <div class="bp-modal-prio-row">
         <input type="checkbox" id="bp-modal-prio" style="width:auto;" />
@@ -193,15 +209,14 @@
     // Status
     // ------------------------------------------------------------------
     let huidigJaar = new Date().getFullYear();
-    let alleRecepten = [];               // { id, naam, short_name, brouwsel_hl }
+    let alleRecepten = [];               // { id, naam, short_name, brouwsel_hl, kleur }
     let capaciteitMap = {};              // `${group}_${week}` -> max_brouwsels
     let planningPerWeek = {};            // week -> { jk:[], wp_60hl:[], wp_120hl:[], wp_320hl:[] }
     let huidigeGebruikerId = null;
 
-    // Modal-context: welk item wordt bewerkt (null = nieuw), en voor welke
-    // week/groep een nieuw item wordt toegevoegd.
-    let modalContext = { mode: 'add', item: null, week: null, group: 'jk' };
-    let modalGeselecteerdRecipeId = null;
+    // Modal-context
+    let modalContext = { mode: 'add', item: null, group: 'jk' };
+    let gekozenWeken = new Set();
 
     function escapeHtml(str) {
       const div = document.createElement('div');
@@ -210,32 +225,25 @@
     }
 
     // ------------------------------------------------------------------
-    // ISO-weekhulpfuncties (geen library nodig)
+    // ISO-weekhulpfuncties
     // ------------------------------------------------------------------
     function isoWeeksInYear(jaar) {
-      const p = (y) => {
-        const d = new Date(Date.UTC(y, 0, 1));
-        const dow = d.getUTCDay() || 7;
-        return dow === 4 || (dow === 3 && isLeapYear(y)) ? 53 : 52;
-      };
-      function isLeapYear(y) { return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0; }
-      return p(jaar);
+      const d = new Date(Date.UTC(jaar, 0, 1));
+      const dow = d.getUTCDay() || 7;
+      const isLeap = (jaar % 4 === 0 && jaar % 100 !== 0) || jaar % 400 === 0;
+      return dow === 4 || (dow === 3 && isLeap) ? 53 : 52;
     }
 
     function mondayOfIsoWeek(jaar, week) {
       const jan4 = new Date(Date.UTC(jaar, 0, 4));
-      const jan4Dag = (jan4.getUTCDay() + 6) % 7; // 0 = maandag
+      const jan4Dag = (jan4.getUTCDay() + 6) % 7;
       const week1Maandag = new Date(jan4);
       week1Maandag.setUTCDate(jan4.getUTCDate() - jan4Dag);
       const maandag = new Date(week1Maandag);
       maandag.setUTCDate(week1Maandag.getUTCDate() + (week - 1) * 7);
       return maandag;
     }
-
-    function formatDagMaand(d) {
-      return `${d.getUTCDate()}-${d.getUTCMonth() + 1}`;
-    }
-
+    function formatDagMaand(d) { return `${d.getUTCDate()}-${d.getUTCMonth() + 1}`; }
     function weekDatumRange(jaar, week) {
       const maandag = mondayOfIsoWeek(jaar, week);
       const zondag = new Date(maandag);
@@ -244,7 +252,7 @@
     }
 
     // ------------------------------------------------------------------
-    // HL -> planninggroep
+    // HL -> planninggroep (blijft op de achtergrond, niet meer in de labels)
     // ------------------------------------------------------------------
     function bepaalWpGroep(hl) {
       if (hl < 80) return 'wp_60hl';
@@ -253,12 +261,24 @@
     }
 
     // ------------------------------------------------------------------
+    // Kleur -> leesbare tekstkleur (voor de gevulde item-balk)
+    // ------------------------------------------------------------------
+    function contrastKleur(hex) {
+      if (!hex) return null;
+      const c = hex.replace('#', '');
+      if (c.length !== 6) return null;
+      const r = parseInt(c.substr(0, 2), 16), g = parseInt(c.substr(2, 2), 16), b = parseInt(c.substr(4, 2), 16);
+      const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      return lum > 0.6 ? '#1f1f1f' : '#ffffff';
+    }
+
+    // ------------------------------------------------------------------
     // Laden
     // ------------------------------------------------------------------
     async function laadRecepten() {
       const { data, error } = await supabaseClient
         .from('recipes')
-        .select('id, naam, short_name, brouwsel_hl, status')
+        .select('id, naam, short_name, brouwsel_hl, status, kleur')
         .neq('status', 'gearchiveerd')
         .order('naam');
       if (error) { console.error('Kon recepten niet laden:', error); return; }
@@ -267,30 +287,23 @@
 
     async function laadCapaciteit(jaar) {
       const { data, error } = await supabaseClient
-        .from('brew_capacity')
-        .select('capacity_group, week_number, max_brouwsels')
-        .eq('iso_year', jaar);
+        .from('brew_capacity').select('capacity_group, week_number, max_brouwsels').eq('iso_year', jaar);
       if (error) { console.error('Kon capaciteit niet laden:', error); return; }
       capaciteitMap = {};
-      (data || []).forEach(r => {
-        capaciteitMap[`${r.capacity_group}_${r.week_number}`] = Number(r.max_brouwsels);
-      });
+      (data || []).forEach(r => { capaciteitMap[`${r.capacity_group}_${r.week_number}`] = Number(r.max_brouwsels); });
     }
-
     function capaciteit(groep, week) {
       const key = `${groep}_${week}`;
       if (key in capaciteitMap) return capaciteitMap[key];
-      return groep === 'jk' ? 18 : 23; // standaardwaarden
+      return groep === 'jk' ? 18 : 23;
     }
 
     async function laadPlanning(jaar) {
       const { data, error } = await supabaseClient
         .from('brew_planning')
         .select('id, plan_group, week_number, recipe_id, aantal_brouwsels, hl, prio, sort_order')
-        .eq('iso_year', jaar)
-        .order('sort_order');
+        .eq('iso_year', jaar).order('sort_order');
       if (error) { console.error('Kon brouwplanning niet laden:', error); return; }
-
       planningPerWeek = {};
       (data || []).forEach(r => {
         if (!planningPerWeek[r.week_number]) {
@@ -300,8 +313,9 @@
       });
     }
 
+    function receptById(recipeId) { return alleRecepten.find(x => String(x.id) === String(recipeId)); }
     function receptNaam(recipeId) {
-      const r = alleRecepten.find(x => String(x.id) === String(recipeId));
+      const r = receptById(recipeId);
       return r ? (r.short_name || r.naam) : '(unknown recipe)';
     }
 
@@ -314,11 +328,14 @@
     }
 
     function renderItem(item) {
+      const recept = receptById(item.recipe_id);
       const naam = escapeHtml(receptNaam(item.recipe_id));
       const hl = item.hl != null ? Number(item.hl).toFixed(0) : '—';
+      const kleur = recept ? recept.kleur : null;
+      const stijl = kleur ? `background:${kleur}; border-color:${kleur}; color:${contrastKleur(kleur)};` : '';
       return `
-        <div class="bp-item" data-id="${item.id}">
-          <span>${naam} · ${item.aantal_brouwsels}br · ${hl}hl</span>
+        <div class="bp-item" data-id="${item.id}" style="${stijl}">
+          <span class="bp-item-tekst">${naam} · ${item.aantal_brouwsels}br · ${hl}hl</span>
           ${item.prio ? '<span class="bp-prio-ster" title="Prio">&#9733;</span>' : ''}
         </div>`;
     }
@@ -345,28 +362,16 @@
             <div class="bp-weekkop">
               <span class="bp-weeknr">wk ${week}</span>
               <span class="bp-weekdatum">${weekDatumRange(huidigJaar, week)}</span>
-              <span class="bp-cap">JK max <input type="number" min="0" class="bp-cap-input" data-group="jk" data-week="${week}" value="${jkMax}" /> brws</span>
-              <span class="bp-cap">WP max <input type="number" min="0" class="bp-cap-input" data-group="wp" data-week="${week}" value="${wpMax}" /> brws</span>
+              <button type="button" class="bp-add-inline bp-add-wp" data-week="${week}">+ Brews</button>
+              <span class="bp-cap ${wpOver ? 'over' : ''}">WP ${wpSom}/<input type="number" min="0" class="bp-cap-input" data-group="wp" data-week="${week}" value="${wpMax}" /> brws</span>
+              <button type="button" class="bp-add-inline bp-add-jk" data-week="${week}">+ Brews</button>
+              <span class="bp-cap ${jkOver ? 'over' : ''}">JK ${jkSom}/<input type="number" min="0" class="bp-cap-input" data-group="jk" data-week="${week}" value="${jkMax}" /> brws</span>
             </div>
             <div class="bp-kolommen">
-              <div class="bp-col ${jkOver ? 'over' : ''}">
-                <div class="bp-col-teller">${jkSom}/${jkMax} brws</div>
-                ${p.jk.map(renderItem).join('')}
-                <button type="button" class="bp-add-btn bp-add-jk" data-week="${week}">+ brew</button>
-              </div>
-              <div class="bp-col ${wpOver ? 'over' : ''}">
-                ${p.wp_60hl.map(renderItem).join('')}
-              </div>
-              <div class="bp-col ${wpOver ? 'over' : ''}">
-                ${p.wp_120hl.map(renderItem).join('')}
-              </div>
-              <div class="bp-col ${wpOver ? 'over' : ''}">
-                ${p.wp_320hl.map(renderItem).join('')}
-              </div>
-              <div class="bp-wp-banner ${wpOver ? 'over' : ''}">
-                <span>WP total this week: ${wpSom}/${wpMax} brws</span>
-                <button type="button" class="bp-add-wp" data-week="${week}">+ brew WP</button>
-              </div>
+              <div class="bp-col ${wpOver ? 'over' : ''}">${p.wp_60hl.map(renderItem).join('')}</div>
+              <div class="bp-col ${wpOver ? 'over' : ''}">${p.wp_120hl.map(renderItem).join('')}</div>
+              <div class="bp-col ${wpOver ? 'over' : ''}">${p.wp_320hl.map(renderItem).join('')}</div>
+              <div class="bp-col ${jkOver ? 'over' : ''}">${p.jk.map(renderItem).join('')}</div>
             </div>
           </div>`;
       }
@@ -388,119 +393,256 @@
           await laadEnRenderAlles();
         });
       });
-
       document.querySelectorAll('.bp-add-jk').forEach(btn => {
-        btn.addEventListener('click', () => openModal('add', null, Number(btn.dataset.week), 'jk'));
+        btn.addEventListener('click', () => openModal('add', null, [Number(btn.dataset.week)], 'jk'));
       });
       document.querySelectorAll('.bp-add-wp').forEach(btn => {
-        btn.addEventListener('click', () => openModal('add', null, Number(btn.dataset.week), 'wp'));
+        btn.addEventListener('click', () => openModal('add', null, [Number(btn.dataset.week)], 'wp'));
       });
       document.querySelectorAll('.bp-item').forEach(el => {
         el.addEventListener('click', () => {
           const id = el.dataset.id;
           const item = Object.values(planningPerWeek).flatMap(w => [...w.jk, ...w.wp_60hl, ...w.wp_120hl, ...w.wp_320hl])
             .find(i => String(i.id) === String(id));
-          if (item) openModal('edit', item, item.week_number, null);
+          if (item) openModal('edit', item, [item.week_number], null);
         });
       });
     }
 
     // ------------------------------------------------------------------
-    // Modal (add / edit)
+    // Modal — bierregels (herhaalbaar)
     // ------------------------------------------------------------------
-    function openModal(mode, item, week, group) {
-      modalContext = { mode, item, week, group };
-      modalGeselecteerdRecipeId = item ? item.recipe_id : null;
-
-      document.getElementById('bp-modal-titel').textContent = mode === 'edit' ? 'Edit brew' : 'Add brew';
-      document.getElementById('bp-modal-recept-zoek').value = item ? escapeHtml(receptNaam(item.recipe_id)) : '';
-      document.getElementById('bp-modal-recept-resultaten').style.display = 'none';
-      document.getElementById('bp-modal-brouwsels').value = item ? item.aantal_brouwsels : 1;
-      document.getElementById('bp-modal-week').value = week;
-      document.getElementById('bp-modal-prio').checked = item ? !!item.prio : false;
-      document.getElementById('bp-modal-delete').style.display = mode === 'edit' ? 'inline-block' : 'none';
-      document.getElementById('bp-modal-melding').textContent = '';
-      werkHlPreview();
-      document.getElementById('bp-modal-overlay').classList.add('open');
+    function bierRijHtml() {
+      return `
+        <div class="bp-bier-rij" data-recipe-id="">
+          <div class="bp-bier-zoekwrap">
+            <input type="text" class="bp-bier-zoek" autocomplete="off" placeholder="Search recipe (short name)…" />
+            <div class="bp-bier-resultaten"></div>
+          </div>
+          <input type="number" class="bp-bier-brouwsels" min="1" step="1" value="1" />
+          <span class="bp-bier-hl">— hl</span>
+          <button type="button" class="bp-bier-verwijder" title="Remove">&times;</button>
+        </div>`;
     }
 
-    function sluitModal() {
-      document.getElementById('bp-modal-overlay').classList.remove('open');
-    }
-
-    function werkHlPreview() {
-      const recept = alleRecepten.find(r => String(r.id) === String(modalGeselecteerdRecipeId));
-      const brouwsels = Number(document.getElementById('bp-modal-brouwsels').value) || 0;
-      const preview = document.getElementById('bp-modal-hl-preview');
+    function werkBierRijHlBij(rij) {
+      const recept = receptById(rij.dataset.recipeId);
+      const brouwsels = Number(rij.querySelector('.bp-bier-brouwsels').value) || 0;
+      const hlEl = rij.querySelector('.bp-bier-hl');
       if (recept && recept.brouwsel_hl != null) {
-        const hl = brouwsels * Number(recept.brouwsel_hl);
-        preview.textContent = `= ${hl.toFixed(0)} hl (from recipe)`;
+        hlEl.textContent = `${(brouwsels * Number(recept.brouwsel_hl)).toFixed(0)} hl`;
       } else {
-        preview.textContent = '= — hl (select a recipe)';
+        hlEl.textContent = '— hl';
       }
     }
 
-    document.getElementById('bp-modal-recept-zoek').addEventListener('input', (e) => {
-      modalGeselecteerdRecipeId = null;
-      werkHlPreview();
-      const term = e.target.value.trim().toLowerCase();
-      const container = document.getElementById('bp-modal-recept-resultaten');
-      if (term === '') { container.style.display = 'none'; return; }
-      const matches = alleRecepten.filter(r =>
-        r.naam.toLowerCase().includes(term) || (r.short_name || '').toLowerCase().includes(term)
-      ).slice(0, 20);
-      container.innerHTML = matches.length
-        ? matches.map(r => `<div data-id="${r.id}">${escapeHtml(r.short_name || r.naam)} <span style="color:#999;">(${escapeHtml(r.naam)})</span></div>`).join('')
-        : '<div style="color:#999;">No matching recipes.</div>';
-      container.style.display = 'block';
-    });
-    document.getElementById('bp-modal-recept-resultaten').addEventListener('click', (e) => {
-      const rij = e.target.closest('[data-id]');
+    const bierenContainer = document.getElementById('bp-modal-bieren-rijen');
+
+    bierenContainer.addEventListener('input', (e) => {
+      const rij = e.target.closest('.bp-bier-rij');
       if (!rij) return;
-      modalGeselecteerdRecipeId = rij.dataset.id;
-      document.getElementById('bp-modal-recept-zoek').value = escapeHtml(receptNaam(rij.dataset.id));
-      document.getElementById('bp-modal-recept-resultaten').style.display = 'none';
-      werkHlPreview();
+
+      if (e.target.classList.contains('bp-bier-zoek')) {
+        rij.dataset.recipeId = '';
+        werkBierRijHlBij(rij);
+        const term = e.target.value.trim().toLowerCase();
+        const resultaten = rij.querySelector('.bp-bier-resultaten');
+        if (term === '') { resultaten.style.display = 'none'; return; }
+        const matches = alleRecepten.filter(r =>
+          r.naam.toLowerCase().includes(term) || (r.short_name || '').toLowerCase().includes(term)
+        ).slice(0, 20);
+        resultaten.innerHTML = matches.length
+          ? matches.map(r => `<div data-id="${r.id}">${escapeHtml(r.short_name || r.naam)} <span style="color:#999;">(${escapeHtml(r.naam)})</span></div>`).join('')
+          : '<div style="color:#999;">No matching recipes.</div>';
+        resultaten.style.display = 'block';
+      } else if (e.target.classList.contains('bp-bier-brouwsels')) {
+        werkBierRijHlBij(rij);
+      }
     });
-    document.getElementById('bp-modal-brouwsels').addEventListener('input', werkHlPreview);
+
+    bierenContainer.addEventListener('click', (e) => {
+      const resultaatRegel = e.target.closest('.bp-bier-resultaten [data-id]');
+      if (resultaatRegel) {
+        const rij = resultaatRegel.closest('.bp-bier-rij');
+        rij.dataset.recipeId = resultaatRegel.dataset.id;
+        rij.querySelector('.bp-bier-zoek').value = escapeHtml(receptNaam(resultaatRegel.dataset.id));
+        rij.querySelector('.bp-bier-resultaten').style.display = 'none';
+        werkBierRijHlBij(rij);
+        return;
+      }
+      const verwijderBtn = e.target.closest('.bp-bier-verwijder');
+      if (verwijderBtn) {
+        const alleRijen = bierenContainer.querySelectorAll('.bp-bier-rij');
+        if (alleRijen.length > 1) {
+          verwijderBtn.closest('.bp-bier-rij').remove();
+        } else {
+          const rij = verwijderBtn.closest('.bp-bier-rij');
+          rij.dataset.recipeId = '';
+          rij.querySelector('.bp-bier-zoek').value = '';
+          rij.querySelector('.bp-bier-brouwsels').value = 1;
+          werkBierRijHlBij(rij);
+        }
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      document.querySelectorAll('.bp-bier-resultaten').forEach(el => {
+        if (!el.parentElement.contains(e.target)) el.style.display = 'none';
+      });
+    });
+
+    document.getElementById('bp-modal-nog-een-bier').addEventListener('click', () => {
+      bierenContainer.insertAdjacentHTML('beforeend', bierRijHtml());
+    });
+
+    // ------------------------------------------------------------------
+    // Modal — weekkeuze (add-mode: meerdere weken)
+    // ------------------------------------------------------------------
+    function renderWekenGrid() {
+      const grid = document.getElementById('bp-weken-grid');
+      const totaal = isoWeeksInYear(huidigJaar);
+      let html = '';
+      for (let w = 1; w <= totaal; w++) {
+        html += `<div class="bp-week-chip ${gekozenWeken.has(w) ? 'gekozen' : ''}" data-week="${w}">${w}</div>`;
+      }
+      grid.innerHTML = html;
+    }
+    document.getElementById('bp-weken-grid').addEventListener('click', (e) => {
+      const chip = e.target.closest('.bp-week-chip');
+      if (!chip) return;
+      const w = Number(chip.dataset.week);
+      if (gekozenWeken.has(w)) gekozenWeken.delete(w); else gekozenWeken.add(w);
+      chip.classList.toggle('gekozen');
+    });
+    document.getElementById('bp-weken-toepassen').addEventListener('click', () => {
+      const interval = Math.max(1, Number(document.getElementById('bp-weken-interval').value) || 1);
+      const start = Number(document.getElementById('bp-weken-start').value);
+      const aantal = Math.max(1, Number(document.getElementById('bp-weken-aantal').value) || 1);
+      if (!start) return;
+      const totaalWeken = isoWeeksInYear(huidigJaar);
+      for (let i = 0; i < aantal; i++) {
+        const w = start + i * interval;
+        if (w >= 1 && w <= totaalWeken) gekozenWeken.add(w);
+      }
+      renderWekenGrid();
+    });
+    document.getElementById('bp-weken-wissen').addEventListener('click', () => {
+      gekozenWeken.clear();
+      renderWekenGrid();
+    });
+
+    // ------------------------------------------------------------------
+    // Modal openen / sluiten
+    // ------------------------------------------------------------------
+    function openModal(mode, item, weken, group) {
+      modalContext = { mode, item, group };
+      document.getElementById('bp-modal-titel').textContent = mode === 'edit' ? 'Edit brew' : 'Add brews';
+      document.getElementById('bp-modal-melding').textContent = '';
+      document.getElementById('bp-modal-delete').style.display = mode === 'edit' ? 'inline-block' : 'none';
+      document.getElementById('bp-modal-prio').checked = item ? !!item.prio : false;
+
+      if (mode === 'edit') {
+        document.getElementById('bp-modal-weken-sectie').style.display = 'none';
+        document.getElementById('bp-modal-week-enkel-sectie').style.display = 'block';
+        document.getElementById('bp-modal-week').value = weken[0];
+
+        bierenContainer.innerHTML = bierRijHtml();
+        const rij = bierenContainer.querySelector('.bp-bier-rij');
+        rij.dataset.recipeId = item.recipe_id;
+        rij.querySelector('.bp-bier-zoek').value = escapeHtml(receptNaam(item.recipe_id));
+        rij.querySelector('.bp-bier-brouwsels').value = item.aantal_brouwsels;
+        werkBierRijHlBij(rij);
+        document.getElementById('bp-modal-nog-een-bier').style.display = 'none';
+      } else {
+        document.getElementById('bp-modal-weken-sectie').style.display = 'block';
+        document.getElementById('bp-modal-week-enkel-sectie').style.display = 'none';
+        document.getElementById('bp-modal-nog-een-bier').style.display = 'inline-block';
+
+        gekozenWeken = new Set(weken);
+        document.getElementById('bp-weken-start').value = weken[0] || '';
+        renderWekenGrid();
+
+        bierenContainer.innerHTML = bierRijHtml();
+      }
+
+      document.getElementById('bp-modal-overlay').classList.add('open');
+    }
+
+    function sluitModal() { document.getElementById('bp-modal-overlay').classList.remove('open'); }
     document.getElementById('bp-modal-cancel').addEventListener('click', sluitModal);
     document.getElementById('bp-modal-overlay').addEventListener('click', (e) => {
       if (e.target.id === 'bp-modal-overlay') sluitModal();
     });
 
+    // ------------------------------------------------------------------
+    // Opslaan
+    // ------------------------------------------------------------------
     document.getElementById('bp-modal-save').addEventListener('click', async () => {
       const melding = document.getElementById('bp-modal-melding');
-      const recept = alleRecepten.find(r => String(r.id) === String(modalGeselecteerdRecipeId));
-      const brouwsels = Number(document.getElementById('bp-modal-brouwsels').value);
-      const week = Number(document.getElementById('bp-modal-week').value);
       const prio = document.getElementById('bp-modal-prio').checked;
 
-      if (!recept) { melding.textContent = 'Select a recipe first.'; melding.className = 'bp-modal-melding fout'; return; }
-      if (!brouwsels || brouwsels <= 0) { melding.textContent = 'Enter a number of brews.'; melding.className = 'bp-modal-melding fout'; return; }
-      if (!week || week < 1 || week > 53) { melding.textContent = 'Enter a valid week number.'; melding.className = 'bp-modal-melding fout'; return; }
-
-      const hl = brouwsels * Number(recept.brouwsel_hl || 0);
-      const planGroup = modalContext.mode === 'edit'
-        ? (modalContext.item.plan_group === 'jk' ? 'jk' : bepaalWpGroep(hl))
-        : (modalContext.group === 'jk' ? 'jk' : bepaalWpGroep(hl));
-
-      melding.textContent = 'Saving…';
-      melding.className = 'bp-modal-melding';
-
       if (modalContext.mode === 'edit') {
+        const rij = bierenContainer.querySelector('.bp-bier-rij');
+        const recept = receptById(rij.dataset.recipeId);
+        const brouwsels = Number(rij.querySelector('.bp-bier-brouwsels').value);
+        const week = Number(document.getElementById('bp-modal-week').value);
+
+        if (!recept) { melding.textContent = 'Select a recipe.'; melding.className = 'bp-modal-melding fout'; return; }
+        if (!brouwsels || !Number.isInteger(brouwsels) || brouwsels < 1) {
+          melding.textContent = 'Number of brews must be a whole number (1 or more).';
+          melding.className = 'bp-modal-melding fout'; return;
+        }
+        if (!week || week < 1 || week > 53) { melding.textContent = 'Enter a valid week number.'; melding.className = 'bp-modal-melding fout'; return; }
+
+        const hl = brouwsels * Number(recept.brouwsel_hl || 0);
+        const planGroup = modalContext.item.plan_group === 'jk' ? 'jk' : bepaalWpGroep(hl);
+
+        melding.textContent = 'Saving…'; melding.className = 'bp-modal-melding';
         const { error } = await supabaseClient.from('brew_planning').update({
           recipe_id: recept.id, aantal_brouwsels: brouwsels, hl, prio,
           week_number: week, plan_group: planGroup, bijgewerkt_op: new Date().toISOString(),
         }).eq('id', modalContext.item.id);
         if (error) { melding.textContent = 'Could not save: ' + error.message; melding.className = 'bp-modal-melding fout'; return; }
-      } else {
-        const { error } = await supabaseClient.from('brew_planning').insert({
-          plan_group: planGroup, iso_year: huidigJaar, week_number: week,
-          recipe_id: recept.id, aantal_brouwsels: brouwsels, hl, prio,
-          aangemaakt_door: huidigeGebruikerId,
-        });
-        if (error) { melding.textContent = 'Could not save: ' + error.message; melding.className = 'bp-modal-melding fout'; return; }
+
+        sluitModal();
+        await laadEnRenderAlles();
+        return;
       }
+
+      const weken = Array.from(gekozenWeken).sort((a, b) => a - b);
+      if (weken.length === 0) { melding.textContent = 'Select at least one week.'; melding.className = 'bp-modal-melding fout'; return; }
+
+      const bierRijen = Array.from(bierenContainer.querySelectorAll('.bp-bier-rij'));
+      const geldigeBieren = [];
+      for (const rij of bierRijen) {
+        const recept = receptById(rij.dataset.recipeId);
+        if (!recept) continue;
+        const brouwsels = Number(rij.querySelector('.bp-bier-brouwsels').value);
+        if (!brouwsels || !Number.isInteger(brouwsels) || brouwsels < 1) {
+          melding.textContent = `Number of brews for "${receptNaam(recept.id)}" must be a whole number (1 or more).`;
+          melding.className = 'bp-modal-melding fout';
+          return;
+        }
+        geldigeBieren.push({ recept, brouwsels });
+      }
+      if (geldigeBieren.length === 0) { melding.textContent = 'Select at least one recipe.'; melding.className = 'bp-modal-melding fout'; return; }
+
+      const rijenOmInTeVoegen = [];
+      weken.forEach(week => {
+        geldigeBieren.forEach(({ recept, brouwsels }) => {
+          const hl = brouwsels * Number(recept.brouwsel_hl || 0);
+          const planGroup = modalContext.group === 'jk' ? 'jk' : bepaalWpGroep(hl);
+          rijenOmInTeVoegen.push({
+            plan_group: planGroup, iso_year: huidigJaar, week_number: week,
+            recipe_id: recept.id, aantal_brouwsels: brouwsels, hl, prio,
+            aangemaakt_door: huidigeGebruikerId,
+          });
+        });
+      });
+
+      melding.textContent = 'Saving…'; melding.className = 'bp-modal-melding';
+      const { error } = await supabaseClient.from('brew_planning').insert(rijenOmInTeVoegen);
+      if (error) { melding.textContent = 'Could not save: ' + error.message; melding.className = 'bp-modal-melding fout'; return; }
 
       sluitModal();
       await laadEnRenderAlles();
