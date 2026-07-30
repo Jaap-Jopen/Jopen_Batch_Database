@@ -30,8 +30,16 @@
   }
   .bp-koprij div { font-size: 0.78em; font-weight: 600; color: #6b6b6b; }
 
-  .bp-weekblok { padding: 12px; border-bottom: 1px solid #eee; }
+  .bp-weekblok { padding: 12px; border-bottom: 1px solid #eee; border-left: 5px solid transparent; }
   .bp-weekblok:last-child { border-bottom: none; }
+  .bp-weekblok.bp-weekblok-over {
+    background: #fdecea; border-left-color: #a33f2c;
+  }
+  .bp-weekblok-over .bp-weeknr { color: #a33f2c; }
+  .bp-over-badge {
+    font-size: 0.72em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+    color: #fff; background: #a33f2c; padding: 2px 8px; border-radius: 10px;
+  }
 
   /* Volgorde in de weekbalk (van links naar rechts): week - dagen -
      WP +Brews - WP huidig/max - JK +Brews - JK huidig/max. */
@@ -63,7 +71,15 @@
   }
   .bp-item:hover { border-color: var(--jopen-red); }
   .bp-item .bp-item-tekst { line-height: 1.3; }
-  .bp-item .bp-prio-ster { color: #b8860b; flex-shrink: 0; font-size: 1.5em; line-height: 1; }
+  .bp-prio-marker { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; line-height: 1; margin-left: 2px; }
+  .bp-prio-marker .bp-prio-ster {
+    color: #b8860b; font-size: 1.05em;
+    text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+  }
+  .bp-prio-marker .bp-prio-label {
+    font-size: 0.58em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+    color: #1f1f1f; margin-top: 1px;
+  }
 
   /* --- Modal (add / edit) --- */
   .bp-modal-overlay {
@@ -336,7 +352,7 @@
       return `
         <div class="bp-item" data-id="${item.id}" style="${stijl}">
           <span class="bp-item-tekst">${naam} · ${item.aantal_brouwsels}br · ${hl}hl</span>
-          ${item.prio ? '<span class="bp-prio-ster" title="Prio">&#9733;</span>' : ''}
+          ${item.prio ? '<span class="bp-prio-marker" title="Prio"><span class="bp-prio-ster">&#9733;</span><span class="bp-prio-label">prio</span></span>' : ''}
         </div>`;
     }
 
@@ -356,12 +372,14 @@
           .reduce((s, g) => s + p[g].reduce((s2, i) => s2 + Number(i.aantal_brouwsels), 0), 0);
         const wpMax = capaciteit('wp', week);
         const wpOver = wpSom > wpMax;
+        const weekOver = jkOver || wpOver;
 
         html += `
-          <div class="bp-weekblok">
+          <div class="bp-weekblok ${weekOver ? 'bp-weekblok-over' : ''}">
             <div class="bp-weekkop">
               <span class="bp-weeknr">wk ${week}</span>
               <span class="bp-weekdatum">${weekDatumRange(huidigJaar, week)}</span>
+              ${weekOver ? '<span class="bp-over-badge">Over capacity</span>' : ''}
               <button type="button" class="bp-add-inline bp-add-wp" data-week="${week}">+ Brews</button>
               <span class="bp-cap ${wpOver ? 'over' : ''}">WP ${wpSom}/<input type="number" min="0" class="bp-cap-input" data-group="wp" data-week="${week}" value="${wpMax}" /> brws</span>
               <button type="button" class="bp-add-inline bp-add-jk" data-week="${week}">+ Brews</button>

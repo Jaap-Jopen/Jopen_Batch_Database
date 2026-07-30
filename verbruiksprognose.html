@@ -73,8 +73,7 @@
     <div class="vp-filter-tabs" id="vp-filter-tabs">
       <button type="button" class="actief" data-rol="alle">All</button>
       <button type="button" data-rol="hoofdmout">Malt &amp; grains</button>
-      <button type="button" data-rol="hopgift_kook">Hops (boil)</button>
-      <button type="button" data-rol="dry_hop">Hops (dry hop)</button>
+      <button type="button" data-rol="hops">Hops</button>
       <button type="button" data-rol="toegift_brouwerij">Brewing additions</button>
       <button type="button" data-rol="gist">Yeast</button>
       <button type="button" data-rol="toegift_kelder">Cellar additions</button>
@@ -91,13 +90,30 @@
   <script>
     const ROL_LABEL = {
       hoofdmout: 'Malt & grains',
-      hopgift_kook: 'Hops (boil)',
-      dry_hop: 'Hops (dry hop)',
+      hops: 'Hops',
       toegift_brouwerij: 'Brewing additions',
       gist: 'Yeast',
       toegift_kelder: 'Cellar additions',
     };
-    const ROL_VOLGORDE = ['hoofdmout', 'hopgift_kook', 'dry_hop', 'toegift_brouwerij', 'gist', 'toegift_kelder'];
+    const ROL_VOLGORDE = ['hoofdmout', 'hops', 'toegift_brouwerij', 'gist', 'toegift_kelder'];
+
+    // hopgift_kook (boil) en dry_hop worden voor de prognose bij elkaar
+    // opgeteld tot één "Hops"-groep -- voor inkoop maakt boil/dry hop niet
+    // uit, je bestelt gewoon hop.
+    function naarWeergaveRol(rol) {
+      if (rol === 'hopgift_kook' || rol === 'dry_hop') return 'hops';
+      return rol || 'overig';
+    }
+
+    // Eenheid -> kg, alleen voor de expliciete "Total (kg)"-kolom bij hop.
+    // Bewust voorzichtig: bij een onherkende eenheid gokken we niet, maar
+    // tonen we "—" zodat het opvalt en handmatig nagekeken kan worden.
+    function naarKg(eenheid, hoeveelheid) {
+      const e = (eenheid || '').trim().toLowerCase();
+      if (['kg', 'kilogram', 'kilo'].includes(e)) return hoeveelheid;
+      if (['g', 'gr', 'gram', 'grams'].includes(e)) return hoeveelheid / 1000;
+      return null;
+    }
 
     let huidigJaar = new Date().getFullYear();
     let actieveRolFilter = 'alle';
@@ -200,7 +216,7 @@
         const brouwsels = brouwselsPerRecept[regel.recipe_id] || 0;
         if (brouwsels === 0) return;
 
-        const rol = regel.rol || 'overig';
+        const rol = naarWeergaveRol(regel.rol);
         if (!perRol[rol]) perRol[rol] = {};
         const key = `${regel.ingredient_id}|${regel.eenheid || ''}`;
         if (!perRol[rol][key]) {
@@ -249,20 +265,24 @@
         ietsGetoond = true;
 
         const rijen = Object.values(ingredientenVanRol).sort((a, b) => b.totaal - a.totaal);
+        const isHopsGroep = rol === 'hops';
 
         html += `
           <div class="vp-groep">
             <div class="vp-groep-titel">${ROL_LABEL[rol] || rol}</div>
             <table class="vp-tabel">
-              <thead><tr><th>Ingredient</th><th>Total needed</th></tr></thead>
+              <thead><tr><th>Ingredient</th><th>Total needed</th>${isHopsGroep ? '<th>Total (kg)</th>' : ''}</tr></thead>
               <tbody>
-                ${rijen.map((r, i) => `
+                ${rijen.map((r, i) => {
+                  const kg = isHopsGroep ? naarKg(r.eenheid, r.totaal) : null;
+                  return `
                   <tr class="vp-rij-ingredient" data-detail="detail-${rol}-${i}">
                     <td>${escapeHtml(r.naam)}</td>
                     <td>${formatGetal(r.totaal)}${r.eenheid ? ' ' + escapeHtml(r.eenheid) : ''}</td>
+                    ${isHopsGroep ? `<td>${kg !== null ? formatGetal(kg) + ' kg' : `<span title="Unit '${escapeHtml(r.eenheid || '')}' not recognized — check manually">—</span>`}</td>` : ''}
                   </tr>
                   <tr class="vp-detail-rij" id="detail-${rol}-${i}">
-                    <td colspan="2">
+                    <td colspan="${isHopsGroep ? 3 : 2}">
                       Per recipe:
                       <ul>
                         ${Object.entries(r.perRecept).map(([naam, hoev]) =>
@@ -270,7 +290,8 @@
                         ).join('')}
                       </ul>
                     </td>
-                  </tr>`).join('')}
+                  </tr>`;
+                }).join('')}
               </tbody>
             </table>
           </div>`;

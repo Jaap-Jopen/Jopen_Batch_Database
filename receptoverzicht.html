@@ -843,6 +843,16 @@ async function openDetail(id) {
     <div class="section-title">General</div>
     ${paramColumnsHtml(generalRows) || '<div class="empty">None entered.</div>'}
     ${badgeRowsHtml(generalBadgeRows)}
+    ${r.kleur ? `
+      <div class="param-columns">
+        <div class="param-row">
+          <span>Recipe Color</span>
+          <span style="display:inline-flex; align-items:center; gap:6px;">
+            <span style="display:inline-block; width:16px; height:16px; border-radius:50%; background:${escapeHtml(r.kleur)}; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15);"></span>
+            ${escapeHtml(r.kleur)}
+          </span>
+        </div>
+      </div>` : ''}
 
     <div class="section-title">End product specifications</div>
     ${paramColumnsHtml(specRows) || '<div class="empty">None entered.</div>'}
