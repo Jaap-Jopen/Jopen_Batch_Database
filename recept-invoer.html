@@ -350,7 +350,9 @@
         </table>
         <button type="button" class="re-btn secundair" data-tbody="re-ing-keldertoegift-tbody" data-roles="toegift_kelder" data-add-btn>+ Add cellar addition</button>
         <div class="re-grid" style="margin-top:16px;">
-          <div class="re-field wide">
+          <div class="re-field wide" style="display:none;">
+            <!-- Verborgen op verzoek van de gebruiker (leek niet nodig) -- kolom
+                 blijft in de database bestaan, zie recipe_processtappen.kelder_toevoeging_dag. -->
             <label for="veld-kelder_toevoeging_dag">Cellar addition day</label>
             <input type="number" id="veld-kelder_toevoeging_dag" />
           </div>
@@ -647,7 +649,7 @@ const VERPAKKING_FIELDS = [
   ['co2_fust_tolerantie', 'CO2 keg tolerance', '', 'number'],
   ['zuurstof_fust_spec', 'O2 keg spec', '', 'number'],
 ];
-const VERPAKKING_FORMATEN = ['12x33cl', '24x33cl', '6x75cl', '20L', '50L', '20L keykeg', '20L Polykeg', '12x33cl blik', '24x33cl blik', '6x4x33cl'];
+const VERPAKKING_FORMATEN = ['12x33cl', '24x33cl', '6x75cl', '20L', '50L', '20L keykeg', '30L keykeg', '20L Polykeg', '12x33cl blik', '24x33cl blik', '6x4x33cl'];
 
 const PROCESSTAPPEN_FIELDS = [
   ['dry_hop_warm', 'Dry hop warm'], ['dry_hop_cold', 'Dry hop 16°C'], ['dry_hop_0c', 'Dry hop 0°C'],

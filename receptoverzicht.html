@@ -800,7 +800,8 @@ async function openDetail(id) {
   ].filter(([,v]) => v !== null && v !== undefined && v !== '');
 
   const cellarNotesRows = [
-    ['Cellar addition day', pt.kelder_toevoeging_dag, ''],
+    // 'Cellar addition day' bewust verborgen op verzoek van de gebruiker --
+    // kolom blijft bestaan in recipe_processtappen.kelder_toevoeging_dag.
     ['Processing comment', pt.comment_verwerken, ''],
   ].filter(([,v]) => v !== null && v !== undefined && v !== '');
 

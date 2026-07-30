@@ -156,6 +156,7 @@
     <div class="bp-toolbar">
       <label for="bp-jaar" style="font-size:0.9em; color:#6b6b6b;">Year</label>
       <select id="bp-jaar"></select>
+      <span style="font-size:0.9em; color:#6b6b6b;">Current week: <b id="bp-huidige-week" style="color:#1f1f1f;">—</b></span>
       <div class="bp-legenda">
         <span><i class="dot prio"></i> Prio</span>
         <span><i class="dot over"></i> Over capacity</span>
@@ -267,6 +268,18 @@
       return `${formatDagMaand(maandag)} t/m ${formatDagMaand(zondag)}`;
     }
 
+    function huidigeIsoJaarEnWeek() {
+      const d = new Date();
+      const dagNr = (d.getDay() + 6) % 7;
+      d.setDate(d.getDate() - dagNr + 3); // donderdag van deze week bepaalt het ISO-jaar
+      const isoJaar = d.getFullYear();
+      const jan4 = new Date(isoJaar, 0, 4);
+      const jan4Dag = (jan4.getDay() + 6) % 7;
+      jan4.setDate(jan4.getDate() - jan4Dag + 3);
+      const week = 1 + Math.round((d - jan4) / (7 * 24 * 3600 * 1000));
+      return { jaar: isoJaar, week };
+    }
+
     // ------------------------------------------------------------------
     // HL -> planninggroep (blijft op de achtergrond, niet meer in de labels)
     // ------------------------------------------------------------------
@@ -375,7 +388,7 @@
         const weekOver = jkOver || wpOver;
 
         html += `
-          <div class="bp-weekblok ${weekOver ? 'bp-weekblok-over' : ''}">
+          <div class="bp-weekblok ${weekOver ? 'bp-weekblok-over' : ''}" id="bp-weekblok-${week}">
             <div class="bp-weekkop">
               <span class="bp-weeknr">wk ${week}</span>
               <span class="bp-weekdatum">${weekDatumRange(huidigJaar, week)}</span>
@@ -699,9 +712,24 @@
       const gebruiker = await getHuidigeGebruiker();
       huidigeGebruikerId = gebruiker ? gebruiker.id : null;
 
+      const { jaar: huidigIsoJaar, week: huidigeWeek } = huidigeIsoJaarEnWeek();
+      document.getElementById('bp-huidige-week').textContent = `wk ${huidigeWeek} (${huidigIsoJaar})`;
+
+      // Standaard openen op het huidige jaar (was al de default), en na de
+      // eerste render eenmalig doorscrollen naar het blok van de huidige
+      // week -- niet opnieuw bij latere her-renders (bv. na een wijziging),
+      // anders springt de pagina steeds terug.
       vulJaarSelector();
       await laadRecepten();
       await laadEnRenderAlles();
+
+      if (huidigJaar === huidigIsoJaar) {
+        const doel = document.getElementById(`bp-weekblok-${huidigeWeek}`);
+        const scrollContainer = document.getElementById('bp-scroll');
+        if (doel && scrollContainer) {
+          scrollContainer.scrollTop = doel.offsetTop - scrollContainer.offsetTop;
+        }
+      }
     })();
   </script>
 </body>
