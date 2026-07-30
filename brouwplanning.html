@@ -80,6 +80,15 @@
     font-size: 0.58em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
     color: #1f1f1f; margin-top: 1px;
   }
+  .bp-comment-marker { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; line-height: 1; margin-left: 2px; }
+  .bp-comment-marker .bp-comment-icon {
+    color: #2a5db0; font-size: 1.05em; font-weight: 900;
+    text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+  }
+  .bp-comment-marker .bp-comment-label {
+    font-size: 0.58em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+    color: #1f1f1f; margin-top: 1px;
+  }
 
   /* --- Modal (add / edit) --- */
   .bp-modal-overlay {
@@ -209,6 +218,13 @@
         <label for="bp-modal-prio" style="margin:0; text-transform:none; letter-spacing:normal; color:#1f1f1f;">Prio</label>
       </div>
 
+      <!-- Comment: alleen relevant bij het bewerken van een al gepland brouwsel,
+           niet nodig tijdens het aanmaken zelf. -->
+      <div id="bp-modal-comment-sectie" style="display:none;">
+        <label for="bp-modal-comment">Comment</label>
+        <textarea id="bp-modal-comment" rows="3" style="width:100%; padding:7px 9px; border:1px solid #ccc; border-radius:6px; font-size:0.95em; font-family:inherit; resize:vertical;"></textarea>
+      </div>
+
       <div class="bp-modal-knoppen">
         <button type="button" class="bp-btn-delete" id="bp-modal-delete" style="display:none;">Delete</button>
         <button type="button" class="bp-btn-cancel" id="bp-modal-cancel">Cancel</button>
@@ -330,7 +346,7 @@
     async function laadPlanning(jaar) {
       const { data, error } = await supabaseClient
         .from('brew_planning')
-        .select('id, plan_group, week_number, recipe_id, aantal_brouwsels, hl, prio, sort_order')
+        .select('id, plan_group, week_number, recipe_id, aantal_brouwsels, hl, prio, sort_order, notities')
         .eq('iso_year', jaar).order('sort_order');
       if (error) { console.error('Kon brouwplanning niet laden:', error); return; }
       planningPerWeek = {};
@@ -366,6 +382,7 @@
         <div class="bp-item" data-id="${item.id}" style="${stijl}">
           <span class="bp-item-tekst">${naam} · ${item.aantal_brouwsels}br · ${hl}hl</span>
           ${item.prio ? '<span class="bp-prio-marker" title="Prio"><span class="bp-prio-ster">&#9733;</span><span class="bp-prio-label">prio</span></span>' : ''}
+          ${item.notities ? `<span class="bp-comment-marker" title="${escapeHtml(item.notities)}"><span class="bp-comment-icon">!</span><span class="bp-comment-label">check</span></span>` : ''}
         </div>`;
     }
 
@@ -576,6 +593,8 @@
         document.getElementById('bp-modal-weken-sectie').style.display = 'none';
         document.getElementById('bp-modal-week-enkel-sectie').style.display = 'block';
         document.getElementById('bp-modal-week').value = weken[0];
+        document.getElementById('bp-modal-comment-sectie').style.display = 'block';
+        document.getElementById('bp-modal-comment').value = item.notities || '';
 
         bierenContainer.innerHTML = bierRijHtml();
         const rij = bierenContainer.querySelector('.bp-bier-rij');
@@ -588,6 +607,8 @@
         document.getElementById('bp-modal-weken-sectie').style.display = 'block';
         document.getElementById('bp-modal-week-enkel-sectie').style.display = 'none';
         document.getElementById('bp-modal-nog-een-bier').style.display = 'inline-block';
+        document.getElementById('bp-modal-comment-sectie').style.display = 'none';
+        document.getElementById('bp-modal-comment').value = '';
 
         gekozenWeken = new Set(weken);
         document.getElementById('bp-weken-start').value = weken[0] || '';
@@ -627,11 +648,13 @@
 
         const hl = brouwsels * Number(recept.brouwsel_hl || 0);
         const planGroup = modalContext.item.plan_group === 'jk' ? 'jk' : bepaalWpGroep(hl);
+        const comment = document.getElementById('bp-modal-comment').value.trim() || null;
 
         melding.textContent = 'Saving…'; melding.className = 'bp-modal-melding';
         const { error } = await supabaseClient.from('brew_planning').update({
           recipe_id: recept.id, aantal_brouwsels: brouwsels, hl, prio,
-          week_number: week, plan_group: planGroup, bijgewerkt_op: new Date().toISOString(),
+          week_number: week, plan_group: planGroup, notities: comment,
+          bijgewerkt_op: new Date().toISOString(),
         }).eq('id', modalContext.item.id);
         if (error) { melding.textContent = 'Could not save: ' + error.message; melding.className = 'bp-modal-melding fout'; return; }
 
