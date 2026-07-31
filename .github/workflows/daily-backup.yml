@@ -27,10 +27,14 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
-      - name: Install postgresql-client
+      - name: Install postgresql-client 17
+        # Ubuntu's eigen apt-pakket geeft alleen pg_dump 16, terwijl Supabase
+        # Postgres 17 draait -- pg_dump weigert dan met een version-mismatch-
+        # fout. De officiële PGDG-repo toevoegen geeft wél versie 17.
         run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
+          sudo apt-get install -y postgresql-common
+          yes '' | sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh
+          sudo apt-get install -y postgresql-client-17
 
       - name: Dump database
         env:
