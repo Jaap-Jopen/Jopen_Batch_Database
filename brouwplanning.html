@@ -133,6 +133,7 @@
   .bp-bier-resultaten div:hover { background: var(--jopen-red-tint); }
   .bp-bier-brouwsels { width: 64px !important; flex: none; }
   .bp-bier-hl { width: 68px; flex: none; font-size: 0.78em; color: #6b6b6b; }
+  .bp-bier-hl-vrij { width: 68px; flex: none; }
   .bp-bier-verwijder {
     flex: none; background: #fff; border: 1px solid #ccc; border-radius: 6px; width: 28px; height: 28px;
     cursor: pointer; color: #a33f2c; font-size: 1em; line-height: 1;
@@ -485,19 +486,45 @@
           </div>
           <input type="number" class="bp-bier-brouwsels" min="1" step="1" value="1" />
           <span class="bp-bier-hl">— hl</span>
+          <input type="number" class="bp-bier-hl-vrij" min="0" step="1" placeholder="hl" style="display:none;" title="Recipe has no default volume yet — enter it here" />
           <button type="button" class="bp-bier-verwijder" title="Remove">&times;</button>
         </div>`;
+    }
+
+    // Recept nog niet af (brouwsel_hl is 0/leeg in het recept, bv. een
+    // placeholder-recept zoals "NPI") -> volume wordt vrij ingevoerd i.p.v.
+    // berekend, en de plan-groep (JK blijft JK; WP wordt op basis van dat
+    // ingevoerde volume bepaald) volgt gewoon dezelfde logica als anders.
+    function receptHeeftGeenVolume(recept) {
+      return !recept || !recept.brouwsel_hl;
     }
 
     function werkBierRijHlBij(rij) {
       const recept = receptById(rij.dataset.recipeId);
       const brouwsels = Number(rij.querySelector('.bp-bier-brouwsels').value) || 0;
       const hlEl = rij.querySelector('.bp-bier-hl');
-      if (recept && recept.brouwsel_hl != null) {
+      const hlVrijEl = rij.querySelector('.bp-bier-hl-vrij');
+      if (recept && receptHeeftGeenVolume(recept)) {
+        hlEl.style.display = 'none';
+        hlVrijEl.style.display = 'inline-block';
+      } else if (recept) {
+        hlEl.style.display = '';
+        hlVrijEl.style.display = 'none';
         hlEl.textContent = `${(brouwsels * Number(recept.brouwsel_hl)).toFixed(0)} hl`;
       } else {
+        hlEl.style.display = '';
+        hlVrijEl.style.display = 'none';
         hlEl.textContent = '— hl';
       }
+    }
+
+    // Bepaalt de uiteindelijke hl voor een bierregel: berekend uit het recept,
+    // of (bij een recept zonder volume) de vrij ingevoerde waarde.
+    function bepaalHlVoorRij(rij, recept, brouwsels) {
+      if (receptHeeftGeenVolume(recept)) {
+        return Number(rij.querySelector('.bp-bier-hl-vrij').value) || 0;
+      }
+      return brouwsels * Number(recept.brouwsel_hl);
     }
 
     const bierenContainer = document.getElementById('bp-modal-bieren-rijen');
@@ -618,6 +645,7 @@
         rij.querySelector('.bp-bier-zoek').value = escapeHtml(receptNaam(item.recipe_id));
         rij.querySelector('.bp-bier-brouwsels').value = item.aantal_brouwsels;
         werkBierRijHlBij(rij);
+        rij.querySelector('.bp-bier-hl-vrij').value = item.hl ?? '';
         document.getElementById('bp-modal-nog-een-bier').style.display = 'none';
       } else {
         document.getElementById('bp-modal-weken-sectie').style.display = 'block';
@@ -662,7 +690,11 @@
         }
         if (!week || week < 1 || week > 53) { melding.textContent = 'Enter a valid week number.'; melding.className = 'bp-modal-melding fout'; return; }
 
-        const hl = brouwsels * Number(recept.brouwsel_hl || 0);
+        const hl = bepaalHlVoorRij(rij, recept, brouwsels);
+        if (receptHeeftGeenVolume(recept) && hl <= 0) {
+          melding.textContent = 'This recipe has no default volume yet — enter the volume (hl) for this brew.';
+          melding.className = 'bp-modal-melding fout'; return;
+        }
         const planGroup = modalContext.item.plan_group === 'jk' ? 'jk' : bepaalWpGroep(hl);
         const comment = document.getElementById('bp-modal-comment').value.trim() || null;
 
@@ -693,14 +725,19 @@
           melding.className = 'bp-modal-melding fout';
           return;
         }
-        geldigeBieren.push({ recept, brouwsels });
+        const hl = bepaalHlVoorRij(rij, recept, brouwsels);
+        if (receptHeeftGeenVolume(recept) && hl <= 0) {
+          melding.textContent = `"${receptNaam(recept.id)}" has no default volume yet — enter the volume (hl) for this brew.`;
+          melding.className = 'bp-modal-melding fout';
+          return;
+        }
+        geldigeBieren.push({ recept, brouwsels, hl });
       }
       if (geldigeBieren.length === 0) { melding.textContent = 'Select at least one recipe.'; melding.className = 'bp-modal-melding fout'; return; }
 
       const rijenOmInTeVoegen = [];
       weken.forEach(week => {
-        geldigeBieren.forEach(({ recept, brouwsels }) => {
-          const hl = brouwsels * Number(recept.brouwsel_hl || 0);
+        geldigeBieren.forEach(({ recept, brouwsels, hl }) => {
           const planGroup = modalContext.group === 'jk' ? 'jk' : bepaalWpGroep(hl);
           rijenOmInTeVoegen.push({
             plan_group: planGroup, iso_year: huidigJaar, week_number: week,
