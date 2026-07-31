@@ -104,6 +104,10 @@
     background: #fff;
   }
   .count { font-family: var(--mono); font-size: 12px; color: #7a7266; white-space: nowrap; }
+  .toolbar select, .toolbar button#sort-richting {
+    padding: 9px 12px; border: 1px solid var(--line); border-radius: 4px;
+    font-family: var(--serif); font-size: 14px; background: #fff; cursor: pointer;
+  }
 
   table { width: 100%; border-collapse: collapse; background: #fff; }
   thead th {
@@ -243,6 +247,23 @@
   <div id="list-view">
     <div class="toolbar">
       <input id="search" placeholder="Search by name or beer style…">
+      <select id="filter-status">
+        <option value="">All statuses</option>
+        <option value="actief">Active</option>
+        <option value="concept">Draft</option>
+        <option value="gearchiveerd">Archived</option>
+      </select>
+      <select id="filter-locatie">
+        <option value="">All locations</option>
+      </select>
+      <select id="sort-veld">
+        <option value="naam">Name</option>
+        <option value="bierstijl">Beer style</option>
+        <option value="locatie">Location</option>
+        <option value="versie">Version</option>
+        <option value="laatste_batch">Last batch generated</option>
+      </select>
+      <button type="button" id="sort-richting" title="Toggle sort direction">&#9650; A-Z</button>
       <div class="count" id="result-count"></div>
       <a href="recept-invoer.html" class="edit-pill" id="new-recipe-link" style="display:none; margin-bottom:0;">+ New recipe</a>
     </div>
@@ -328,7 +349,8 @@ async function loadRecipes() {
   });
 
   allRecipes = data || [];
-  renderList(allRecipes);
+  vulLocatieFilter();
+  pasFiltersToe();
 }
 
 function formatDatum(iso) {
@@ -362,11 +384,60 @@ function renderList(recipes) {
   });
 }
 
-document.getElementById('search').addEventListener('input', (e) => {
-  const q = e.target.value.trim().toLowerCase();
-  const filtered = allRecipes.filter(r =>
-    (r.naam||'').toLowerCase().includes(q) || (r.bierstijl||'').toLowerCase().includes(q));
-  renderList(filtered);
+let sorteerRichting = 'asc';
+
+function vulLocatieFilter() {
+  const select = document.getElementById('filter-locatie');
+  const huidige = select.value;
+  const locaties = [...new Set(allRecipes.map(r => r.locatie).filter(Boolean))].sort();
+  select.innerHTML = '<option value="">All locations</option>' +
+    locaties.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('');
+  select.value = huidige;
+}
+
+function pasFiltersToe() {
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const statusFilter = document.getElementById('filter-status').value;
+  const locatieFilter = document.getElementById('filter-locatie').value;
+  const sortVeld = document.getElementById('sort-veld').value;
+
+  let resultaat = allRecipes.filter(r => {
+    const matchtZoekterm = (r.naam || '').toLowerCase().includes(q) || (r.bierstijl || '').toLowerCase().includes(q);
+    const matchtStatus = !statusFilter || r.status === statusFilter;
+    const matchtLocatie = !locatieFilter || r.locatie === locatieFilter;
+    return matchtZoekterm && matchtStatus && matchtLocatie;
+  });
+
+  const vergelijk = (a, b) => {
+    switch (sortVeld) {
+      case 'bierstijl': return (a.bierstijl || '').localeCompare(b.bierstijl || '');
+      case 'locatie': return (a.locatie || '').localeCompare(b.locatie || '');
+      case 'versie': {
+        const va = (a.versie_major ?? 1) * 1000 + (a.versie_minor ?? 0);
+        const vb = (b.versie_major ?? 1) * 1000 + (b.versie_minor ?? 0);
+        return va - vb;
+      }
+      case 'laatste_batch': {
+        const da = laatsteBatchPerRecept[a.id] || '';
+        const db = laatsteBatchPerRecept[b.id] || '';
+        return da.localeCompare(db);
+      }
+      default: return (a.naam || '').localeCompare(b.naam || '');
+    }
+  };
+  resultaat.sort((a, b) => sorteerRichting === 'asc' ? vergelijk(a, b) : -vergelijk(a, b));
+
+  renderList(resultaat);
+}
+
+document.getElementById('search').addEventListener('input', pasFiltersToe);
+document.getElementById('filter-status').addEventListener('change', pasFiltersToe);
+document.getElementById('filter-locatie').addEventListener('change', pasFiltersToe);
+document.getElementById('sort-veld').addEventListener('change', pasFiltersToe);
+document.getElementById('sort-richting').addEventListener('click', () => {
+  sorteerRichting = sorteerRichting === 'asc' ? 'desc' : 'asc';
+  document.getElementById('sort-richting').innerHTML = sorteerRichting === 'asc' ? '&#9650; A-Z' : '&#9660; Z-A';
+  pasFiltersToe();
 });
 
 async function openDetail(id) {
