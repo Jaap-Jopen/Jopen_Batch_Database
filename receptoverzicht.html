@@ -104,7 +104,7 @@
     background: #fff;
   }
   .count { font-family: var(--mono); font-size: 12px; color: #7a7266; white-space: nowrap; }
-  .toolbar select, .toolbar button#sort-richting {
+  .toolbar select {
     padding: 9px 12px; border: 1px solid var(--line); border-radius: 4px;
     font-family: var(--serif); font-size: 14px; background: #fff; cursor: pointer;
   }
@@ -120,6 +120,9 @@
     padding: 10px 14px;
     border-bottom: 2px solid var(--hop-dark);
   }
+  thead th.sorteerbaar { cursor: pointer; user-select: none; white-space: nowrap; }
+  thead th.sorteerbaar:hover { color: var(--hop-dark); }
+  thead th.sorteer-actief { color: var(--hop-dark); }
   tbody td {
     padding: 12px 14px;
     border-bottom: 1px solid var(--line);
@@ -256,14 +259,6 @@
       <select id="filter-locatie">
         <option value="">All locations</option>
       </select>
-      <select id="sort-veld">
-        <option value="naam">Name</option>
-        <option value="bierstijl">Beer style</option>
-        <option value="locatie">Location</option>
-        <option value="versie">Version</option>
-        <option value="laatste_batch">Last batch generated</option>
-      </select>
-      <button type="button" id="sort-richting" title="Toggle sort direction">&#9650; A-Z</button>
       <div class="count" id="result-count"></div>
       <a href="recept-invoer.html" class="edit-pill" id="new-recipe-link" style="display:none; margin-bottom:0;">+ New recipe</a>
     </div>
@@ -382,17 +377,46 @@ function renderList(recipes) {
       <td><span class="status-pill status-${r.status}">${statusLabel(r.status)}</span></td>
       <td>${formatDatum(laatsteBatchPerRecept[r.id])}</td>
     </tr>`).join('');
+
+  const kolommen = [
+    { veld: 'naam', label: 'Name' },
+    { veld: 'bierstijl', label: 'Beer style' },
+    { veld: 'locatie', label: 'Location' },
+    { veld: 'versie', label: 'Version' },
+    { veld: null, label: 'Status' },
+    { veld: 'laatste_batch', label: 'Last batch generated' },
+  ];
+  const headerHtml = kolommen.map(k => {
+    if (!k.veld) return `<th>${k.label}</th>`;
+    const actief = huidigSorteerVeld === k.veld;
+    const pijl = actief ? (sorteerRichting === 'asc' ? ' &#9650;' : ' &#9660;') : '';
+    return `<th class="sorteerbaar${actief ? ' sorteer-actief' : ''}" data-sort="${k.veld}">${k.label}${pijl}</th>`;
+  }).join('');
+
   container.innerHTML = `
     <table>
-      <thead><tr><th>Name</th><th>Beer style</th><th>Location</th><th>Version</th><th>Status</th><th>Last batch generated</th></tr></thead>
+      <thead><tr>${headerHtml}</tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
   container.querySelectorAll('tbody tr').forEach(tr => {
     tr.addEventListener('click', () => openDetail(tr.dataset.id));
   });
+  container.querySelectorAll('th.sorteerbaar').forEach(th => {
+    th.addEventListener('click', () => {
+      const veld = th.dataset.sort;
+      if (huidigSorteerVeld === veld) {
+        sorteerRichting = sorteerRichting === 'asc' ? 'desc' : 'asc';
+      } else {
+        huidigSorteerVeld = veld;
+        sorteerRichting = 'asc';
+      }
+      pasFiltersToe();
+    });
+  });
 }
 
 let sorteerRichting = 'asc';
+let huidigSorteerVeld = 'naam';
 
 function vulLocatieFilter() {
   const select = document.getElementById('filter-locatie');
@@ -407,7 +431,6 @@ function pasFiltersToe() {
   const q = document.getElementById('search').value.trim().toLowerCase();
   const statusFilter = document.getElementById('filter-status').value;
   const locatieFilter = document.getElementById('filter-locatie').value;
-  const sortVeld = document.getElementById('sort-veld').value;
 
   let resultaat = allRecipes.filter(r => {
     const matchtZoekterm = (r.naam || '').toLowerCase().includes(q) || (r.bierstijl || '').toLowerCase().includes(q);
@@ -417,7 +440,7 @@ function pasFiltersToe() {
   });
 
   const vergelijk = (a, b) => {
-    switch (sortVeld) {
+    switch (huidigSorteerVeld) {
       case 'bierstijl': return (a.bierstijl || '').localeCompare(b.bierstijl || '');
       case 'locatie': return (a.locatie || '').localeCompare(b.locatie || '');
       case 'versie': {
@@ -441,12 +464,6 @@ function pasFiltersToe() {
 document.getElementById('search').addEventListener('input', pasFiltersToe);
 document.getElementById('filter-status').addEventListener('change', pasFiltersToe);
 document.getElementById('filter-locatie').addEventListener('change', pasFiltersToe);
-document.getElementById('sort-veld').addEventListener('change', pasFiltersToe);
-document.getElementById('sort-richting').addEventListener('click', () => {
-  sorteerRichting = sorteerRichting === 'asc' ? 'desc' : 'asc';
-  document.getElementById('sort-richting').innerHTML = sorteerRichting === 'asc' ? '&#9650; A-Z' : '&#9660; Z-A';
-  pasFiltersToe();
-});
 
 async function openDetail(id) {
   document.getElementById('list-view').style.display = 'none';
