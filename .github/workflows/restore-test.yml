@@ -1,0 +1,53 @@
+name: Restore test (eenmalig, handmatig)
+
+# ALLEEN handmatig te starten (workflow_dispatch), draait nooit vanzelf.
+# Bedoeld om één keer (of een enkele keer per jaar) te bevestigen dat een
+# backup-dump ook daadwerkelijk terug te zetten is -- niet alleen dat de
+# backup wordt gemaakt.
+#
+# Zet dit NOOIT tegen je echte productieproject -- gebruik een los,
+# wegwerpbaar test-project in Supabase (New project, gratis plan, later
+# gewoon weer te verwijderen).
+#
+# Vereiste secret (Settings -> Secrets and variables -> Actions):
+#   RESTORE_TEST_DB_URL - Session pooler connection string van het
+#                          WEGWERP-testproject (niet van productie!).
+#
+# Hergebruikt de bestaande BACKUP_REPO_PAT/BACKUP_REPO secrets om het
+# dumpbestand op te halen uit de private backup-repo.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dump_filename:
+        description: 'Bestandsnaam in dumps/, bv. jopen_backup_2026-07-31.dump'
+        required: true
+
+jobs:
+  restore-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install postgresql-client 17
+        run: |
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+
+      - name: Haal dumpbestand op uit backup-repo
+        env:
+          BACKUP_REPO_PAT: ${{ secrets.BACKUP_REPO_PAT }}
+          BACKUP_REPO: ${{ secrets.BACKUP_REPO }}
+        run: |
+          git clone "https://x-access-token:${BACKUP_REPO_PAT}@github.com/${BACKUP_REPO}.git" backup-repo
+          test -f "backup-repo/dumps/${{ github.event.inputs.dump_filename }}" || (echo "Bestand niet gevonden in dumps/" && exit 1)
+
+      - name: Restore naar test-project
+        env:
+          RESTORE_TEST_DB_URL: ${{ secrets.RESTORE_TEST_DB_URL }}
+        run: |
+          /usr/lib/postgresql/17/bin/pg_restore \
+            --clean --if-exists --no-owner --no-privileges \
+            -d "$RESTORE_TEST_DB_URL" \
+            "backup-repo/dumps/${{ github.event.inputs.dump_filename }}"
+          echo "Restore voltooid -- check het test-project in Supabase (Table Editor) om te bevestigen."
