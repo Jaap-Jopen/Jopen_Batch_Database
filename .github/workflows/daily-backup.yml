@@ -1,0 +1,68 @@
+name: Daily Supabase backup
+
+# Draait elke nacht en zet een pg_dump van de Supabase-database weg in een
+# APARTE, PRIVATE repo (niet deze repo, want deze is public i.v.m. GitHub
+# Pages op het gratis plan). Zo staat er een kopie van de data die volledig
+# los staat van Supabase zelf: als het Supabase-project ooit stuk gaat, per
+# ongeluk verwijderd wordt, of een query iets sloopt, kun je hiermee terug.
+#
+# Vereiste secrets (Settings → Secrets and variables → Actions → New repository secret):
+#   SUPABASE_DB_URL   - de Postgres-connectionstring (met wachtwoord), te vinden
+#                        in Supabase Dashboard → Project Settings → Database →
+#                        Connection string → "URI" (gebruik de "Session pooler"
+#                        variant als de directe host geen IPv4 heeft/werkt).
+#   BACKUP_REPO_PAT   - fine-grained PAT met Contents: Read & Write op de
+#                        aparte private backup-repo (zie backup-repo hieronder).
+#   BACKUP_REPO       - bv. "Jopen-Bier/Jopen_Batch_Database_Backups"
+#
+# Let op: deze drie moeten nog worden aangemaakt/toegevoegd voordat dit script
+# voor het eerst succesvol draait.
+
+on:
+  schedule:
+    - cron: '0 3 * * *'   # 03:00 UTC = 04:00/05:00 NL-tijd, afhankelijk van zomer/wintertijd
+  workflow_dispatch: {}    # handmatig te starten via de Actions-tab, voor een test
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install postgresql-client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Dump database
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          mkdir -p dump
+          STAMP=$(date -u +"%Y-%m-%d")
+          # -Fc = custom format: gecomprimeerd, en herstelbaar met pg_restore
+          # (ook gedeeltelijk herstelbaar, i.t.t. een platte .sql-dump)
+          pg_dump "$SUPABASE_DB_URL" -Fc -f "dump/jopen_backup_${STAMP}.dump"
+          echo "BACKUP_FILE=jopen_backup_${STAMP}.dump" >> "$GITHUB_ENV"
+
+      - name: Push dump to private backup repo
+        env:
+          BACKUP_REPO_PAT: ${{ secrets.BACKUP_REPO_PAT }}
+          BACKUP_REPO: ${{ secrets.BACKUP_REPO }}
+        run: |
+          git clone "https://x-access-token:${BACKUP_REPO_PAT}@github.com/${BACKUP_REPO}.git" backup-repo
+          mkdir -p backup-repo/dumps
+          cp "dump/${BACKUP_FILE}" "backup-repo/dumps/${BACKUP_FILE}"
+          cd backup-repo
+          git config user.name "jopen-backup-bot"
+          git config user.email "backup-bot@users.noreply.github.com"
+          git add "dumps/${BACKUP_FILE}"
+          git commit -m "Backup ${BACKUP_FILE}" || echo "Niets om te committen"
+          git push
+
+          # Bewaar alleen de laatste 30 dagen aan dumps, zodat de backup-repo
+          # niet ongelimiteerd blijft groeien.
+          cd dumps
+          ls -1t | tail -n +31 | xargs -r rm --
+          cd ..
+          git add dumps
+          git commit -m "Opruimen dumps ouder dan 30 dagen" || echo "Niets op te ruimen"
+          git push
