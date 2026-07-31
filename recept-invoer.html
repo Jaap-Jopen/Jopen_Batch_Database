@@ -65,22 +65,31 @@
   }
   .re-subkop:first-child { margin-top: 0; }
   .re-full-span { column-span: all; margin-top: 8px; }
-  .re-kleur-picker { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }
+  .re-kleur-picker { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; margin-top: 4px; }
   .re-kleur-swatch {
-    width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent;
-    cursor: pointer; padding: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12);
+    width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent;
+    cursor: pointer; padding: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15);
+    position: relative; flex-shrink: 0;
   }
-  .re-kleur-swatch.geselecteerd { border-color: #1f1f1f; }
+  .re-kleur-swatch.geselecteerd {
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #1f1f1f, inset 0 0 0 1px rgba(0,0,0,0.15);
+  }
+  .re-kleur-swatch.geselecteerd::after {
+    content: '\2713'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 15px; font-weight: 700; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 1px 2px #000;
+  }
   .re-kleur-swatch.re-kleur-geen {
     background: #fff repeating-linear-gradient(45deg, #ddd 0 2px, transparent 2px 6px);
   }
-  .re-kleur-custom-wrap { position: relative; width: 28px; height: 28px; }
+  .re-kleur-swatch.re-kleur-geen.geselecteerd::after { color: #a33f2c; text-shadow: none; }
+  .re-kleur-huidig { font-size: 0.85em; color: #6b6b6b; margin-left: 4px; white-space: nowrap; }
+  .re-kleur-custom-wrap { position: relative; width: 32px; height: 32px; flex-shrink: 0; }
   .re-kleur-custom-wrap input[type="color"] {
     position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; padding: 0; border: none;
   }
   .re-kleur-custom-wrap .re-kleur-custom-swatch {
     position: absolute; inset: 0; border-radius: 50%; border: 2px dashed #999; pointer-events: none;
-    display: flex; align-items: center; justify-content: center; font-size: 13px; color: #999;
+    display: flex; align-items: center; justify-content: center; font-size: 15px; color: #999; background: #fff;
   }
   .re-badge-field label { font-weight: 700; }
   .re-badge-field input {
@@ -231,6 +240,7 @@
           <div class="re-field wide">
             <label>Recipe Color <span style="text-transform:none; font-weight:normal;">(used in brewing planning)</span></label>
             <div class="re-kleur-picker" id="re-kleur-picker"></div>
+            <span class="re-kleur-huidig" id="re-kleur-huidig">No color selected</span>
             <input type="hidden" id="veld-kleur" />
           </div>
         </div>
@@ -1160,9 +1170,14 @@ initBadgeKleuren();
 // brouwplanning.html sneller herkenbaar te maken.
 // ----------------------------------------------------------------------
 const RECEPT_KLEUREN_PALET = [
-  '#E0001D', '#F97316', '#F59E0B', '#EAB308', '#84CC16', '#22C55E',
-  '#10B981', '#14B8A6', '#06B6D4', '#3B82F6', '#6366F1', '#8B5CF6',
-  '#A855F7', '#EC4899', '#78350F', '#6B7280',
+  // rood/oranje/geel
+  '#E0001D', '#B91C1C', '#F97316', '#EA580C', '#F59E0B', '#D97706', '#EAB308', '#CA8A04',
+  // groen
+  '#84CC16', '#65A30D', '#22C55E', '#16A34A', '#10B981', '#059669', '#14B8A6', '#0D9488',
+  // blauw/paars
+  '#06B6D4', '#0891B2', '#3B82F6', '#2563EB', '#6366F1', '#4F46E5', '#8B5CF6', '#7C3AED',
+  // roze/bruin/grijs
+  '#A855F7', '#C026D3', '#EC4899', '#DB2777', '#78350F', '#92400E', '#57534E', '#6B7280',
 ];
 
 function initKleurenPicker() {
@@ -1196,6 +1211,8 @@ function initKleurenPicker() {
     container.querySelectorAll('.re-kleur-swatch').forEach(el => {
       el.classList.toggle('geselecteerd', el.dataset.kleur.toLowerCase() === (hex || '').toLowerCase());
     });
+    const label = document.getElementById('re-kleur-huidig');
+    if (label) label.textContent = hex ? `Selected: ${hex}` : 'No color selected';
   }
 
   container.querySelectorAll('.re-kleur-swatch').forEach(btn => {
@@ -1208,6 +1225,8 @@ function initKleurenPicker() {
   document.getElementById('re-kleur-custom-input').addEventListener('input', (e) => {
     verborgenVeld.value = e.target.value;
     markeerGeselecteerd(null); // geen paletswatch actief; het kleurvlakje van de custom-input toont zelf de keuze
+    const label = document.getElementById('re-kleur-huidig');
+    if (label) label.textContent = `Selected: ${e.target.value}`;
   });
 
   // Zet de picker in de juiste stand voor een gegeven waarde (leeg / palet / custom).
@@ -1218,6 +1237,8 @@ function initKleurenPicker() {
     } else if (hex) {
       document.getElementById('re-kleur-custom-input').value = hex;
       markeerGeselecteerd(null);
+      const label = document.getElementById('re-kleur-huidig');
+      if (label) label.textContent = `Selected: ${hex}`;
     } else {
       markeerGeselecteerd('');
     }
