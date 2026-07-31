@@ -666,8 +666,19 @@
 
     function sluitModal() { document.getElementById('bp-modal-overlay').classList.remove('open'); }
     document.getElementById('bp-modal-cancel').addEventListener('click', sluitModal);
-    document.getElementById('bp-modal-overlay').addEventListener('click', (e) => {
-      if (e.target.id === 'bp-modal-overlay') sluitModal();
+
+    // Alleen sluiten als de muisklik ZOWEL begint als eindigt op de overlay
+    // zelf. Met alleen een 'click'-listener sluit de modal ook als je bv. in
+    // het zoekveld begint te slepen (tekst selecteren) en toevallig buiten
+    // de modal loslaat -- de click-target is dan de overlay, ook al was de
+    // bedoeling gewoon binnen de modal te klikken.
+    let overlayMousedownWasOpOverlay = false;
+    const overlayEl = document.getElementById('bp-modal-overlay');
+    overlayEl.addEventListener('mousedown', (e) => {
+      overlayMousedownWasOpOverlay = (e.target.id === 'bp-modal-overlay');
+    });
+    overlayEl.addEventListener('click', (e) => {
+      if (e.target.id === 'bp-modal-overlay' && overlayMousedownWasOpOverlay) sluitModal();
     });
 
     // ------------------------------------------------------------------
