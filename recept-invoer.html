@@ -98,6 +98,12 @@
     transition: background-color 0.15s, color 0.15s, border-color 0.15s;
   }
   .re-comment-row { margin-bottom: 10px; }
+  .re-ing-drag-handle {
+    cursor: grab; text-align: center; color: #999; width: 22px; user-select: none; touch-action: none;
+  }
+  .re-ing-drag-handle:active { cursor: grabbing; }
+  tr.re-ing-slepend { opacity: 0.4; }
+  tr.re-ing-drop-doel { box-shadow: inset 0 2px 0 var(--jopen-red, #E0001D); }
   .re-comment-row label { display: block; font-family: var(--mono); font-size: 11px; color: #6b6355; margin-bottom: 4px; }
   .re-comment-row input, .re-comment-row textarea {
     width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px;
@@ -273,7 +279,7 @@
       <div class="re-section">
         <h2>Malt &amp; Grains</h2>
         <table class="re-ing-table">
-          <thead><tr><th>Ingredient</th><th>Amount (kg)</th><th>Unit</th><th>EBC</th><th>%</th><th>Timing</th><th>Order</th><th>Note</th><th></th></tr></thead>
+          <thead><tr><th></th><th>Ingredient</th><th>Amount (kg)</th><th>Unit</th><th>EBC</th><th>%</th><th>Timing</th><th>Note</th><th></th></tr></thead>
           <tbody id="re-ing-mout-tbody"></tbody>
           <tfoot>
             <tr style="font-weight:bold; border-top: 2px solid var(--hop-dark);">
@@ -293,7 +299,7 @@
       <div class="re-section">
         <h2>Hops and Herbs</h2>
         <table class="re-ing-table">
-          <thead><tr><th>Role</th><th>Ingredient</th><th>Alpha %</th><th>Amount</th><th>Unit</th><th>Timing</th><th>Rendement %</th><th>EBU</th><th>Order</th><th>HDT</th><th>Note</th><th></th></tr></thead>
+          <thead><tr><th></th><th>Role</th><th>Ingredient</th><th>Alpha %</th><th>Amount</th><th>Unit</th><th>Timing</th><th>Rendement %</th><th>EBU</th><th>HDT</th><th>Note</th><th></th></tr></thead>
           <tbody id="re-ing-hop-tbody"></tbody>
         </table>
         <p class="re-versie-uitleg" style="margin-top:-4px;">Rendement/EBU calculated from Original extract + Boil volume (General/Boiling). Calculated total EBU: <strong id="re-ebu-totaal-waarde">—</strong></p>
@@ -337,7 +343,7 @@
       <div class="re-section">
         <h2>Additions Brewing</h2>
         <table class="re-ing-table">
-          <thead><tr><th>Ingredient</th><th>Amount</th><th>Unit</th><th>Timing</th><th>Order</th><th>Note</th><th></th></tr></thead>
+          <thead><tr><th></th><th>Ingredient</th><th>Amount</th><th>Unit</th><th>Timing</th><th>Note</th><th></th></tr></thead>
           <tbody id="re-ing-brouwtoegift-tbody"></tbody>
         </table>
         <button type="button" class="re-btn secundair" data-tbody="re-ing-brouwtoegift-tbody" data-roles="toegift_brouwerij" data-add-btn>+ Add brewing addition</button>
@@ -346,7 +352,7 @@
       <div class="re-section">
         <h2>Yeasts</h2>
         <table class="re-ing-table">
-          <thead><tr><th>Ingredient</th><th>Amount</th><th>Unit</th><th>Timing</th><th>Order</th><th>Note</th><th></th></tr></thead>
+          <thead><tr><th></th><th>Ingredient</th><th>Amount</th><th>Unit</th><th>Timing</th><th>Note</th><th></th></tr></thead>
           <tbody id="re-ing-gist-tbody"></tbody>
         </table>
         <button type="button" class="re-btn secundair" data-tbody="re-ing-gist-tbody" data-roles="gist" data-add-btn>+ Add yeast</button>
@@ -355,7 +361,7 @@
       <div class="re-section">
         <h2>Additions Cellar</h2>
         <table class="re-ing-table">
-          <thead><tr><th>Ingredient</th><th>Amount</th><th>Unit</th><th>Timing</th><th>Order</th><th>Note</th><th></th></tr></thead>
+          <thead><tr><th></th><th>Ingredient</th><th>Amount</th><th>Unit</th><th>Timing</th><th>Note</th><th></th></tr></thead>
           <tbody id="re-ing-keldertoegift-tbody"></tbody>
         </table>
         <button type="button" class="re-btn secundair" data-tbody="re-ing-keldertoegift-tbody" data-roles="toegift_kelder" data-add-btn>+ Add cellar addition</button>
@@ -854,6 +860,13 @@ function voegIngredientRegelToe(tbodyId, rollenLijst, regel = {}) {
     </td>` : `<td><input type="text" class="re-ing-tijdstip" value="${regel.tijdstip ?? ''}" /></td>`;
 
   tr.innerHTML = `
+    <td class="re-ing-drag-handle" draggable="true" title="Drag to reorder">
+      <svg width="12" height="18" viewBox="0 0 12 18" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="3" cy="3" r="1.6"/><circle cx="9" cy="3" r="1.6"/>
+        <circle cx="3" cy="9" r="1.6"/><circle cx="9" cy="9" r="1.6"/>
+        <circle cx="3" cy="15" r="1.6"/><circle cx="9" cy="15" r="1.6"/>
+      </svg>
+    </td>
     ${rolKolomHtml}
     <td><select class="re-ing-ingredient">${ingredientOpties(regel.ingredient_id)}</select></td>
     ${alphaKolomHtml}
@@ -864,7 +877,7 @@ function voegIngredientRegelToe(tbodyId, rollenLijst, regel = {}) {
     ${tijdstipKolomHtml}
     ${rendementKolomHtml}
     ${ebuKolomHtml}
-    <td><input type="number" class="re-ing-volgorde" value="${regel.volgorde ?? ''}" style="width:60px;" /></td>
+    <input type="hidden" class="re-ing-volgorde" value="${regel.volgorde ?? ''}" />
     ${hdtKolomHtml}
     <td><input type="text" class="re-ing-notitie" value="${regel.notitie ?? ''}" /></td>
     <td><button type="button" class="re-verwijder-regel">&times;</button></td>
@@ -877,8 +890,10 @@ function voegIngredientRegelToe(tbodyId, rollenLijst, regel = {}) {
   }
 
   tbody.appendChild(tr);
+  herNummerVolgorde(tbody);
   tr.querySelector('.re-verwijder-regel').addEventListener('click', () => {
     tr.remove();
+    herNummerVolgorde(tbody);
     herberekenHopgewichten();
     if (isHopSectie) herberekenHopRendementEnEbu();
     if (isMoutSectie) herberekenMoutTotalen();
@@ -942,6 +957,56 @@ document.querySelectorAll('[data-add-btn]').forEach(btn => {
   const rollenLijst = btn.dataset.roles.split(',');
   btn.addEventListener('click', () => voegIngredientRegelToe(tbodyId, rollenLijst));
 });
+
+// ----------------------------------------------------------------------
+// Drag-and-drop volgorde: sleep aan het handvat (eerste kolom) om een
+// ingrediëntregel te verplaatsen. Na loslaten wordt de hele tabel opnieuw
+// genummerd en die nummers gaan gewoon mee als recipe_ingredients.volgorde,
+// hetzelfde veld dat er al was -- alleen niet meer met de hand te typen.
+// ----------------------------------------------------------------------
+function herNummerVolgorde(tbody) {
+  Array.from(tbody.children).forEach((tr, i) => {
+    const veld = tr.querySelector('.re-ing-volgorde');
+    if (veld) veld.value = i + 1;
+  });
+}
+
+function maakTbodySorteerbaar(tbodyId) {
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  let dragSrcRow = null;
+
+  tbody.addEventListener('dragstart', (e) => {
+    const handle = e.target.closest('.re-ing-drag-handle');
+    if (!handle) { e.preventDefault(); return; }
+    dragSrcRow = handle.closest('tr');
+    dragSrcRow.classList.add('re-ing-slepend');
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', dragSrcRow.id); } catch (err) { /* Firefox vereist setData, verder genegeerd */ }
+    try { e.dataTransfer.setDragImage(dragSrcRow, 10, 10); } catch (err) { /* niet kritisch als dit faalt */ }
+  });
+
+  tbody.addEventListener('dragover', (e) => {
+    if (!dragSrcRow) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const overRow = e.target.closest('tr');
+    if (!overRow || overRow === dragSrcRow || !tbody.contains(overRow)) return;
+    const rect = overRow.getBoundingClientRect();
+    const naHelft = (e.clientY - rect.top) / rect.height > 0.5;
+    tbody.insertBefore(dragSrcRow, naHelft ? overRow.nextSibling : overRow);
+  });
+
+  tbody.addEventListener('drop', (e) => { e.preventDefault(); });
+
+  tbody.addEventListener('dragend', () => {
+    if (dragSrcRow) dragSrcRow.classList.remove('re-ing-slepend');
+    dragSrcRow = null;
+    herNummerVolgorde(tbody);
+  });
+}
+
+document.querySelectorAll('[data-add-btn]').forEach(btn => maakTbodySorteerbaar(btn.dataset.tbody));
 
 function leesIngredientRegelsUit(tbodyId) {
   const isHopSectie = tbodyId === 're-ing-hop-tbody';

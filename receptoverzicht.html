@@ -261,6 +261,7 @@
 // Supabase-client (supabaseClient) en auth komen nu uit config.js, gedeeld
 // door alle Jopen-app-pagina's. Zie config.js voor de credentials.
 let allRecipes = [];
+let laatsteBatchPerRecept = {};
 let huidigeGebruikerRol = null;
 
 const mainEl = document.getElementById('main');
@@ -306,16 +307,33 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 async function loadRecipes() {
   const container = document.getElementById('list-container');
-  const { data, error } = await supabaseClient
-    .from('recipes')
-    .select('id, naam, bierstijl, locatie, status, versie_major, versie_minor, recipe_group_id')
-    .order('naam');
+  const [{ data, error }, { data: batchData, error: batchErr }] = await Promise.all([
+    supabaseClient
+      .from('recipes')
+      .select('id, naam, bierstijl, locatie, status, versie_major, versie_minor, recipe_group_id')
+      .order('naam'),
+    supabaseClient.from('batches').select('recipe_id, aangemaakt_op'),
+  ]);
   if (error) {
     container.innerHTML = `<div class="error">Error loading: ${error.message}</div>`;
     return;
   }
+  if (batchErr) console.error('Could not load batch generation dates:', batchErr);
+
+  laatsteBatchPerRecept = {};
+  (batchData || []).forEach(b => {
+    if (!b.recipe_id || !b.aangemaakt_op) return;
+    const huidig = laatsteBatchPerRecept[b.recipe_id];
+    if (!huidig || b.aangemaakt_op > huidig) laatsteBatchPerRecept[b.recipe_id] = b.aangemaakt_op;
+  });
+
   allRecipes = data || [];
   renderList(allRecipes);
+}
+
+function formatDatum(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function renderList(recipes) {
@@ -332,10 +350,11 @@ function renderList(recipes) {
       <td>${escapeHtml(r.locatie || '—')}</td>
       <td>v${r.versie_major ?? 1}.${r.versie_minor ?? 0}</td>
       <td><span class="status-pill status-${r.status}">${statusLabel(r.status)}</span></td>
+      <td>${formatDatum(laatsteBatchPerRecept[r.id])}</td>
     </tr>`).join('');
   container.innerHTML = `
     <table>
-      <thead><tr><th>Name</th><th>Beer style</th><th>Location</th><th>Version</th><th>Status</th></tr></thead>
+      <thead><tr><th>Name</th><th>Beer style</th><th>Location</th><th>Version</th><th>Status</th><th>Last batch generated</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
   container.querySelectorAll('tbody tr').forEach(tr => {
