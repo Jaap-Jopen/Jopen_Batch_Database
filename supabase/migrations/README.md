@@ -53,3 +53,9 @@ productie-wijziging zodra dit gepusht wordt.
   via Settings → Units. Eerste stap richting het vervangen van het vrije
   tekstveld "Unit" op receptregels door een vaste keuzelijst — die omzetting
   zelf moet nog gebeuren.
+- `20260731094745_recipes_delete_policy.sql` — DELETE-policy op `recipes`
+  voor editor/admin, nodig voor de nieuwe Delete-knop op de receptkaart.
+  Let op: geen `ON DELETE CASCADE` toegevoegd op eventuele gerelateerde
+  tabellen — als een recept al in gebruik is (batches, brew_planning, etc.)
+  kan de DELETE alsnog stuklopen op een foreign-key-constraint; dat is
+  bewust niet stilzwijgend opgelost.

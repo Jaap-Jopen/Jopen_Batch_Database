@@ -857,7 +857,7 @@ async function openDetail(id) {
     <div class="recipe-meta">
       <b>${escapeHtml(r.bierstijl || 'unknown style')}</b> · ${escapeHtml(r.locatie || '—')} ·
       version ${r.versie_major ?? 1}.${r.versie_minor ?? 0} · <span class="status-pill status-${r.status}">${statusLabel(r.status)}</span>
-      ${magBewerken() ? ` <a class="edit-pill" href="recept-invoer.html?id=${r.id}">Edit &rarr;</a>` : ''}
+      ${magBewerken() ? ` <a class="edit-pill" href="recept-invoer.html?id=${r.id}">Edit &rarr;</a> <button type="button" id="delete-recipe-btn" class="edit-pill" style="background:#a33f2c; border:none; cursor:pointer; font:inherit; font-family:var(--mono);">Delete</button>` : ''}
     </div>
 
     <div class="section-title">General</div>
@@ -924,6 +924,25 @@ async function openDetail(id) {
 
     ${vorigeVersiesHtml}
   `;
+
+  const deleteBtn = document.getElementById('delete-recipe-btn');
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', async () => {
+      if (!confirm(`Are you sure you want to delete ${r.naam}?`)) return;
+      deleteBtn.disabled = true;
+      deleteBtn.textContent = 'Deleting…';
+      const { error } = await supabaseClient.from('recipes').delete().eq('id', r.id);
+      if (error) {
+        alert('Could not delete: ' + error.message);
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = 'Delete';
+        return;
+      }
+      document.getElementById('detail-view').classList.remove('active');
+      document.getElementById('list-view').style.display = 'block';
+      await loadRecipes();
+    });
+  }
 }
 
 document.getElementById('back-btn').addEventListener('click', () => {
