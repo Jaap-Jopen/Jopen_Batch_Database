@@ -47,8 +47,13 @@ jobs:
           mkdir -p dump
           STAMP=$(date -u +"%Y-%m-%d")
           # -Fc = custom format: gecomprimeerd, en herstelbaar met pg_restore
-          # (ook gedeeltelijk herstelbaar, i.t.t. een platte .sql-dump)
-          /usr/lib/postgresql/17/bin/pg_dump "$SUPABASE_DB_URL" -Fc -f "dump/jopen_backup_${STAMP}.dump"
+          # (ook gedeeltelijk herstelbaar, i.t.t. een platte .sql-dump).
+          # --schema=public: alleen ons eigen schema, NIET Supabase's interne
+          # auth/storage/realtime/extensions/cron/graphql-schema's -- die
+          # horen bij het Supabase-project zelf, niet bij onze data, en
+          # geven bij een restore in een ander project alleen maar
+          # onschuldige maar verwarrende "must be owner of..."-fouten.
+          /usr/lib/postgresql/17/bin/pg_dump "$SUPABASE_DB_URL" --schema=public -Fc -f "dump/jopen_backup_${STAMP}.dump"
           echo "BACKUP_FILE=jopen_backup_${STAMP}.dump" >> "$GITHUB_ENV"
 
       - name: Push dump to private backup repo
