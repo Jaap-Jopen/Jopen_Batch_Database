@@ -163,6 +163,7 @@
       <label for="bp-jaar" style="font-size:0.9em; color:#6b6b6b;">Year</label>
       <select id="bp-jaar"></select>
       <span style="font-size:0.9em; color:#6b6b6b;">Current week: <b id="bp-huidige-week" style="color:#1f1f1f;">—</b></span>
+      <span style="font-size:0.9em; color:#6b6b6b;">Total volume planned: <b id="bp-totaal-volume" style="color:#1f1f1f;">—</b></span>
       <div class="bp-legenda">
         <span><i class="dot prio"></i> Prio</span>
         <span><i class="dot over"></i> Over capacity</span>
@@ -280,6 +281,10 @@
       zondag.setUTCDate(maandag.getUTCDate() + 6);
       return `${formatDagMaand(maandag)} t/m ${formatDagMaand(zondag)}`;
     }
+    function formatHl(hl) {
+      const n = Number(hl) || 0;
+      return Number.isInteger(n) ? String(n) : n.toFixed(1);
+    }
 
     function huidigeIsoJaarEnWeek() {
       const d = new Date();
@@ -367,6 +372,16 @@
     async function laadEnRenderAlles() {
       await Promise.all([laadCapaciteit(huidigJaar), laadPlanning(huidigJaar)]);
       renderWeken();
+      werkTotaalVolumeBij();
+    }
+
+    function werkTotaalVolumeBij() {
+      const totaal = Object.values(planningPerWeek).reduce((som, p) => {
+        return som + ['jk', 'wp_60hl', 'wp_120hl', 'wp_320hl']
+          .reduce((s, g) => s + p[g].reduce((s2, i) => s2 + Number(i.hl || 0), 0), 0);
+      }, 0);
+      const el = document.getElementById('bp-totaal-volume');
+      if (el) el.textContent = `${formatHl(totaal)} hl`;
     }
 
     function renderItem(item) {
@@ -394,11 +409,14 @@
         const jkSom = p.jk.reduce((s, i) => s + Number(i.aantal_brouwsels), 0);
         const jkMax = capaciteit('jk', week);
         const jkOver = jkSom > jkMax;
+        const jkHl = p.jk.reduce((s, i) => s + Number(i.hl || 0), 0);
 
         const wpSom = ['wp_60hl', 'wp_120hl', 'wp_320hl']
           .reduce((s, g) => s + p[g].reduce((s2, i) => s2 + Number(i.aantal_brouwsels), 0), 0);
         const wpMax = capaciteit('wp', week);
         const wpOver = wpSom > wpMax;
+        const wpHl = ['wp_60hl', 'wp_120hl', 'wp_320hl']
+          .reduce((s, g) => s + p[g].reduce((s2, i) => s2 + Number(i.hl || 0), 0), 0);
         const weekOver = jkOver || wpOver;
 
         html += `
@@ -406,6 +424,7 @@
             <div class="bp-weekkop">
               <span class="bp-weeknr">wk ${week}</span>
               <span class="bp-weekdatum">${weekDatumRange(huidigJaar, week)}</span>
+              <span class="bp-weekdatum">Total volume: ${formatHl(jkHl + wpHl)} hl</span>
               ${weekOver ? '<span class="bp-over-badge">Over capacity</span>' : ''}
               <button type="button" class="bp-add-inline bp-add-wp" data-week="${week}">+ Brews WP</button>
               <span class="bp-cap ${wpOver ? 'over' : ''}">WP ${wpSom}/<input type="number" min="0" class="bp-cap-input" data-group="wp" data-week="${week}" value="${wpMax}" /> brws</span>
