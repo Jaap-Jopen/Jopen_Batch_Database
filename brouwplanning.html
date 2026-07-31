@@ -80,14 +80,11 @@
     font-size: 0.58em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
     color: #1f1f1f; margin-top: 1px;
   }
-  .bp-comment-marker { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; line-height: 1; margin-left: 2px; }
-  .bp-comment-marker .bp-comment-icon {
-    color: #2a5db0; font-size: 1.05em; font-weight: 900;
-    text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
-  }
+  .bp-comment-marker { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; margin-left: 2px; }
+  .bp-comment-marker .bp-comment-icon { display: block; filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000); }
   .bp-comment-marker .bp-comment-label {
     font-size: 0.58em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
-    color: #1f1f1f; margin-top: 1px;
+    color: #1f1f1f; margin-top: 1px; line-height: 1;
   }
 
   /* --- Modal (add / edit) --- */
@@ -382,7 +379,7 @@
         <div class="bp-item" data-id="${item.id}" style="${stijl}">
           <span class="bp-item-tekst">${naam} · ${item.aantal_brouwsels}br · ${hl}hl</span>
           ${item.prio ? '<span class="bp-prio-marker" title="Prio"><span class="bp-prio-ster">&#9733;</span><span class="bp-prio-label">prio</span></span>' : ''}
-          ${item.notities ? `<span class="bp-comment-marker" title="${escapeHtml(item.notities)}"><span class="bp-comment-icon">!</span><span class="bp-comment-label">check</span></span>` : ''}
+          ${item.notities ? `<span class="bp-comment-marker" title="${escapeHtml(item.notities)}"><svg class="bp-comment-icon" width="15" height="14" viewBox="0 0 20 18" xmlns="http://www.w3.org/2000/svg"><path d="M2 2h16v10H8.5L4 16v-4H2z" fill="#2a5db0"/></svg><span class="bp-comment-label">Comment</span></span>` : ''}
         </div>`;
     }
 
