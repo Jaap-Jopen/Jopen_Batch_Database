@@ -296,6 +296,14 @@ function statusLabel(status) {
   return labels[status] || status || 'Unknown';
 }
 
+// Zelfde principe als statusLabel(): in de database staat de volledige naam
+// (verplicht door de check-constraint op recipes.locatie), in de app tonen
+// we de korte WP/JK-afkorting.
+function locatieLabel(locatie) {
+  const labels = { 'Waarderpolder': 'WP', 'Jopen Kerk': 'JK' };
+  return labels[locatie] || locatie || '—';
+}
+
 function magBewerken() {
   return huidigeGebruikerRol === 'admin' || huidigeGebruikerRol === 'editor';
 }
@@ -369,7 +377,7 @@ function renderList(recipes) {
     <tr data-id="${r.id}">
       <td>${escapeHtml(r.naam)}</td>
       <td>${escapeHtml(r.bierstijl || '—')}</td>
-      <td>${escapeHtml(r.locatie || '—')}</td>
+      <td>${escapeHtml(locatieLabel(r.locatie))}</td>
       <td>v${r.versie_major ?? 1}.${r.versie_minor ?? 0}</td>
       <td><span class="status-pill status-${r.status}">${statusLabel(r.status)}</span></td>
       <td>${formatDatum(laatsteBatchPerRecept[r.id])}</td>
@@ -391,7 +399,7 @@ function vulLocatieFilter() {
   const huidige = select.value;
   const locaties = [...new Set(allRecipes.map(r => r.locatie).filter(Boolean))].sort();
   select.innerHTML = '<option value="">All locations</option>' +
-    locaties.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('');
+    locaties.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(locatieLabel(l))}</option>`).join('');
   select.value = huidige;
 }
 
@@ -926,7 +934,7 @@ async function openDetail(id) {
   container.innerHTML = `
     <h2 class="recipe-title">${escapeHtml(r.naam)}</h2>
     <div class="recipe-meta">
-      <b>${escapeHtml(r.bierstijl || 'unknown style')}</b> · ${escapeHtml(r.locatie || '—')} ·
+      <b>${escapeHtml(r.bierstijl || 'unknown style')}</b> · ${escapeHtml(locatieLabel(r.locatie))} ·
       version ${r.versie_major ?? 1}.${r.versie_minor ?? 0} · <span class="status-pill status-${r.status}">${statusLabel(r.status)}</span>
       ${magBewerken() ? ` <a class="edit-pill" href="recept-invoer.html?id=${r.id}">Edit &rarr;</a> <button type="button" id="delete-recipe-btn" class="edit-pill" style="background:#a33f2c; border:none; cursor:pointer; font:inherit; font-family:var(--mono);">Delete</button>` : ''}
     </div>
