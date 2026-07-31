@@ -30,10 +30,14 @@ jobs:
       - name: Install postgresql-client 17
         # Ubuntu's eigen apt-pakket geeft alleen pg_dump 16, terwijl Supabase
         # Postgres 17 draait -- pg_dump weigert dan met een version-mismatch-
-        # fout. De officiële PGDG-repo toevoegen geeft wél versie 17.
+        # fout. De officiële PGDG-repo toevoegen geeft wél versie 17. Let op:
+        # de generieke `pg_dump`-opdracht kan na installatie alsnog naar de
+        # oude v16-wrapper blijven wijzen, dus de dump-stap roept hierna het
+        # exacte pad naar de v17-binary aan i.p.v. de kale `pg_dump`-opdracht.
         run: |
           sudo apt-get install -y postgresql-common
-          yes '' | sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get update
           sudo apt-get install -y postgresql-client-17
 
       - name: Dump database
@@ -44,7 +48,7 @@ jobs:
           STAMP=$(date -u +"%Y-%m-%d")
           # -Fc = custom format: gecomprimeerd, en herstelbaar met pg_restore
           # (ook gedeeltelijk herstelbaar, i.t.t. een platte .sql-dump)
-          pg_dump "$SUPABASE_DB_URL" -Fc -f "dump/jopen_backup_${STAMP}.dump"
+          /usr/lib/postgresql/17/bin/pg_dump "$SUPABASE_DB_URL" -Fc -f "dump/jopen_backup_${STAMP}.dump"
           echo "BACKUP_FILE=jopen_backup_${STAMP}.dump" >> "$GITHUB_ENV"
 
       - name: Push dump to private backup repo
