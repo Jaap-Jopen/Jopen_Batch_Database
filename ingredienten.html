@@ -124,29 +124,39 @@
   }
   .ing-error { color: #a33f2c; }
 
-  .filter-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .filter-group-label {
-    font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
-    color: #6b6355;
+  /* -- Dropdown-filters (Excel-stijl: checkboxen in een uitklappaneel, met
+     een klein indicator-puntje op de knop zelf zodra er gefilterd wordt) -- */
+  .dd-filter { position: relative; display: inline-block; }
+  .dd-filter-btn {
+    position: relative; display: flex; align-items: center; gap: 6px;
+    padding: 9px 14px; border: 1px solid var(--line); border-radius: 4px;
+    font-family: var(--serif); font-size: 14px; background: #fff; color: var(--ink); cursor: pointer;
   }
-  .filter-toggle {
-    font-family: var(--mono); font-size: 12px; padding: 6px 12px; border-radius: 20px;
-    border: 1.5px solid var(--line); background: #fff; color: #6b6355; cursor: pointer;
-    user-select: none; transition: background 0.12s, color 0.12s, border-color 0.12s;
+  .dd-filter-btn:hover { border-color: var(--hop-dark); }
+  .dd-filter-btn.actief-menu { border-color: var(--hop-dark); }
+  .dd-filter-caret { font-size: 10px; opacity: 0.55; }
+  .dd-filter-mark {
+    position: absolute; top: -4px; right: -4px; width: 9px; height: 9px; border-radius: 50%;
+    background: var(--amber); border: 2px solid var(--paper);
   }
-  .filter-toggle:hover { border-color: var(--hop-dark); }
-  .filter-toggle.actief { background: var(--hop-dark); color: #fff; border-color: var(--hop-dark); }
-  .filter-gefilterd-badge {
-    font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--amber);
-    display: inline-flex; align-items: center; gap: 5px;
+  .dd-filter-panel {
+    position: absolute; top: calc(100% + 6px); left: 0; z-index: 60; min-width: 200px;
+    background: #fff; border: 1px solid var(--line); border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.14); padding: 6px 0;
   }
-  .filter-gefilterd-badge::before {
-    content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--amber); display: inline-block;
+  .dd-filter-panel-header {
+    display: flex; justify-content: space-between; gap: 10px; padding: 2px 14px 8px;
+    margin-bottom: 4px; border-bottom: 1px solid var(--line);
   }
-  .filter-reset {
-    font-family: var(--mono); font-size: 11px; color: var(--hop-dark); background: transparent; border: none;
-    text-decoration: underline; cursor: pointer; padding: 0;
+  .dd-filter-panel-header button {
+    background: none; border: none; padding: 0; cursor: pointer;
+    font-family: var(--mono); font-size: 11px; color: var(--hop-dark); text-decoration: underline;
   }
+  .dd-filter-option {
+    display: flex; align-items: center; gap: 9px; padding: 7px 14px; font-size: 14px; cursor: pointer;
+  }
+  .dd-filter-option:hover { background: #f4f2ea; }
+  .dd-filter-option input { cursor: pointer; }
 
   /* -- Versiebeheer: save-popup, zelfde patroon als recept-invoer.html -- */
   .ing-modal-overlay {
@@ -194,16 +204,26 @@
     </div>
     <div class="ing-toolbar">
       <input id="ing-search" placeholder="Search by name…">
-      <div class="filter-group">
-        <span class="filter-group-label">Category</span>
-        <div id="ing-filter-categorie-toggles"></div>
+      <div class="dd-filter" id="dd-ing-categorie">
+        <button type="button" class="dd-filter-btn" id="dd-ing-categorie-btn">Category <span class="dd-filter-caret">&#9662;</span><span class="dd-filter-mark" id="dd-ing-categorie-mark" style="display:none;"></span></button>
+        <div class="dd-filter-panel" id="dd-ing-categorie-panel" style="display:none;">
+          <div class="dd-filter-panel-header">
+            <button type="button" data-actie="all">Select all</button>
+            <button type="button" data-actie="none">Clear</button>
+          </div>
+          <div id="dd-ing-categorie-options"></div>
+        </div>
       </div>
-      <div class="filter-group">
-        <span class="filter-group-label">Status</span>
-        <div id="ing-filter-status-toggles"></div>
+      <div class="dd-filter" id="dd-ing-status">
+        <button type="button" class="dd-filter-btn" id="dd-ing-status-btn">Status <span class="dd-filter-caret">&#9662;</span><span class="dd-filter-mark" id="dd-ing-status-mark" style="display:none;"></span></button>
+        <div class="dd-filter-panel" id="dd-ing-status-panel" style="display:none;">
+          <div class="dd-filter-panel-header">
+            <button type="button" data-actie="all">Select all</button>
+            <button type="button" data-actie="none">Clear</button>
+          </div>
+          <div id="dd-ing-status-options"></div>
+        </div>
       </div>
-      <span class="filter-gefilterd-badge" id="ing-filter-gefilterd-badge" style="display:none;">Filtered</span>
-      <button type="button" class="filter-reset" id="ing-filter-reset-btn" style="display:none;">Reset filters</button>
       <div class="ing-count" id="ing-result-count"></div>
     </div>
     <div id="ing-list-container"><div class="ing-loading">Loading ingredients…</div></div>
@@ -374,56 +394,76 @@ async function laadIngredienten() {
   pasFiltersToe();
 }
 
+function setupDropdownFilter(prefix, opties, geselecteerdSet, onChange) {
+  const optionsContainer = document.getElementById(`dd-${prefix}-options`);
+  optionsContainer.innerHTML = opties.map(([waarde, label]) => `
+    <label class="dd-filter-option">
+      <input type="checkbox" value="${escapeHtml(String(waarde))}" ${geselecteerdSet.has(waarde) ? 'checked' : ''} />
+      ${escapeHtml(label)}
+    </label>
+  `).join('');
+
+  const mark = document.getElementById(`dd-${prefix}-mark`);
+  const werkMarkBij = () => {
+    mark.style.display = geselecteerdSet.size < opties.length ? 'block' : 'none';
+  };
+  werkMarkBij();
+
+  optionsContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      if (cb.checked) geselecteerdSet.add(cb.value); else geselecteerdSet.delete(cb.value);
+      werkMarkBij();
+      onChange();
+    });
+  });
+
+  const panel = document.getElementById(`dd-${prefix}-panel`);
+  panel.querySelector('[data-actie="all"]').onclick = () => {
+    opties.forEach(([w]) => geselecteerdSet.add(w));
+    optionsContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+    werkMarkBij();
+    onChange();
+  };
+  panel.querySelector('[data-actie="none"]').onclick = () => {
+    geselecteerdSet.clear();
+    optionsContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    werkMarkBij();
+    onChange();
+  };
+}
+
 function renderFilterToggles() {
   const alleStatussen = [...new Set(alleIngredienten.map(i => i.status).filter(Boolean))].sort();
-  const statusContainer = document.getElementById('ing-filter-status-toggles');
-  statusContainer.innerHTML = alleStatussen.map(s => `
-    <button type="button" class="filter-toggle${geselecteerdeIngStatussen.has(s) ? ' actief' : ''}" data-status="${escapeHtml(s)}">${escapeHtml(statusLabel(s))}</button>
-  `).join('');
-  statusContainer.querySelectorAll('.filter-toggle').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const waarde = btn.dataset.status;
-      if (geselecteerdeIngStatussen.has(waarde)) geselecteerdeIngStatussen.delete(waarde);
-      else geselecteerdeIngStatussen.add(waarde);
-      btn.classList.toggle('actief');
-      bewaarIngFilters();
-      pasFiltersToe();
-    });
+  const statusOpties = alleStatussen.map(s => [s, statusLabel(s)]);
+  setupDropdownFilter('ing-status', statusOpties, geselecteerdeIngStatussen, () => {
+    bewaarIngFilters();
+    pasFiltersToe();
   });
 
-  const catContainer = document.getElementById('ing-filter-categorie-toggles');
-  catContainer.innerHTML = alleCategorieen.map(c => `
-    <button type="button" class="filter-toggle${geselecteerdeIngCategorieen.has(String(c.id)) ? ' actief' : ''}" data-categorie="${c.id}">${escapeHtml(c.name)}</button>
-  `).join('');
-  catContainer.querySelectorAll('.filter-toggle').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const waarde = btn.dataset.categorie;
-      if (geselecteerdeIngCategorieen.has(waarde)) geselecteerdeIngCategorieen.delete(waarde);
-      else geselecteerdeIngCategorieen.add(waarde);
-      btn.classList.toggle('actief');
-      bewaarIngFilters();
-      pasFiltersToe();
-    });
+  const categorieOpties = alleCategorieen.map(c => [String(c.id), c.name]);
+  setupDropdownFilter('ing-categorie', categorieOpties, geselecteerdeIngCategorieen, () => {
+    bewaarIngFilters();
+    pasFiltersToe();
   });
-
-  werkIngGefilterdIndicatorBij();
 }
 
-function werkIngGefilterdIndicatorBij() {
-  const alleStatussen = [...new Set(alleIngredienten.map(i => i.status).filter(Boolean))];
-  const alleStatussenAan = geselecteerdeIngStatussen.size === alleStatussen.length;
-  const alleCategorieenAan = geselecteerdeIngCategorieen.size === alleCategorieen.length;
-  const isGefilterd = !alleStatussenAan || !alleCategorieenAan;
-  document.getElementById('ing-filter-gefilterd-badge').style.display = isGefilterd ? 'inline-flex' : 'none';
-  document.getElementById('ing-filter-reset-btn').style.display = isGefilterd ? 'inline' : 'none';
+// -- Dropdown open/dicht, buiten-klik sluit alles, één tegelijk open --
+function toggleDropdownPanel(prefix) {
+  const panel = document.getElementById(`dd-${prefix}-panel`);
+  const wasOpen = panel.style.display !== 'none';
+  document.querySelectorAll('.dd-filter-panel').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.dd-filter-btn').forEach(b => b.classList.remove('actief-menu'));
+  if (!wasOpen) {
+    panel.style.display = 'block';
+    document.getElementById(`dd-${prefix}-btn`).classList.add('actief-menu');
+  }
 }
-
-document.getElementById('ing-filter-reset-btn').addEventListener('click', () => {
-  geselecteerdeIngStatussen = new Set([...new Set(alleIngredienten.map(i => i.status).filter(Boolean))]);
-  geselecteerdeIngCategorieen = new Set(alleCategorieen.map(c => String(c.id)));
-  bewaarIngFilters();
-  renderFilterToggles();
-  pasFiltersToe();
+document.getElementById('dd-ing-status-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleDropdownPanel('ing-status'); });
+document.getElementById('dd-ing-categorie-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleDropdownPanel('ing-categorie'); });
+document.querySelectorAll('.dd-filter-panel').forEach(p => p.addEventListener('click', e => e.stopPropagation()));
+document.addEventListener('click', () => {
+  document.querySelectorAll('.dd-filter-panel').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.dd-filter-btn').forEach(b => b.classList.remove('actief-menu'));
 });
 
 function huidigeFilters() {
@@ -469,7 +509,6 @@ function pasFiltersToe() {
   });
   laatstGefilterd = gefilterd;
   renderIngLijst(pasSorteringToe(gefilterd));
-  werkIngGefilterdIndicatorBij();
 }
 
 document.getElementById('ing-search').addEventListener('input', pasFiltersToe);
