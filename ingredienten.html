@@ -103,6 +103,11 @@
     border-radius: 20px; font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; cursor: pointer;
   }
   .ing-bewerk-btn:hover { background: #96601f; }
+  .ing-verwijder-knop {
+    margin-top: 18px; margin-left: 10px; background: #a33f2c; color: #fff; border: none; padding: 10px 20px;
+    border-radius: 20px; font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; cursor: pointer;
+  }
+  .ing-verwijder-knop:hover { background: #7e2f21; }
   .ing-annuleer-btn {
     margin-top: 18px; margin-left: 10px; background: transparent; color: #6b6355; border: 1px solid var(--line);
     padding: 10px 18px; border-radius: 4px; font-family: var(--mono); font-size: 12px; cursor: pointer;
@@ -694,7 +699,7 @@ function renderDetailAlleen(id) {
           <span>${val !== null && val !== undefined && val !== '' ? escapeHtml(String(val)) + (unit ? ' ' + unit : '') : '—'}</span>
         </div>`).join('')}
       <div class="ing-latest-revisie" id="ing-latest-revisie-houder" style="display:none;"></div>
-      ${magBewerken ? `<button class="ing-bewerk-btn" id="ing-bewerk-btn">Edit</button> <button class="ing-annuleer-btn" id="ing-verwijder-btn" style="border-color:#a33f2c; color:#a33f2c;">Delete</button>` : ''}
+      ${magBewerken ? `<button class="ing-bewerk-btn" id="ing-bewerk-btn">Edit</button> <button class="ing-verwijder-knop" id="ing-verwijder-btn">Delete</button>` : ''}
     </div>
   `;
 
