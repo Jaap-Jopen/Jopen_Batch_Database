@@ -686,6 +686,38 @@ async function genereerEnDownloadBatchrapport(supabase, batchnummer) {
   const vestigingsPrefix = vestigingsBron.slice(0, 2);
   const bestandsnaam = `${bundel.batch.batchnummer} ${naam} v${versienummer} ${vestigingsPrefix}.xlsx`;
 
+  await slaBatchrapportOp(blob, bestandsnaam);
+}
+
+/**
+ * Slaat het gegenereerde batchrapport op. Gebruikt waar mogelijk de File
+ * System Access API (showSaveFilePicker) zodat de gebruiker zelf een map
+ * kiest via de normale OS-dialoog, i.p.v. dat het rapport altijd in de
+ * standaard downloadmap belandt. Chrome/Edge ondersteunen dit; Firefox en
+ * Safari niet -- die vallen automatisch terug op de oude download-aanpak.
+ */
+async function slaBatchrapportOp(blob, bestandsnaam) {
+  if ('showSaveFilePicker' in window) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: bestandsnaam,
+        types: [{
+          description: 'Excel Workbook',
+          accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] },
+        }],
+      });
+      const schrijfbareStream = await handle.createWritable();
+      await schrijfbareStream.write(blob);
+      await schrijfbareStream.close();
+      return;
+    } catch (err) {
+      // Gebruiker annuleerde de dialoog (AbortError) -- geen fout, gewoon niets doen.
+      if (err && err.name === 'AbortError') return;
+      // Iets anders ging mis (bv. rechten): val terug op gewone download i.p.v. helemaal niets opleveren.
+      console.warn('showSaveFilePicker mislukt, val terug op download:', err);
+    }
+  }
+
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
