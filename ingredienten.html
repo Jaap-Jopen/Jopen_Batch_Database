@@ -724,7 +724,14 @@ async function verwijderIngredient(i) {
   const { error } = await supabaseClient.from('ingredients').delete().eq('id', i.id);
 
   if (error) {
-    alert('Could not delete: ' + error.message);
+    // FK-violation op recipe_ingredients/batch_ingredient_lotnummers betekent dat
+    // dit ingrediënt echt ergens in gebruik is (recept of batch) -- bewust geen
+    // cascade-delete daarop, zelfde patroon als bij recepten. ingredient_revisies
+    // (alleen de eigen wijzigingshistorie) cascadet inmiddels gewoon mee.
+    const inGebruik = error.code === '23503';
+    alert(inGebruik
+      ? `Could not delete ${i.naam}: it is still used in one or more recipes or batches. Remove those references first.`
+      : 'Could not delete: ' + error.message);
     if (btn) { btn.disabled = false; btn.textContent = 'Delete'; }
     return;
   }
