@@ -48,11 +48,7 @@
         <input type="text" id="invite-naam" required />
 
         <label for="invite-rol">Role</label>
-        <select id="invite-rol" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
-          <option value="viewer">Viewer</option>
-          <option value="editor">Editor</option>
-          <option value="admin">Admin</option>
-        </select>
+        <select id="invite-rol" required style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;"></select>
 
         <button type="button" id="genereer-link-btn">Create account</button>
         <p id="invite-melding" class="jopen-form-melding"></p>
@@ -80,6 +76,18 @@
   <script>
     let huidigeGebruikerId = null;
     let huidigeGebruikerNaam = null;
+    let rollenLijst = []; // {id, naam} uit de roles-tabel, geladen bij init
+
+    async function laadRollenLijst() {
+      const { data } = await supabaseClient.from('roles').select('id, naam').order('id');
+      rollenLijst = data || [];
+    }
+
+    function rolOptiesHtml(geselecteerdeRol) {
+      return rollenLijst.map(r =>
+        `<option value="${r.naam}" ${r.naam === geselecteerdeRol ? 'selected' : ''}>${rolLabel(r.naam)}</option>`
+      ).join('');
+    }
 
     // Zelfde HTML als supabase-invite-email-template.html (repo-root) --
     // hier gedupliceerd zodat de pagina 'm direct kan invullen met de echte
@@ -226,12 +234,8 @@
           <td>${g.naam}</td>
           <td>
             ${isZelf
-              ? `<span class="rol-badge ${g.rol}">${g.rol}</span>`
-              : `<select class="gebr-rol-select">
-                   <option value="viewer" ${g.rol === 'viewer' ? 'selected' : ''}>viewer</option>
-                   <option value="editor" ${g.rol === 'editor' ? 'selected' : ''}>editor</option>
-                   <option value="admin" ${g.rol === 'admin' ? 'selected' : ''}>admin</option>
-                 </select>`}
+              ? `<span class="rol-badge ${g.rol}">${rolLabel(g.rol)}</span>`
+              : `<select class="gebr-rol-select">${rolOptiesHtml(g.rol)}</select>`}
           </td>
           <td>${g.actief ? 'Yes' : '<span class="actief-nee">No</span>'}</td>
           <td>${formatLaatstIngelogd(g.laatst_ingelogd)}</td>
@@ -332,6 +336,8 @@
       huidigeGebruikerId = gebruiker.id;
       huidigeGebruikerNaam = gebruiker.naam;
       document.getElementById('admin-inhoud').style.display = 'block';
+      await laadRollenLijst();
+      document.getElementById('invite-rol').innerHTML = rolOptiesHtml('viewer');
       laadGebruikersLijst();
     }
 

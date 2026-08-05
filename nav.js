@@ -30,27 +30,79 @@ if (!JOPEN_PUBLIEKE_PAGINAS.includes(window.location.pathname.split('/').pop()))
 // module toevoegen? Voeg 'm toe aan de juiste groep hieronder (of maak een
 // nieuwe groep als het ergens anders bij hoort) -- verschijnt dan automatisch
 // als item in de bijbehorende dropdown.
+// moduleKey koppelt een nav-item aan een rij in permission_modules, zodat
+// renderNav() 'm kan verbergen als de rol van de gebruiker geen "can_view"
+// heeft voor die module. Items zonder moduleKey worden nooit verborgen.
 const JOPEN_MODULE_GROEPEN = [
   { naam: 'Batches', items: [
-      { naam: 'Batch Creation', href: 'batchcreation.html' },
+      { naam: 'Batch Creation', href: 'batchcreation.html', moduleKey: 'batches' },
   ]},
   { naam: 'Planning', items: [
-      { naam: 'Brewing planning', href: 'brouwplanning.html' },
-      { naam: 'Consumption forecast', href: 'verbruiksprognose.html' },
+      { naam: 'Brewing planning', href: 'brouwplanning.html', moduleKey: 'brewing_planning' },
+      { naam: 'Consumption forecast', href: 'verbruiksprognose.html', moduleKey: 'brewing_planning' },
   ]},
   { naam: 'Databases', items: [
-      { naam: 'Recipes', href: 'receptoverzicht.html' },
-      { naam: 'Ingredients', href: 'ingredienten.html' },
+      { naam: 'Recipes', href: 'receptoverzicht.html', moduleKey: 'recipes' },
+      { naam: 'Ingredients', href: 'ingredienten.html', moduleKey: 'ingredients' },
+  ]},
+  { naam: 'Configuration', items: [
+      { naam: 'Settings', href: 'settings.html', moduleKey: 'settings' },
   ]},
 ];
 
-// Admin-only pagina's blijven in het gebruikersmenu rechts (account-achtig
-// van aard, geen inhoudelijke module) -- zie renderNav().
+// Users, User Roles en Status blijven hardcoded admin-only (account-achtig
+// van aard / beheert de rechten zelf, dus bewust GEEN permission_modules-rij
+// die instelbaar is -- zie ook rollen.html, dat User Management en Role
+// Management zelf ook altijd als vergrendeld toont).
 const JOPEN_ADMIN_PAGINAS = [
   { naam: 'Users', href: 'gebruikers.html' },
-  { naam: 'Settings', href: 'settings.html' },
+  { naam: 'User Roles', href: 'rollen.html' },
   { naam: 'Status', href: 'status.html' },
 ];
+
+// Interne (snake_case) rolnaam -> leesbaar label, zelfde principe als
+// statusLabel()/locatieLabel() elders in de app.
+const JOPEN_ROL_LABELS = { admin: 'Admin', head_brewer: 'Head brewer', brewer: 'Brewer', planner: 'Planner', qa: 'QA', viewer: 'Viewer' };
+function rolLabel(rol) { return JOPEN_ROL_LABELS[rol] || rol; }
+
+// Rechten van de huidige gebruiker, per module_key: {view, edit, delete}.
+// Admin krijgt dit hardcoded (nooit via de tabel) zodat een fout in
+// role_permissions een admin nooit buiten zijn eigen systeem kan sluiten.
+let _jopenRechtenCache = null;
+async function jopenHaalRechten() {
+  if (_jopenRechtenCache) return _jopenRechtenCache;
+  const gebruiker = await getHuidigeGebruiker();
+  if (!gebruiker) { _jopenRechtenCache = {}; return _jopenRechtenCache; }
+
+  if (gebruiker.rol === 'admin') {
+    const { data: modules } = await supabaseClient.from('permission_modules').select('module_key');
+    const alles = {};
+    (modules || []).forEach(m => { alles[m.module_key] = { view: true, edit: true, delete: true }; });
+    _jopenRechtenCache = alles;
+    return _jopenRechtenCache;
+  }
+
+  const { data: rolRij } = await supabaseClient.from('roles').select('id').eq('naam', gebruiker.rol).maybeSingle();
+  if (!rolRij) { _jopenRechtenCache = {}; return _jopenRechtenCache; }
+
+  const { data } = await supabaseClient
+    .from('role_permissions')
+    .select('module_key, can_view, can_edit, can_delete')
+    .eq('role_id', rolRij.id);
+
+  const rechten = {};
+  (data || []).forEach(r => { rechten[r.module_key] = { view: r.can_view, edit: r.can_edit, delete: r.can_delete }; });
+  _jopenRechtenCache = rechten;
+  return _jopenRechtenCache;
+}
+
+// Cache leegmaken bij het (opnieuw) inloggen, zodat een andere gebruiker op
+// hetzelfde apparaat niet de rechten van de vorige gebruiker meekrijgt.
+function jopenWisRechtenCache() { _jopenRechtenCache = null; }
+
+async function magBekijkenModule(moduleKey) { const r = await jopenHaalRechten(); return !!(r[moduleKey] && r[moduleKey].view); }
+async function magBewerkenModule(moduleKey) { const r = await jopenHaalRechten(); return !!(r[moduleKey] && r[moduleKey].edit); }
+async function magVerwijderenModule(moduleKey) { const r = await jopenHaalRechten(); return !!(r[moduleKey] && r[moduleKey].delete); }
 
 /**
  * Stuurt direct door naar login.html als er geen ingelogde gebruiker is,
@@ -77,14 +129,21 @@ async function vereisIngelogd() {
   return true;
 }
 
-function renderNav(huidigeGebruiker) {
+async function renderNav(huidigeGebruiker) {
   const container = document.getElementById('jopen-nav');
   if (!container) return;
 
   const huidigePagina = window.location.pathname.split('/').pop();
   const isAdmin = huidigeGebruiker?.rol === 'admin';
+  const rechten = huidigeGebruiker ? await jopenHaalRechten() : {};
 
-  const categorieenHtml = JOPEN_MODULE_GROEPEN.map((groep, i) => {
+  // Groepen filteren op zichtbare items (can_view voor de moduleKey, of geen
+  // moduleKey -- die worden nooit verborgen), en lege groepen weglaten.
+  const zichtbareGroepen = JOPEN_MODULE_GROEPEN
+    .map(groep => ({ ...groep, items: groep.items.filter(m => !m.moduleKey || (rechten[m.moduleKey] && rechten[m.moduleKey].view)) }))
+    .filter(groep => groep.items.length > 0);
+
+  const categorieenHtml = zichtbareGroepen.map((groep, i) => {
     const bevatActieve = groep.items.some(m => m.href === huidigePagina);
     const itemsHtml = groep.items.map(m => {
       const isActief = m.href === huidigePagina;
@@ -111,7 +170,7 @@ function renderNav(huidigeGebruiker) {
   const rechterkant = huidigeGebruiker
     ? `<div class="jopen-nav-gebruiker-wrap">
          <button id="jopen-gebruiker-btn" class="jopen-nav-gebruiker-btn">
-           ${escapeHtmlNav(huidigeGebruiker.naam)} <span class="jopen-nav-rol">(${escapeHtmlNav(huidigeGebruiker.rol)})</span>
+           ${escapeHtmlNav(huidigeGebruiker.naam)} <span class="jopen-nav-rol">(${escapeHtmlNav(rolLabel(huidigeGebruiker.rol))})</span>
            <span class="jopen-nav-caret">&#9662;</span>
          </button>
          <div id="jopen-gebruiker-menu" class="jopen-nav-dropdown" style="display:none;">
@@ -185,11 +244,12 @@ async function initJopenNav() {
   if (!magDoorgaan) return; // pagina stuurt door naar login.html, verder niets doen
 
   const gebruiker = await getHuidigeGebruiker();
-  renderNav(gebruiker);
+  await renderNav(gebruiker);
 
   onAuthChange(async () => {
+    jopenWisRechtenCache();
     const opnieuw = await getHuidigeGebruiker();
-    renderNav(opnieuw);
+    await renderNav(opnieuw);
   });
 }
 

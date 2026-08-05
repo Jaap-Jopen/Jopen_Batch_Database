@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jopen Brouwerij — User Roles</title>
+  <link rel="stylesheet" href="jopen-shared.css" />
+  <style>
+    .geen-toegang { padding: 40px 0; color: #555; }
+    .rl-uitleg { max-width: 720px; }
+    table.rl-matrix { width: 100%; border-collapse: collapse; background: #fff; margin: 20px 0 32px; }
+    table.rl-matrix th, table.rl-matrix td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #eee; vertical-align: middle; }
+    table.rl-matrix th { font-size: 0.85em; color: #555; border-bottom: 2px solid #ddd; white-space: nowrap; }
+    table.rl-matrix td.rl-rolnaam { font-weight: 600; white-space: nowrap; }
+    table.rl-matrix tr.rl-admin-rij { background: #fbe4e6; }
+    table.rl-matrix tr.rl-admin-rij td.rl-rolnaam { color: #A80016; }
+    .rl-cel { display: flex; gap: 10px; align-items: center; }
+    .rl-cel label { display: flex; align-items: center; gap: 3px; font-size: 0.8em; color: #555; cursor: pointer; }
+    .rl-cel input[type="checkbox"] { cursor: pointer; }
+    .rl-cel input[type="checkbox"]:disabled { cursor: not-allowed; opacity: 0.4; }
+    .rl-slot { font-size: 0.8em; color: #999; font-style: italic; }
+    .rl-vergrendeld-kolom { color: #999; font-style: italic; font-size: 0.85em; }
+    .rl-melding-inline { font-size: 0.8em; margin-left: 4px; }
+    .rl-melding-inline.ok { color: #2a7a3b; }
+    .rl-melding-inline.fout { color: #A80016; }
+  </style>
+</head>
+<body>
+
+  <div id="jopen-nav"></div>
+
+  <main class="jopen-pagina">
+    <h1>User Roles</h1>
+    <p class="jopen-subtitel rl-uitleg">
+      What each role can see, edit, and delete per part of the app. Changes save immediately per checkbox.
+      <strong>Admin</strong> always has full access everywhere (locked, to prevent accidentally locking yourself out).
+      <strong>User Management</strong> and <strong>Role Management</strong> are always admin-only for the same reason —
+      those columns are locked for every other role.
+    </p>
+
+    <div id="geen-toegang" class="geen-toegang" style="display:none;">
+      This screen is only visible to admins. Log in with an admin account to manage roles.
+    </div>
+
+    <div id="admin-inhoud" style="display:none;">
+      <div id="rl-matrix-container"><div class="jopen-subtitel">Loading roles…</div></div>
+      <p class="jopen-subtitel" style="margin-top:24px;">
+        Roles themselves (adding a new role, e.g. for a different job function) aren't self-service on purpose —
+        message an admin/developer to add one, so a new role can get a proper security review before anyone is assigned to it.
+      </p>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="nav.js"></script>
+  <script>
+    // module_keys die nooit instelbaar zijn -- altijd hardcoded admin-only,
+    // ongeacht wat er in role_permissions staat (zie ook rechten-check in
+    // magBewerkenModule/magVerwijderenModule elders, die dit zelf ook nooit
+    // aan een niet-admin rol toekent omdat we deze cellen hier nooit
+    // aanpasbaar maken).
+    const RL_VERGRENDELDE_MODULES = ['user_management', 'role_management'];
+
+    async function laadRollenMatrix() {
+      const container = document.getElementById('rl-matrix-container');
+
+      const [{ data: roles, error: rolesErr }, { data: modules, error: modErr }, { data: rechten, error: rechtenErr }] = await Promise.all([
+        supabaseClient.from('roles').select('id, naam').order('id'),
+        supabaseClient.from('permission_modules').select('module_key, naam, volgorde').order('volgorde'),
+        supabaseClient.from('role_permissions').select('role_id, module_key, can_view, can_edit, can_delete'),
+      ]);
+
+      if (rolesErr || modErr || rechtenErr) {
+        container.innerHTML = `<p class="jopen-form-melding fout">Could not load roles: ${(rolesErr || modErr || rechtenErr).message}</p>`;
+        return;
+      }
+
+      const rechtenMap = {}; // `${role_id}|${module_key}` -> rij
+      (rechten || []).forEach(r => { rechtenMap[`${r.role_id}|${r.module_key}`] = r; });
+
+      const headerHtml = modules.map(m => `<th>${escapeHtmlNav(m.naam)}</th>`).join('');
+
+      const rijenHtml = roles.map(rol => {
+        const isAdminRol = rol.naam === 'admin';
+        const cellenHtml = modules.map(m => {
+          const vergrendeld = isAdminRol || RL_VERGRENDELDE_MODULES.includes(m.module_key);
+          const rij = rechtenMap[`${rol.id}|${m.module_key}`] || { can_view: isAdminRol, can_edit: isAdminRol, can_delete: isAdminRol };
+          const checked = { view: isAdminRol || rij.can_view, edit: isAdminRol || rij.can_edit, delete: isAdminRol || rij.can_delete };
+          const disabledAttr = vergrendeld ? 'disabled' : '';
+          return `
+            <td>
+              <div class="rl-cel" data-role-id="${rol.id}" data-module-key="${m.module_key}">
+                <label><input type="checkbox" class="rl-check" data-veld="can_view" ${checked.view ? 'checked' : ''} ${disabledAttr} /> View</label>
+                <label><input type="checkbox" class="rl-check" data-veld="can_edit" ${checked.edit ? 'checked' : ''} ${disabledAttr} /> Edit</label>
+                <label><input type="checkbox" class="rl-check" data-veld="can_delete" ${checked.delete ? 'checked' : ''} ${disabledAttr} /> Delete</label>
+                <span class="rl-melding-inline"></span>
+              </div>
+            </td>`;
+        }).join('');
+
+        return `<tr class="${isAdminRol ? 'rl-admin-rij' : ''}"><td class="rl-rolnaam">${escapeHtmlNav(rolLabel(rol.naam))}${isAdminRol ? ' <span class="rl-slot">(locked)</span>' : ''}</td>${cellenHtml}</tr>`;
+      }).join('');
+
+      container.innerHTML = `
+        <table class="rl-matrix">
+          <thead><tr><th>Role</th>${headerHtml}</tr></thead>
+          <tbody>${rijenHtml}</tbody>
+        </table>`;
+
+      container.querySelectorAll('.rl-cel:not(:has(input:disabled))').forEach(cel => {
+        cel.querySelectorAll('.rl-check').forEach(cb => {
+          cb.addEventListener('change', () => slaRechtOp(cel));
+        });
+      });
+    }
+
+    async function slaRechtOp(cel) {
+      const roleId = Number(cel.dataset.roleId);
+      const moduleKey = cel.dataset.moduleKey;
+      const melding = cel.querySelector('.rl-melding-inline');
+
+      const waarden = {
+        can_view: cel.querySelector('[data-veld="can_view"]').checked,
+        can_edit: cel.querySelector('[data-veld="can_edit"]').checked,
+        can_delete: cel.querySelector('[data-veld="can_delete"]').checked,
+      };
+      // Edit/Delete zonder View is verwarrend in de UI (je zou iets kunnen
+      // bewerken dat je zelf niet kunt zien) -- Edit/Delete aanvinken zet
+      // dus automatisch ook View aan.
+      if ((waarden.can_edit || waarden.can_delete) && !waarden.can_view) {
+        waarden.can_view = true;
+        cel.querySelector('[data-veld="can_view"]').checked = true;
+      }
+
+      melding.textContent = 'Saving…';
+      melding.className = 'rl-melding-inline';
+
+      const { error } = await supabaseClient
+        .from('role_permissions')
+        .upsert({ role_id: roleId, module_key: moduleKey, ...waarden }, { onConflict: 'role_id,module_key' });
+
+      if (error) {
+        melding.textContent = 'Failed: ' + error.message;
+        melding.className = 'rl-melding-inline fout';
+        return;
+      }
+      melding.textContent = 'Saved';
+      melding.className = 'rl-melding-inline ok';
+      setTimeout(() => { melding.textContent = ''; }, 1500);
+    }
+
+    async function initRollenPagina() {
+      const gebruiker = await getHuidigeGebruiker();
+      if (!gebruiker || gebruiker.rol !== 'admin') {
+        document.getElementById('geen-toegang').style.display = 'block';
+        return;
+      }
+      document.getElementById('admin-inhoud').style.display = 'block';
+      laadRollenMatrix();
+    }
+
+    document.addEventListener('DOMContentLoaded', initRollenPagina);
+  </script>
+</body>
+</html>

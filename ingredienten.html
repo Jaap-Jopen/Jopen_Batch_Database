@@ -267,8 +267,10 @@
 <script>
 let alleIngredienten = [];
 let alleCategorieen = [];
-let huidigeGebruikerRol = null; // filled with 'admin' | 'editor' | 'viewer' | null (not logged in)
+let huidigeGebruikerRol = null; // filled with the role name, or null (not logged in)
 let huidigeGebruiker = null;
+let magIngBewerken = false;   // rechten voor module 'ingredients', geladen in initIngredientenPagina
+let magIngVerwijderen = false;
 let laatsteWijzigingPerIngredient = {};
 
 // Display-only translation of the status values as stored in the database
@@ -317,8 +319,10 @@ async function initIngredientenPagina() {
   const gebruiker = await getHuidigeGebruiker();
   huidigeGebruiker = gebruiker;
   huidigeGebruikerRol = gebruiker ? gebruiker.rol : null;
+  magIngBewerken = !!gebruiker && await magBewerkenModule('ingredients');
+  magIngVerwijderen = !!gebruiker && await magVerwijderenModule('ingredients');
 
-  if (huidigeGebruikerRol === 'admin' || huidigeGebruikerRol === 'editor') {
+  if (magIngBewerken) {
     document.getElementById('ing-nieuw-btn').style.display = 'inline-block';
   }
 
@@ -672,7 +676,6 @@ function renderDetailAlleen(id) {
     return;
   }
 
-  const magBewerken = huidigeGebruikerRol === 'admin' || huidigeGebruikerRol === 'editor';
   const cat = i.ingredient_categories || null;
   const categorieNaam = cat?.name || i.categorie || 'unknown category';
 
@@ -699,12 +702,15 @@ function renderDetailAlleen(id) {
           <span>${val !== null && val !== undefined && val !== '' ? escapeHtml(String(val)) + (unit ? ' ' + unit : '') : '—'}</span>
         </div>`).join('')}
       <div class="ing-latest-revisie" id="ing-latest-revisie-houder" style="display:none;"></div>
-      ${magBewerken ? `<button class="ing-bewerk-btn" id="ing-bewerk-btn">Edit</button> <button class="ing-verwijder-knop" id="ing-verwijder-btn">Delete</button>` : ''}
+      ${magIngBewerken ? `<button class="ing-bewerk-btn" id="ing-bewerk-btn">Edit</button>` : ''}
+      ${magIngVerwijderen ? `<button class="ing-verwijder-knop" id="ing-verwijder-btn">Delete</button>` : ''}
     </div>
   `;
 
-  if (magBewerken) {
+  if (magIngBewerken) {
     document.getElementById('ing-bewerk-btn').addEventListener('click', () => renderDetailBewerken(i));
+  }
+  if (magIngVerwijderen) {
     document.getElementById('ing-verwijder-btn').addEventListener('click', () => verwijderIngredient(i));
   }
 

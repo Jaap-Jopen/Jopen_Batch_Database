@@ -154,8 +154,8 @@
       return div.innerHTML;
     }
 
-    function magBewerken(gebruiker) {
-      return gebruiker && (gebruiker.rol === 'admin' || gebruiker.rol === 'editor');
+    async function magBewerken(gebruiker) {
+      return !!gebruiker && await magBewerkenModule('batches');
     }
 
     // Recepten ophalen voor de zoekfunctie. Gearchiveerde versies worden
@@ -364,8 +364,8 @@
 
     window.addEventListener('DOMContentLoaded', async () => {
       const gebruiker = await getHuidigeGebruiker();
-      magAanmaken = magBewerken(gebruiker);
-      magVerwijderen = gebruiker?.rol === 'admin';
+      magAanmaken = await magBewerken(gebruiker);
+      magVerwijderen = !!gebruiker && await magVerwijderenModule('batches');
       document.getElementById('bc-geen-rechten').style.display = magAanmaken ? 'none' : 'block';
       document.getElementById('bc-formulier').style.display = magAanmaken ? 'block' : 'none';
 

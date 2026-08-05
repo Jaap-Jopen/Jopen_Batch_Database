@@ -1334,8 +1334,9 @@ function vulExtraVeldenUit(fermData, procData) {
 
 async function initReceptInvoer() {
   huidigeGebruiker = await getHuidigeGebruiker();
+  const magReceptenBewerken = !!huidigeGebruiker && await magBewerkenModule('recipes');
 
-  if (!huidigeGebruiker || (huidigeGebruiker.rol !== 'admin' && huidigeGebruiker.rol !== 'editor')) {
+  if (!magReceptenBewerken) {
     document.getElementById('re-loading').style.display = 'none';
     document.getElementById('re-geen-rechten').style.display = 'block';
     return;

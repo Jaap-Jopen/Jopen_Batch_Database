@@ -378,14 +378,15 @@ function locatieLabel(locatie) {
   return labels[locatie] || locatie || '—';
 }
 
-function magBewerken() {
-  return huidigeGebruikerRol === 'admin' || huidigeGebruikerRol === 'editor';
-}
+let magReceptBewerken = false;   // rechten voor module 'recipes', geladen bij page load
+let magReceptVerwijderen = false;
 
 window.addEventListener('DOMContentLoaded', async () => {
   const gebruiker = await getHuidigeGebruiker();
   huidigeGebruikerRol = gebruiker ? gebruiker.rol : null;
-  if (magBewerken()) {
+  magReceptBewerken = !!gebruiker && await magBewerkenModule('recipes');
+  magReceptVerwijderen = !!gebruiker && await magVerwijderenModule('recipes');
+  if (magReceptBewerken) {
     document.getElementById('new-recipe-link').style.display = 'inline-block';
   }
 
@@ -1138,7 +1139,7 @@ async function openDetail(id) {
     <div class="recipe-meta">
       <b>${escapeHtml(r.bierstijl || 'unknown style')}</b> · ${escapeHtml(locatieLabel(r.locatie))} ·
       version ${r.versie_major ?? 1}.${r.versie_minor ?? 0} · <span class="status-pill status-${r.status}">${statusLabel(r.status)}</span>
-      ${magBewerken() ? ` <a class="edit-pill" href="recept-invoer.html?id=${r.id}">Edit &rarr;</a> <button type="button" id="delete-recipe-btn" class="edit-pill" style="background:#a33f2c; border:none; cursor:pointer; font:inherit; font-family:var(--mono);">Delete</button>` : ''}
+      ${magReceptBewerken ? ` <a class="edit-pill" href="recept-invoer.html?id=${r.id}">Edit &rarr;</a>` : ''}${magReceptVerwijderen ? ` <button type="button" id="delete-recipe-btn" class="edit-pill" style="background:#a33f2c; border:none; cursor:pointer; font:inherit; font-family:var(--mono);">Delete</button>` : ''}
     </div>
 
     <div class="section-title">General</div>
