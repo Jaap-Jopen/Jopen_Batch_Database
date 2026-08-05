@@ -302,8 +302,12 @@
       const tbody = document.getElementById('bc-lijst-tbody');
       const { data, error } = await supabaseClient
         .from('batches')
-        .select('batchnummer, naam, aantal_brouwsels, aangemaakt_op, gebruikers(naam)')
+        .select('id, batchnummer, naam, aantal_brouwsels, aangemaakt_op, gebruikers(naam)')
+        // aangemaakt_op alone isn't a reliable sort key: rows inserted in the same
+        // statement (e.g. a bulk historical import) all share one timestamp, so ties
+        // need a tiebreaker. id (insertion order) does that cheaply.
         .order('aangemaakt_op', { ascending: false })
+        .order('id', { ascending: false })
         .limit(50);
 
       if (error) {
