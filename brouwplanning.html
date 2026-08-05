@@ -226,6 +226,7 @@
 
       <div class="bp-modal-knoppen">
         <button type="button" class="bp-btn-delete" id="bp-modal-delete" style="display:none;">Delete</button>
+        <button type="button" id="bp-modal-create-batch" style="display:none; background:none; border:1px solid var(--jopen-red); color:var(--jopen-red); border-radius:6px;">Create batch &rarr;</button>
         <button type="button" class="bp-btn-cancel" id="bp-modal-cancel">Cancel</button>
         <button type="button" class="bp-btn-save" id="bp-modal-save">Save</button>
       </div>
@@ -630,6 +631,7 @@
       document.getElementById('bp-modal-titel').textContent = mode === 'edit' ? 'Edit brew' : 'Add brews';
       document.getElementById('bp-modal-melding').textContent = '';
       document.getElementById('bp-modal-delete').style.display = mode === 'edit' ? 'inline-block' : 'none';
+      document.getElementById('bp-modal-create-batch').style.display = mode === 'edit' ? 'inline-block' : 'none';
       document.getElementById('bp-modal-prio').checked = item ? !!item.prio : false;
 
       if (mode === 'edit') {
@@ -666,6 +668,17 @@
 
     function sluitModal() { document.getElementById('bp-modal-overlay').classList.remove('open'); }
     document.getElementById('bp-modal-cancel').addEventListener('click', sluitModal);
+
+    document.getElementById('bp-modal-create-batch').addEventListener('click', () => {
+      if (!modalContext || modalContext.mode !== 'edit' || !modalContext.item) return;
+      const rij = bierenContainer.querySelector('.bp-bier-rij');
+      const recipeId = rij?.dataset.recipeId || modalContext.item.recipe_id;
+      const brouwsels = Number(rij?.querySelector('.bp-bier-brouwsels')?.value) || modalContext.item.aantal_brouwsels || '';
+      const params = new URLSearchParams();
+      if (recipeId) params.set('recipe_id', recipeId);
+      if (brouwsels) params.set('brouwsels', brouwsels);
+      window.location.href = 'batchcreation.html' + (params.toString() ? '?' + params.toString() : '');
+    });
 
     // Alleen sluiten als de muisklik ZOWEL begint als eindigt op de overlay
     // zelf. Met alleen een 'click'-listener sluit de modal ook als je bv. in

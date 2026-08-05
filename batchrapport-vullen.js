@@ -672,6 +672,7 @@ async function genereerEnDownloadBatchrapport(supabase, batchnummer) {
   await brZetHopGroepRanden(writer, stylesManager, bundel);
 
   await writer.setCelWaarde('Recept-voorblad!K3', bundel.batch.batchnummer);
+  await writer.setCelWaarde('Recept-voorblad!G7', bundel.batch.aantal_brouwsels ?? null);
   await writer.setCelWaarde('Recept-voorblad!Q1', vestigingsBron);
 
   stylesManager.finalize();

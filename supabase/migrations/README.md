@@ -72,3 +72,7 @@ productie-wijziging zodra dit gepusht wordt.
   op `gebruikers` + een SECURITY DEFINER-functie `zet_laatst_ingelogd()`
   die login.html na een geslaagde login aanroept (schrijft alleen de eigen
   rij weg, dus geen brede UPDATE-policy nodig).
+- `20260805160000_batches_aantal_brouwsels.sql` — `aantal_brouwsels`-kolom
+  op `batches`. De generatiescripts schreven dit veld al naar
+  Recept-voorblad!G7, maar de kolom en het invoerveld op Batch Creation
+  ontbraken nog.
