@@ -401,7 +401,10 @@ async function genereerBatchrapportBuffer(bundel) {
 
   await writer.setCelWaarde('Recept-voorblad!H3', 'Batch nr.:');
   await writer.setCelWaarde('Recept-voorblad!K3', bundel.batch.batchnummer);
-  await writer.setCelWaarde('Recept-voorblad!G7', bundel.batch.aantal_brouwsels ?? null);
+  // Fallback naar 1 (niet null/blank): elke "Totaal gram"-cel op dit tabblad
+  // is E-kolom * G7, dus een lege G7 zet stilzwijgend ALLE hoptotalen op 0
+  // i.p.v. gewoon de waarde van 1 brouwsel te tonen. Zie ook batchrapport-vullen.js.
+  await writer.setCelWaarde('Recept-voorblad!G7', bundel.batch.aantal_brouwsels ?? 1);
   await writer.setCelWaarde('Recept-voorblad!Q1', vestigingsBron);
 
   stylesManager.finalize();
