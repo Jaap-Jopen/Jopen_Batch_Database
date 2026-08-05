@@ -59,3 +59,10 @@ productie-wijziging zodra dit gepusht wordt.
   tabellen — als een recept al in gebruik is (batches, brew_planning, etc.)
   kan de DELETE alsnog stuklopen op een foreign-key-constraint; dat is
   bewust niet stilzwijgend opgelost.
+- `20260805120000_ingredients_versiebeheer.sql` — versiebeheer voor
+  `ingredients` (`versie_major`/`versie_minor`/`ingredient_group_id`,
+  zelfde vorm als recipes), een aparte `versie_status`-kolom
+  ('huidig'/'gearchiveerd', bewust losstaand van de operationele
+  actief/inactief/uitgefaseerd-status), `aangemaakt_op`/`gewijzigd_op`
+  (met trigger die `gewijzigd_op` automatisch bijwerkt) en een nieuwe
+  `ingredient_revisies`-tabel (één-op-één qua vorm met `recipe_revisies`).

@@ -109,6 +109,30 @@
     font-family: var(--serif); font-size: 14px; background: #fff; cursor: pointer;
   }
 
+  .filter-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .filter-group-label {
+    font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: #6b6355;
+  }
+  .filter-toggle {
+    font-family: var(--mono); font-size: 12px; padding: 6px 12px; border-radius: 20px;
+    border: 1.5px solid var(--line); background: #fff; color: #6b6355; cursor: pointer;
+    user-select: none; transition: background 0.12s, color 0.12s, border-color 0.12s;
+  }
+  .filter-toggle:hover { border-color: var(--hop-dark); }
+  .filter-toggle.actief { background: var(--hop-dark); color: #fff; border-color: var(--hop-dark); }
+  .filter-gefilterd-badge {
+    font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--amber);
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .filter-gefilterd-badge::before {
+    content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--amber); display: inline-block;
+  }
+  .filter-reset {
+    font-family: var(--mono); font-size: 11px; color: var(--hop-dark); background: transparent; border: none;
+    text-decoration: underline; cursor: pointer; padding: 0;
+  }
+
   table { width: 100%; border-collapse: collapse; background: #fff; }
   thead th {
     text-align: left;
@@ -250,15 +274,16 @@
   <div id="list-view">
     <div class="toolbar">
       <input id="search" placeholder="Search by name or beer style…">
-      <select id="filter-status">
-        <option value="">All statuses</option>
-        <option value="actief">Active</option>
-        <option value="concept">Draft</option>
-        <option value="gearchiveerd">Archived</option>
-      </select>
-      <select id="filter-locatie">
-        <option value="">All locations</option>
-      </select>
+      <div class="filter-group">
+        <span class="filter-group-label">Status</span>
+        <div id="filter-status-toggles"></div>
+      </div>
+      <div class="filter-group">
+        <span class="filter-group-label">Location</span>
+        <div id="filter-locatie-toggles"></div>
+      </div>
+      <span class="filter-gefilterd-badge" id="filter-gefilterd-badge" style="display:none;">Filtered</span>
+      <button type="button" class="filter-reset" id="filter-reset-btn" style="display:none;">Reset filters</button>
       <div class="count" id="result-count"></div>
       <a href="recept-invoer.html" class="edit-pill" id="new-recipe-link" style="display:none; margin-bottom:0;">+ New recipe</a>
     </div>
@@ -278,7 +303,41 @@
 // door alle Jopen-app-pagina's. Zie config.js voor de credentials.
 let allRecipes = [];
 let laatsteBatchPerRecept = {};
+let laatsteWijzigingPerRecept = {};
 let huidigeGebruikerRol = null;
+
+// -- Filter-status persistentie (toggleboxes voor status/locatie) --
+// Onthoudt welke toggles aan staan tussen bezoeken via localStorage. Bij het
+// eerste bezoek (niets opgeslagen) staat alles aan, wat gelijk is aan "geen
+// filter". `null` in de opgeslagen set betekent hier altijd "alle waarden
+// geselecteerd" totdat de gebruiker er zelf één uitklikt.
+const FILTER_OPSLAG_KEY = 'jopen_receptoverzicht_filters_v1';
+
+function laadOpgeslagenFilters() {
+  try {
+    const ruw = localStorage.getItem(FILTER_OPSLAG_KEY);
+    if (!ruw) return { status: null, locatie: null };
+    const parsed = JSON.parse(ruw);
+    return {
+      status: Array.isArray(parsed.status) ? parsed.status : null,
+      locatie: Array.isArray(parsed.locatie) ? parsed.locatie : null,
+    };
+  } catch (e) {
+    return { status: null, locatie: null };
+  }
+}
+
+function bewaarFilters() {
+  try {
+    localStorage.setItem(FILTER_OPSLAG_KEY, JSON.stringify({
+      status: [...geselecteerdeStatussen],
+      locatie: [...geselecteerdeLocaties],
+    }));
+  } catch (e) { /* localStorage niet beschikbaar: filter werkt nog steeds, alleen niet onthouden */ }
+}
+
+let geselecteerdeStatussen = new Set();
+let geselecteerdeLocaties = new Set();
 
 const mainEl = document.getElementById('main');
 const connStatus = document.getElementById('conn-status');
@@ -329,20 +388,38 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
+// Haalt alle rijen op ondanks Supabase's default limiet van 1000 per query
+// (belangrijk voor recipe_revisies, dat meerdere rijen per recept kan hebben).
+async function haalAlleRijenOp(query) {
+  const PAGINA = 1000;
+  let vanaf = 0;
+  let alles = [];
+  while (true) {
+    const { data, error } = await query.range(vanaf, vanaf + PAGINA - 1);
+    if (error) return { data: null, error };
+    alles = alles.concat(data || []);
+    if (!data || data.length < PAGINA) break;
+    vanaf += PAGINA;
+  }
+  return { data: alles, error: null };
+}
+
 async function loadRecipes() {
   const container = document.getElementById('list-container');
-  const [{ data, error }, { data: batchData, error: batchErr }] = await Promise.all([
+  const [{ data, error }, { data: batchData, error: batchErr }, { data: revisieData, error: revisieErr }] = await Promise.all([
     supabaseClient
       .from('recipes')
       .select('id, naam, bierstijl, locatie, status, versie_major, versie_minor, recipe_group_id')
       .order('naam'),
     supabaseClient.from('batches').select('recipe_id, aangemaakt_op'),
+    haalAlleRijenOp(supabaseClient.from('recipe_revisies').select('recipe_id, datum')),
   ]);
   if (error) {
     container.innerHTML = `<div class="error">Error loading: ${error.message}</div>`;
     return;
   }
   if (batchErr) console.error('Could not load batch generation dates:', batchErr);
+  if (revisieErr) console.error('Could not load revision dates:', revisieErr);
 
   laatsteBatchPerRecept = {};
   (batchData || []).forEach(b => {
@@ -351,10 +428,84 @@ async function loadRecipes() {
     if (!huidig || b.aangemaakt_op > huidig) laatsteBatchPerRecept[b.recipe_id] = b.aangemaakt_op;
   });
 
+  // "Laatst gewijzigd" = de datum van de meest recente revisie van déze
+  // specifieke receptversie (recipe_id) — zelfde bron als het "Latest
+  // revision → Date"-veld dat al in de General-sectie van recept-invoer.html
+  // staat.
+  laatsteWijzigingPerRecept = {};
+  (revisieData || []).forEach(rv => {
+    if (!rv.recipe_id || !rv.datum) return;
+    const huidig = laatsteWijzigingPerRecept[rv.recipe_id];
+    if (!huidig || rv.datum > huidig) laatsteWijzigingPerRecept[rv.recipe_id] = rv.datum;
+  });
+
   allRecipes = data || [];
-  vulLocatieFilter();
+
+  // Filters initialiseren: opgeslagen selectie toepassen indien aanwezig,
+  // anders alles aan (= geen filter) als startpunt.
+  const opgeslagen = laadOpgeslagenFilters();
+  const alleStatussen = ['actief', 'concept', 'gearchiveerd'];
+  geselecteerdeStatussen = new Set(opgeslagen.status ? opgeslagen.status.filter(s => alleStatussen.includes(s)) : alleStatussen);
+  const alleLocaties = [...new Set(allRecipes.map(r => r.locatie).filter(Boolean))].sort();
+  geselecteerdeLocaties = new Set(opgeslagen.locatie ? opgeslagen.locatie.filter(l => alleLocaties.includes(l)) : alleLocaties);
+
+  renderFilterToggles();
   pasFiltersToe();
 }
+
+function renderFilterToggles() {
+  const statusOpties = [
+    ['actief', 'Active'], ['concept', 'Draft'], ['gearchiveerd', 'Archived'],
+  ];
+  const statusContainer = document.getElementById('filter-status-toggles');
+  statusContainer.innerHTML = statusOpties.map(([waarde, label]) => `
+    <button type="button" class="filter-toggle${geselecteerdeStatussen.has(waarde) ? ' actief' : ''}" data-status="${waarde}">${label}</button>
+  `).join('');
+  statusContainer.querySelectorAll('.filter-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const waarde = btn.dataset.status;
+      if (geselecteerdeStatussen.has(waarde)) geselecteerdeStatussen.delete(waarde);
+      else geselecteerdeStatussen.add(waarde);
+      btn.classList.toggle('actief');
+      bewaarFilters();
+      pasFiltersToe();
+    });
+  });
+
+  const alleLocaties = [...new Set(allRecipes.map(r => r.locatie).filter(Boolean))].sort();
+  const locatieContainer = document.getElementById('filter-locatie-toggles');
+  locatieContainer.innerHTML = alleLocaties.map(l => `
+    <button type="button" class="filter-toggle${geselecteerdeLocaties.has(l) ? ' actief' : ''}" data-locatie="${escapeHtml(l)}">${escapeHtml(locatieLabel(l))}</button>
+  `).join('');
+  locatieContainer.querySelectorAll('.filter-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const waarde = btn.dataset.locatie;
+      if (geselecteerdeLocaties.has(waarde)) geselecteerdeLocaties.delete(waarde);
+      else geselecteerdeLocaties.add(waarde);
+      btn.classList.toggle('actief');
+      bewaarFilters();
+      pasFiltersToe();
+    });
+  });
+
+  werkGefilterdIndicatorBij();
+}
+
+function werkGefilterdIndicatorBij() {
+  const alleStatussenAan = geselecteerdeStatussen.size === 3;
+  const alleLocatiesAan = geselecteerdeLocaties.size === [...new Set(allRecipes.map(r => r.locatie).filter(Boolean))].length;
+  const isGefilterd = !alleStatussenAan || !alleLocatiesAan;
+  document.getElementById('filter-gefilterd-badge').style.display = isGefilterd ? 'inline-flex' : 'none';
+  document.getElementById('filter-reset-btn').style.display = isGefilterd ? 'inline' : 'none';
+}
+
+document.getElementById('filter-reset-btn').addEventListener('click', () => {
+  geselecteerdeStatussen = new Set(['actief', 'concept', 'gearchiveerd']);
+  geselecteerdeLocaties = new Set([...new Set(allRecipes.map(r => r.locatie).filter(Boolean))]);
+  bewaarFilters();
+  renderFilterToggles();
+  pasFiltersToe();
+});
 
 function formatDatum(iso) {
   if (!iso) return '—';
@@ -375,6 +526,7 @@ function renderList(recipes) {
       <td>${escapeHtml(locatieLabel(r.locatie))}</td>
       <td>v${r.versie_major ?? 1}.${r.versie_minor ?? 0}</td>
       <td><span class="status-pill status-${r.status}">${statusLabel(r.status)}</span></td>
+      <td>${formatDatum(laatsteWijzigingPerRecept[r.id])}</td>
       <td>${formatDatum(laatsteBatchPerRecept[r.id])}</td>
     </tr>`).join('');
 
@@ -384,6 +536,7 @@ function renderList(recipes) {
     { veld: 'locatie', label: 'Location' },
     { veld: 'versie', label: 'Version' },
     { veld: null, label: 'Status' },
+    { veld: 'laatste_wijziging', label: 'Last modified' },
     { veld: 'laatste_batch', label: 'Last batch generated' },
   ];
   const headerHtml = kolommen.map(k => {
@@ -418,24 +571,13 @@ function renderList(recipes) {
 let sorteerRichting = 'asc';
 let huidigSorteerVeld = 'naam';
 
-function vulLocatieFilter() {
-  const select = document.getElementById('filter-locatie');
-  const huidige = select.value;
-  const locaties = [...new Set(allRecipes.map(r => r.locatie).filter(Boolean))].sort();
-  select.innerHTML = '<option value="">All locations</option>' +
-    locaties.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(locatieLabel(l))}</option>`).join('');
-  select.value = huidige;
-}
-
 function pasFiltersToe() {
   const q = document.getElementById('search').value.trim().toLowerCase();
-  const statusFilter = document.getElementById('filter-status').value;
-  const locatieFilter = document.getElementById('filter-locatie').value;
 
   let resultaat = allRecipes.filter(r => {
     const matchtZoekterm = (r.naam || '').toLowerCase().includes(q) || (r.bierstijl || '').toLowerCase().includes(q);
-    const matchtStatus = !statusFilter || r.status === statusFilter;
-    const matchtLocatie = !locatieFilter || r.locatie === locatieFilter;
+    const matchtStatus = geselecteerdeStatussen.has(r.status);
+    const matchtLocatie = !r.locatie || geselecteerdeLocaties.has(r.locatie);
     return matchtZoekterm && matchtStatus && matchtLocatie;
   });
 
@@ -448,6 +590,11 @@ function pasFiltersToe() {
         const vb = (b.versie_major ?? 1) * 1000 + (b.versie_minor ?? 0);
         return va - vb;
       }
+      case 'laatste_wijziging': {
+        const da = laatsteWijzigingPerRecept[a.id] || '';
+        const db = laatsteWijzigingPerRecept[b.id] || '';
+        return da.localeCompare(db);
+      }
       case 'laatste_batch': {
         const da = laatsteBatchPerRecept[a.id] || '';
         const db = laatsteBatchPerRecept[b.id] || '';
@@ -459,11 +606,10 @@ function pasFiltersToe() {
   resultaat.sort((a, b) => sorteerRichting === 'asc' ? vergelijk(a, b) : -vergelijk(a, b));
 
   renderList(resultaat);
+  werkGefilterdIndicatorBij();
 }
 
 document.getElementById('search').addEventListener('input', pasFiltersToe);
-document.getElementById('filter-status').addEventListener('change', pasFiltersToe);
-document.getElementById('filter-locatie').addEventListener('change', pasFiltersToe);
 
 async function openDetail(id) {
   document.getElementById('list-view').style.display = 'none';

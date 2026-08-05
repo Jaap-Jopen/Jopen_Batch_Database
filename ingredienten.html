@@ -20,7 +20,7 @@
     --hop-dark: #33473a;
     --amber: #b4772c;
     --mono: "IBM Plex Mono", "Courier New", monospace;
-    --serif: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    --serif: Arial, Helvetica, sans-serif;
   }
   .ing-main { font-family: var(--serif); color: var(--ink); background: var(--paper); padding: 24px 32px 60px; }
   .ing-toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
@@ -123,6 +123,63 @@
     text-align: center; padding: 60px 20px; font-family: var(--mono); font-size: 13px; color: #7a7266;
   }
   .ing-error { color: #a33f2c; }
+
+  .filter-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .filter-group-label {
+    font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: #6b6355;
+  }
+  .filter-toggle {
+    font-family: var(--mono); font-size: 12px; padding: 6px 12px; border-radius: 20px;
+    border: 1.5px solid var(--line); background: #fff; color: #6b6355; cursor: pointer;
+    user-select: none; transition: background 0.12s, color 0.12s, border-color 0.12s;
+  }
+  .filter-toggle:hover { border-color: var(--hop-dark); }
+  .filter-toggle.actief { background: var(--hop-dark); color: #fff; border-color: var(--hop-dark); }
+  .filter-gefilterd-badge {
+    font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--amber);
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .filter-gefilterd-badge::before {
+    content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--amber); display: inline-block;
+  }
+  .filter-reset {
+    font-family: var(--mono); font-size: 11px; color: var(--hop-dark); background: transparent; border: none;
+    text-decoration: underline; cursor: pointer; padding: 0;
+  }
+
+  /* -- Versiebeheer: save-popup, zelfde patroon als recept-invoer.html -- */
+  .ing-modal-overlay {
+    position: fixed; inset: 0; background: rgba(28,43,38,0.45); z-index: 50;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .ing-modal {
+    background: #fff; border-radius: 8px; padding: 24px 28px; max-width: 480px; width: 100%;
+    max-height: 85vh; overflow-y: auto; font-family: var(--serif);
+  }
+  .ing-modal h2 { margin-top: 0; }
+  .ing-modal-radio-group { margin: 16px 0; }
+  .ing-modal-radio-option {
+    display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid #ece8dc;
+    cursor: pointer; font-size: 14px;
+  }
+  .ing-modal-radio-option:last-child { border-bottom: none; }
+  .ing-modal-radio-option input { margin-top: 3px; }
+  .ing-modal-radio-option .sub { display: block; color: #6b6355; font-size: 12px; margin-top: 2px; }
+  .ing-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+  .ing-modal textarea {
+    width: 100%; font-family: var(--serif); font-size: 14px; padding: 8px; border: 1px solid var(--line);
+    border-radius: 4px; min-height: 70px; box-sizing: border-box;
+  }
+  .ing-latest-revisie {
+    margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 13px;
+  }
+  .ing-latest-revisie-titel {
+    font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: #6b6355; margin-bottom: 8px;
+  }
+  .ing-latest-revisie-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .ing-latest-revisie-grid .label { font-family: var(--mono); font-size: 11px; color: #6b6355; display: block; }
 </style>
 </head>
 <body>
@@ -136,9 +193,17 @@
       <button class="ing-bewerk-btn" id="ing-nieuw-btn" style="display:none; margin-top:0;">+ New ingredient</button>
     </div>
     <div class="ing-toolbar">
-      <input id="ing-search" placeholder="Search by name or supplier…">
-      <select id="ing-filter-categorie"><option value="">All categories</option></select>
-      <select id="ing-filter-status"><option value="">All statuses</option></select>
+      <input id="ing-search" placeholder="Search by name…">
+      <div class="filter-group">
+        <span class="filter-group-label">Category</span>
+        <div id="ing-filter-categorie-toggles"></div>
+      </div>
+      <div class="filter-group">
+        <span class="filter-group-label">Status</span>
+        <div id="ing-filter-status-toggles"></div>
+      </div>
+      <span class="filter-gefilterd-badge" id="ing-filter-gefilterd-badge" style="display:none;">Filtered</span>
+      <button type="button" class="filter-reset" id="ing-filter-reset-btn" style="display:none;">Reset filters</button>
       <div class="ing-count" id="ing-result-count"></div>
     </div>
     <div id="ing-list-container"><div class="ing-loading">Loading ingredients…</div></div>
@@ -157,12 +222,29 @@
   </div>
 </main>
 
+<div class="ing-modal-overlay" id="ing-save-modal-overlay" style="display:none;">
+  <div class="ing-modal">
+    <h2>Save ingredient</h2>
+    <div class="ing-modal-radio-group" id="ing-modal-radio-group"></div>
+    <div>
+      <label for="ing-veld-wijziging" id="ing-modal-comment-label" style="display:block; font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b6355; margin-bottom: 6px;">Comment *</label>
+      <textarea id="ing-veld-wijziging" required placeholder="Describe what changed in this version."></textarea>
+    </div>
+    <div class="ing-modal-actions">
+      <button type="button" class="ing-annuleer-btn" id="ing-modal-cancel-btn">Cancel</button>
+      <button type="button" class="ing-opslaan-btn" id="ing-modal-confirm-btn">Save</button>
+    </div>
+  </div>
+</div>
+
 <script src="config.js"></script>
 <script src="nav.js"></script>
 <script>
 let alleIngredienten = [];
 let alleCategorieen = [];
 let huidigeGebruikerRol = null; // filled with 'admin' | 'editor' | 'viewer' | null (not logged in)
+let huidigeGebruiker = null;
+let laatsteWijzigingPerIngredient = {};
 
 // Display-only translation of the status values as stored in the database
 // (Dutch: actief/inactief/uitgefaseerd) — the stored value itself is left
@@ -172,8 +254,43 @@ function statusLabel(status) {
   return labels[status] || status || 'Unknown';
 }
 
+function formatDatum(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+// -- Filter-status persistentie, zelfde patroon als receptoverzicht.html --
+const ING_FILTER_OPSLAG_KEY = 'jopen_ingredienten_filters_v1';
+
+function laadOpgeslagenIngFilters() {
+  try {
+    const ruw = localStorage.getItem(ING_FILTER_OPSLAG_KEY);
+    if (!ruw) return { status: null, categorie: null };
+    const parsed = JSON.parse(ruw);
+    return {
+      status: Array.isArray(parsed.status) ? parsed.status : null,
+      categorie: Array.isArray(parsed.categorie) ? parsed.categorie : null,
+    };
+  } catch (e) {
+    return { status: null, categorie: null };
+  }
+}
+
+function bewaarIngFilters() {
+  try {
+    localStorage.setItem(ING_FILTER_OPSLAG_KEY, JSON.stringify({
+      status: [...geselecteerdeIngStatussen],
+      categorie: [...geselecteerdeIngCategorieen],
+    }));
+  } catch (e) { /* localStorage niet beschikbaar */ }
+}
+
+let geselecteerdeIngStatussen = new Set();
+let geselecteerdeIngCategorieen = new Set();
+
 async function initIngredientenPagina() {
   const gebruiker = await getHuidigeGebruiker();
+  huidigeGebruiker = gebruiker;
   huidigeGebruikerRol = gebruiker ? gebruiker.rol : null;
 
   if (huidigeGebruikerRol === 'admin' || huidigeGebruikerRol === 'editor') {
@@ -207,12 +324,14 @@ async function haalAlleRijenOp(query) {
 
 async function laadIngredienten() {
   const container = document.getElementById('ing-list-container');
-  const [ingResult, usageResult] = await Promise.all([
+  const [ingResult, usageResult, revisieResult] = await Promise.all([
     supabaseClient
       .from('ingredients')
-      .select('id, naam, categorie, category_id, eenheid, prijs, extract_pct, alpha_pct, gistfactor, leverancier, status, ingredient_categories(name, uses_alpha_pct, uses_extract_pct, uses_gistfactor)')
+      .select('id, naam, categorie, category_id, eenheid, prijs, extract_pct, alpha_pct, gistfactor, leverancier, status, versie_major, versie_minor, ingredient_group_id, versie_status, aangemaakt_op, gewijzigd_op, ingredient_categories(name, uses_alpha_pct, uses_extract_pct, uses_gistfactor)')
+      .eq('versie_status', 'huidig')
       .order('naam'),
     haalAlleRijenOp(supabaseClient.from('recipe_ingredients').select('ingredient_id, recipe_id')),
+    haalAlleRijenOp(supabaseClient.from('ingredient_revisies').select('ingredient_id, datum')),
   ]);
 
   if (ingResult.error) {
@@ -227,43 +346,89 @@ async function laadIngredienten() {
     receptenPerIngredient[rij.ingredient_id].add(rij.recipe_id);
   });
 
+  // "Laatst gewijzigd": meest recente revisie-datum indien beschikbaar,
+  // anders terugvallen op gewijzigd_op/aangemaakt_op (bv. voor de bulk-
+  // geïmporteerde ingrediënten die nog geen revisiehistorie hebben).
+  laatsteWijzigingPerIngredient = {};
+  if (!revisieResult.error) {
+    (revisieResult.data || []).forEach(rv => {
+      if (!rv.ingredient_id || !rv.datum) return;
+      const huidig = laatsteWijzigingPerIngredient[rv.ingredient_id];
+      if (!huidig || rv.datum > huidig) laatsteWijzigingPerIngredient[rv.ingredient_id] = rv.datum;
+    });
+  } else {
+    console.error('Could not load ingredient revision dates:', revisieResult.error);
+  }
+
   alleIngredienten = (ingResult.data || []).map(i => ({
     ...i,
     gebruikt_in_aantal: receptenPerIngredient[i.id] ? receptenPerIngredient[i.id].size : 0,
   }));
-  vulFilters(alleIngredienten);
+
+  const opgeslagen = laadOpgeslagenIngFilters();
+  const alleStatussen = [...new Set(alleIngredienten.map(i => i.status).filter(Boolean))];
+  geselecteerdeIngStatussen = new Set(opgeslagen.status ? opgeslagen.status.filter(s => alleStatussen.includes(s)) : alleStatussen);
+  geselecteerdeIngCategorieen = new Set(opgeslagen.categorie ? opgeslagen.categorie.filter(c => alleCategorieen.some(cat => String(cat.id) === c)) : alleCategorieen.map(c => String(c.id)));
+
+  renderFilterToggles();
   pasFiltersToe();
 }
 
-function vulFilters(ingredienten) {
-  const statussen = [...new Set(ingredienten.map(i => i.status).filter(Boolean))].sort();
-
-  const catSelect = document.getElementById('ing-filter-categorie');
-  const huidigeCat = catSelect.value;
-  catSelect.innerHTML = '<option value="">All categories</option>';
-  alleCategorieen.forEach(c => {
-    const opt = document.createElement('option');
-    opt.value = c.id; opt.textContent = c.name;
-    catSelect.appendChild(opt);
+function renderFilterToggles() {
+  const alleStatussen = [...new Set(alleIngredienten.map(i => i.status).filter(Boolean))].sort();
+  const statusContainer = document.getElementById('ing-filter-status-toggles');
+  statusContainer.innerHTML = alleStatussen.map(s => `
+    <button type="button" class="filter-toggle${geselecteerdeIngStatussen.has(s) ? ' actief' : ''}" data-status="${escapeHtml(s)}">${escapeHtml(statusLabel(s))}</button>
+  `).join('');
+  statusContainer.querySelectorAll('.filter-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const waarde = btn.dataset.status;
+      if (geselecteerdeIngStatussen.has(waarde)) geselecteerdeIngStatussen.delete(waarde);
+      else geselecteerdeIngStatussen.add(waarde);
+      btn.classList.toggle('actief');
+      bewaarIngFilters();
+      pasFiltersToe();
+    });
   });
-  catSelect.value = huidigeCat;
 
-  const statusSelect = document.getElementById('ing-filter-status');
-  const huidigeStatus = statusSelect.value;
-  statusSelect.innerHTML = '<option value="">All statuses</option>';
-  statussen.forEach(s => {
-    const opt = document.createElement('option');
-    opt.value = s; opt.textContent = statusLabel(s);
-    statusSelect.appendChild(opt);
+  const catContainer = document.getElementById('ing-filter-categorie-toggles');
+  catContainer.innerHTML = alleCategorieen.map(c => `
+    <button type="button" class="filter-toggle${geselecteerdeIngCategorieen.has(String(c.id)) ? ' actief' : ''}" data-categorie="${c.id}">${escapeHtml(c.name)}</button>
+  `).join('');
+  catContainer.querySelectorAll('.filter-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const waarde = btn.dataset.categorie;
+      if (geselecteerdeIngCategorieen.has(waarde)) geselecteerdeIngCategorieen.delete(waarde);
+      else geselecteerdeIngCategorieen.add(waarde);
+      btn.classList.toggle('actief');
+      bewaarIngFilters();
+      pasFiltersToe();
+    });
   });
-  statusSelect.value = huidigeStatus;
+
+  werkIngGefilterdIndicatorBij();
 }
+
+function werkIngGefilterdIndicatorBij() {
+  const alleStatussen = [...new Set(alleIngredienten.map(i => i.status).filter(Boolean))];
+  const alleStatussenAan = geselecteerdeIngStatussen.size === alleStatussen.length;
+  const alleCategorieenAan = geselecteerdeIngCategorieen.size === alleCategorieen.length;
+  const isGefilterd = !alleStatussenAan || !alleCategorieenAan;
+  document.getElementById('ing-filter-gefilterd-badge').style.display = isGefilterd ? 'inline-flex' : 'none';
+  document.getElementById('ing-filter-reset-btn').style.display = isGefilterd ? 'inline' : 'none';
+}
+
+document.getElementById('ing-filter-reset-btn').addEventListener('click', () => {
+  geselecteerdeIngStatussen = new Set([...new Set(alleIngredienten.map(i => i.status).filter(Boolean))]);
+  geselecteerdeIngCategorieen = new Set(alleCategorieen.map(c => String(c.id)));
+  bewaarIngFilters();
+  renderFilterToggles();
+  pasFiltersToe();
+});
 
 function huidigeFilters() {
   return {
     zoek: document.getElementById('ing-search').value.trim().toLowerCase(),
-    categorie: document.getElementById('ing-filter-categorie').value,
-    status: document.getElementById('ing-filter-status').value,
   };
 }
 
@@ -274,8 +439,9 @@ const SORT_KOLOMMEN = {
   naam: i => (i.naam || '').toLowerCase(),
   categorie: i => (i.ingredient_categories?.name || i.categorie || '').toLowerCase(),
   eenheid: i => (i.eenheid || '').toLowerCase(),
-  leverancier: i => (i.leverancier || '').toLowerCase(),
+  versie: i => (i.versie_major ?? 1) * 1000 + (i.versie_minor ?? 0),
   status: i => (i.status || '').toLowerCase(),
+  laatste_wijziging: i => laatsteWijzigingPerIngredient[i.id] || i.gewijzigd_op || i.aangemaakt_op || '',
   gebruikt_in_aantal: i => i.gebruikt_in_aantal || 0,
 };
 
@@ -292,22 +458,21 @@ function pasSorteringToe(lijst) {
 }
 
 function pasFiltersToe() {
-  const { zoek, categorie, status } = huidigeFilters();
+  const { zoek } = huidigeFilters();
   const gefilterd = alleIngredienten.filter(i => {
     const matchtZoek = !zoek ||
       (i.naam || '').toLowerCase().includes(zoek) ||
       (i.leverancier || '').toLowerCase().includes(zoek);
-    const matchtCategorie = !categorie || String(i.category_id) === categorie;
-    const matchtStatus = !status || i.status === status;
+    const matchtCategorie = !i.category_id || geselecteerdeIngCategorieen.has(String(i.category_id));
+    const matchtStatus = !i.status || geselecteerdeIngStatussen.has(i.status);
     return matchtZoek && matchtCategorie && matchtStatus;
   });
   laatstGefilterd = gefilterd;
   renderIngLijst(pasSorteringToe(gefilterd));
+  werkIngGefilterdIndicatorBij();
 }
 
 document.getElementById('ing-search').addEventListener('input', pasFiltersToe);
-document.getElementById('ing-filter-categorie').addEventListener('change', pasFiltersToe);
-document.getElementById('ing-filter-status').addEventListener('change', pasFiltersToe);
 
 function zetSortering(kolom) {
   if (huidigeSortering.kolom === kolom) {
@@ -338,14 +503,16 @@ function renderIngLijst(ingredienten) {
       <td>${escapeHtml(i.naam)}</td>
       <td>${escapeHtml(i.ingredient_categories?.name || i.categorie || '—')}</td>
       <td>${escapeHtml(i.eenheid || '—')}</td>
-      <td>${escapeHtml(i.leverancier || '—')}</td>
+      <td>v${i.versie_major ?? 1}.${i.versie_minor ?? 0}</td>
       <td><span class="status-pill status-${i.status || 'onbekend'}">${escapeHtml(statusLabel(i.status))}</span></td>
+      <td>${formatDatum(laatsteWijzigingPerIngredient[i.id] || i.gewijzigd_op || i.aangemaakt_op)}</td>
       <td class="ing-tabel-getal">${i.gebruikt_in_aantal}</td>
     </tr>`).join('');
 
   const kolommen = [
     ['naam', 'Name'], ['categorie', 'Category'], ['eenheid', 'Unit'],
-    ['leverancier', 'Supplier'], ['status', 'Status'], ['gebruikt_in_aantal', 'Used in # recipes'],
+    ['versie', 'Version'], ['status', 'Status'], ['laatste_wijziging', 'Last modified'],
+    ['gebruikt_in_aantal', 'Used in # recipes'],
   ];
 
   container.innerHTML = `
@@ -368,9 +535,39 @@ function toonDetail(id) {
   document.getElementById('ing-detail').classList.add('actief');
   renderDetailAlleen(id);
   laadGebruiktInRecepten(id);
+  laadIngredientRevisies(id);
 }
 
 let gebruiktInRecepten = [];
+let revisiesVoorHuidigIngredient = [];
+
+async function laadIngredientRevisies(ingredientId) {
+  const { data, error } = await supabaseClient
+    .from('ingredient_revisies')
+    .select('*')
+    .eq('ingredient_id', ingredientId)
+    .order('versie_major', { ascending: false })
+    .order('versie_minor', { ascending: false })
+    .order('id', { ascending: false });
+
+  revisiesVoorHuidigIngredient = error ? [] : (data || []);
+  const houderLatest = document.getElementById('ing-latest-revisie-houder');
+  if (!houderLatest) return; // detailscherm inmiddels weer verlaten
+  if (revisiesVoorHuidigIngredient.length === 0) {
+    houderLatest.style.display = 'none';
+    return;
+  }
+  const laatste = revisiesVoorHuidigIngredient[0];
+  houderLatest.innerHTML = `
+    <div class="ing-latest-revisie-titel">Latest revision</div>
+    <div class="ing-latest-revisie-grid">
+      <div><span class="label">Version</span>v${laatste.versie_major}.${laatste.versie_minor}</div>
+      <div><span class="label">Date</span>${formatDatum(laatste.datum)}</div>
+      <div><span class="label">By</span>${escapeHtml(laatste.door || '—')}</div>
+      <div><span class="label">Comment</span>${escapeHtml(laatste.wijziging || '—')}</div>
+    </div>`;
+  houderLatest.style.display = 'block';
+}
 
 async function laadGebruiktInRecepten(ingredientId) {
   const container = document.getElementById('ing-used-in-container');
@@ -450,19 +647,26 @@ function renderDetailAlleen(id) {
 
   container.innerHTML = `
     <h2 class="ing-titel">${escapeHtml(i.naam)}</h2>
-    <div class="ing-meta">${escapeHtml(categorieNaam)}</div>
+    <div class="ing-meta">${escapeHtml(categorieNaam)} · v${i.versie_major ?? 1}.${i.versie_minor ?? 0}</div>
     <div class="ing-card">
       ${rows.map(([label, val, unit]) => `
         <div class="ing-kv">
           <span>${label}</span>
           <span>${val !== null && val !== undefined && val !== '' ? escapeHtml(String(val)) + (unit ? ' ' + unit : '') : '—'}</span>
         </div>`).join('')}
+      <div class="ing-latest-revisie" id="ing-latest-revisie-houder" style="display:none;"></div>
       ${magBewerken ? `<button class="ing-bewerk-btn" id="ing-bewerk-btn">Edit</button>` : ''}
     </div>
   `;
 
   if (magBewerken) {
     document.getElementById('ing-bewerk-btn').addEventListener('click', () => renderDetailBewerken(i));
+  }
+
+  // Als de revisies voor dit ingrediënt al eerder geladen zijn (bv. terug
+  // van het bewerkscherm), meteen tonen zonder opnieuw te hoeven wachten.
+  if (revisiesVoorHuidigIngredient.length > 0 && String(revisiesVoorHuidigIngredient[0].ingredient_id) === String(id)) {
+    laadIngredientRevisies(id);
   }
 }
 
@@ -521,10 +725,71 @@ function renderDetailBewerken(i) {
   pasVeldZichtbaarheidToe();
 
   document.getElementById('ing-annuleer-btn').addEventListener('click', () => renderDetailAlleen(i.id));
-  document.getElementById('ing-opslaan-btn').addEventListener('click', () => slaIngredientOp(i));
+  document.getElementById('ing-opslaan-btn').addEventListener('click', () => openIngSaveModal(i));
 }
 
-async function slaIngredientOp(i) {
+// -- Versiebeheer opslaan-popup, zelfde patroon als recept-invoer.html --
+function openIngSaveModal(i) {
+  const major = i.versie_major ?? 1;
+  const minor = i.versie_minor ?? 0;
+  const groep = document.getElementById('ing-modal-radio-group');
+  groep.innerHTML = `
+    <label class="ing-modal-radio-option">
+      <input type="radio" name="ing-save-mode" value="klein" checked>
+      <span><strong>v${major}.${minor + 1}</strong>, secondary version (draft)<span class="sub">Updates this version in place.</span></span>
+    </label>
+    <label class="ing-modal-radio-option">
+      <input type="radio" name="ing-save-mode" value="groot">
+      <span><strong>v${major + 1}.0</strong>, primary version (publish)<span class="sub">Archives the current version and creates a new active one.</span></span>
+    </label>
+    <label class="ing-modal-radio-option">
+      <input type="radio" name="ing-save-mode" value="overwrite">
+      <span><strong>v${major}.${minor}</strong>, overwrite current secondary version<span class="sub">Unregistered correction: no comment needed, version/revision history stays untouched.</span></span>
+    </label>
+  `;
+  document.getElementById('ing-veld-wijziging').value = '';
+  werkIngCommentVeldBij();
+  groep.querySelectorAll('input[name="ing-save-mode"]').forEach(r => r.addEventListener('change', werkIngCommentVeldBij));
+  document.getElementById('ing-save-modal-overlay').style.display = 'flex';
+  document.getElementById('ing-save-modal-overlay').dataset.ingredientId = i.id;
+}
+
+function werkIngCommentVeldBij() {
+  const gekozen = document.querySelector('input[name="ing-save-mode"]:checked');
+  const isOverwrite = gekozen && gekozen.value === 'overwrite';
+  const label = document.getElementById('ing-modal-comment-label');
+  const veld = document.getElementById('ing-veld-wijziging');
+  if (isOverwrite) {
+    label.textContent = 'Comment (optional)';
+    veld.required = false;
+  } else {
+    label.textContent = 'Comment *';
+    veld.required = true;
+  }
+}
+
+function closeIngSaveModal() {
+  document.getElementById('ing-save-modal-overlay').style.display = 'none';
+}
+
+document.getElementById('ing-modal-cancel-btn').addEventListener('click', closeIngSaveModal);
+
+document.getElementById('ing-modal-confirm-btn').addEventListener('click', async () => {
+  const gekozen = document.querySelector('input[name="ing-save-mode"]:checked');
+  const mode = gekozen ? gekozen.value : 'klein';
+  const id = document.getElementById('ing-save-modal-overlay').dataset.ingredientId;
+  const i = alleIngredienten.find(x => String(x.id) === String(id));
+  if (!i) { closeIngSaveModal(); return; }
+  const wijziging = document.getElementById('ing-veld-wijziging').value.trim();
+  if (!wijziging && mode !== 'overwrite') {
+    alert('Please describe what you changed.');
+    return;
+  }
+  closeIngSaveModal();
+  await slaIngredientOp(i, mode, wijziging);
+});
+
+async function slaIngredientOp(i, soort, wijziging) {
   const melding = document.getElementById('ing-edit-melding');
   melding.textContent = 'Saving…';
   melding.className = 'ing-melding';
@@ -539,11 +804,14 @@ async function slaIngredientOp(i) {
   };
 
   const { data: { session } } = await supabaseClient.auth.getSession();
+  const gebruikerId = session?.user?.id ?? null;
+  const vandaag = new Date().toISOString().slice(0, 10);
 
   const categoryIdVeld = document.getElementById('veld-category_id').value;
   const gekozenCategorie = alleCategorieen.find(c => String(c.id) === categoryIdVeld);
 
-  const updateData = {
+  const basis = {
+    naam: i.naam,
     category_id: categoryIdVeld ? Number(categoryIdVeld) : null,
     eenheid: tekst('veld-eenheid'),
     prijs: getal('veld-prijs'),
@@ -555,26 +823,125 @@ async function slaIngredientOp(i) {
     gistfactor: (!gekozenCategorie || gekozenCategorie.uses_gistfactor) ? getal('veld-gistfactor') : null,
     leverancier: tekst('veld-leverancier'),
     status: document.getElementById('veld-status').value,
-    gewijzigd_door: session?.user?.id ?? null,
   };
 
-  const { error } = await supabaseClient
+  if (soort === 'overwrite') {
+    // Ongeregistreerde correctie: alleen de data zelf bijwerken. Geen
+    // wijziging aan versienummer en de revisie-log wordt niet aangeraakt —
+    // bedoeld voor het snel rechtzetten van kleine foutjes.
+    const { error } = await supabaseClient
+      .from('ingredients')
+      .update({ ...basis, gewijzigd_door: gebruikerId })
+      .eq('id', i.id);
+
+    if (error) {
+      melding.textContent = 'Save failed: ' + error.message;
+      melding.className = 'ing-melding fout';
+      return;
+    }
+
+    melding.textContent = `Saved (v${i.versie_major ?? 1}.${i.versie_minor ?? 0}, unregistered correction).`;
+    melding.className = 'ing-melding ok';
+    Object.assign(i, basis);
+    setTimeout(() => renderDetailAlleen(i.id), 600);
+    return;
+  }
+
+  if (soort === 'klein') {
+    const nieuweMinor = (i.versie_minor ?? 0) + 1;
+
+    const { error } = await supabaseClient
+      .from('ingredients')
+      .update({ ...basis, versie_minor: nieuweMinor, gewijzigd_door: gebruikerId })
+      .eq('id', i.id);
+
+    if (error) {
+      melding.textContent = 'Save failed: ' + error.message;
+      melding.className = 'ing-melding fout';
+      return;
+    }
+
+    await supabaseClient.from('ingredient_revisies').insert({
+      ingredient_id: i.id,
+      versie_major: i.versie_major ?? 1,
+      versie_minor: nieuweMinor,
+      datum: vandaag,
+      door: huidigeGebruiker?.naam,
+      wijziging,
+      gebruiker_id: gebruikerId,
+    });
+
+    melding.textContent = `Saved as v${i.versie_major ?? 1}.${nieuweMinor}.`;
+    melding.className = 'ing-melding ok';
+    Object.assign(i, basis, { versie_minor: nieuweMinor });
+    laatsteWijzigingPerIngredient[i.id] = vandaag;
+    setTimeout(() => renderDetailAlleen(i.id), 600);
+    return;
+  }
+
+  // soort === 'groot': huidige rij archiveren, nieuwe rij aanmaken met
+  // versie_major + 1, zelfde ingredient_group_id -- zelfde patroon als
+  // recept-invoer.html's major-version-opslaan.
+  const { error: archiveerErr } = await supabaseClient
     .from('ingredients')
-    .update(updateData)
+    .update({ versie_status: 'gearchiveerd', gewijzigd_door: gebruikerId })
     .eq('id', i.id);
 
-  if (error) {
-    melding.textContent = 'Save failed: ' + error.message;
+  if (archiveerErr) {
+    melding.textContent = 'Could not archive current version: ' + archiveerErr.message;
     melding.className = 'ing-melding fout';
     return;
   }
 
-  melding.textContent = 'Saved.';
+  const nieuweMajor = (i.versie_major ?? 1) + 1;
+
+  const { data: nieuw, error: insertErr } = await supabaseClient
+    .from('ingredients')
+    .insert({
+      ...basis,
+      versie_major: nieuweMajor,
+      versie_minor: 0,
+      versie_status: 'huidig',
+      ingredient_group_id: i.ingredient_group_id,
+      aangemaakt_door: gebruikerId,
+      gewijzigd_door: gebruikerId,
+    })
+    .select('id, naam, categorie, category_id, eenheid, prijs, extract_pct, alpha_pct, gistfactor, leverancier, status, versie_major, versie_minor, ingredient_group_id, versie_status, aangemaakt_op, gewijzigd_op, ingredient_categories(name, uses_alpha_pct, uses_extract_pct, uses_gistfactor)')
+    .single();
+
+  if (insertErr) {
+    melding.textContent = 'Failed to create new version: ' + insertErr.message;
+    melding.className = 'ing-melding fout';
+    return;
+  }
+
+  await supabaseClient.from('ingredient_revisies').insert({
+    ingredient_id: nieuw.id,
+    versie_major: nieuweMajor,
+    versie_minor: 0,
+    datum: vandaag,
+    door: huidigeGebruiker?.naam,
+    wijziging: `Major revision from v${i.versie_major ?? 1}.${i.versie_minor ?? 0}: ${wijziging}`,
+    gebruiker_id: gebruikerId,
+  });
+
+  melding.textContent = `Saved as new version v${nieuweMajor}.0.`;
   melding.className = 'ing-melding ok';
 
-  // Lokale kopie + lijst bijwerken zodat het overzicht meteen klopt
-  Object.assign(i, updateData);
-  setTimeout(() => renderDetailAlleen(i.id), 600);
+  // Nieuwe versie toevoegen aan de lokale lijst, oude rij bijwerken naar
+  // gearchiveerd, filters/overzicht verversen.
+  i.versie_status = 'gearchiveerd';
+  nieuw.gebruikt_in_aantal = i.gebruikt_in_aantal;
+  alleIngredienten.push(nieuw);
+  alleIngredienten.sort((a, b) => (a.naam || '').localeCompare(b.naam || ''));
+  laatsteWijzigingPerIngredient[nieuw.id] = vandaag;
+  renderFilterToggles();
+
+  setTimeout(() => {
+    document.getElementById('ing-detail').classList.remove('actief');
+    document.getElementById('ing-list-view').style.display = 'block';
+    pasFiltersToe();
+  }, 900);
 }
 
 function toonNieuwFormulier() {
@@ -672,6 +1039,7 @@ async function slaNieuwIngredientOp() {
   melding.className = 'ing-melding';
 
   const { data: { session } } = await supabaseClient.auth.getSession();
+  const gebruikerId = session?.user?.id ?? null;
 
   const nieuw = {
     naam,
@@ -683,14 +1051,17 @@ async function slaNieuwIngredientOp() {
     gistfactor: gekozenCategorie?.uses_gistfactor ? getal('nieuw-gistfactor') : null,
     leverancier: tekst('nieuw-leverancier'),
     status: document.getElementById('nieuw-status').value,
-    aangemaakt_door: session?.user?.id ?? null,
-    gewijzigd_door: session?.user?.id ?? null,
+    versie_major: 1,
+    versie_minor: 0,
+    versie_status: 'huidig',
+    aangemaakt_door: gebruikerId,
+    gewijzigd_door: gebruikerId,
   };
 
   const { data, error } = await supabaseClient
     .from('ingredients')
     .insert(nieuw)
-    .select('id, naam, categorie, category_id, eenheid, prijs, extract_pct, alpha_pct, gistfactor, leverancier, status, ingredient_categories(name, uses_alpha_pct, uses_extract_pct, uses_gistfactor)')
+    .select('id, naam, categorie, category_id, eenheid, prijs, extract_pct, alpha_pct, gistfactor, leverancier, status, versie_major, versie_minor, ingredient_group_id, versie_status, aangemaakt_op, gewijzigd_op, ingredient_categories(name, uses_alpha_pct, uses_extract_pct, uses_gistfactor)')
     .single();
 
   if (error) {
@@ -699,9 +1070,21 @@ async function slaNieuwIngredientOp() {
     return;
   }
 
+  await supabaseClient.from('ingredient_revisies').insert({
+    ingredient_id: data.id,
+    versie_major: 1,
+    versie_minor: 0,
+    datum: new Date().toISOString().slice(0, 10),
+    door: huidigeGebruiker?.naam,
+    wijziging: 'Initial version',
+    gebruiker_id: gebruikerId,
+  });
+
+  data.gebruikt_in_aantal = 0;
   alleIngredienten.push(data);
   alleIngredienten.sort((a, b) => (a.naam || '').localeCompare(b.naam || ''));
-  vulFilters(alleIngredienten);
+  geselecteerdeIngStatussen.add(data.status);
+  renderFilterToggles();
 
   melding.textContent = 'Added! Returning to the overview…';
   melding.className = 'ing-melding ok';
@@ -709,7 +1092,7 @@ async function slaNieuwIngredientOp() {
   setTimeout(() => {
     document.getElementById('ing-detail').classList.remove('actief');
     document.getElementById('ing-list-view').style.display = 'block';
-    renderIngLijst(alleIngredienten);
+    pasFiltersToe();
   }, 700);
 }
 
