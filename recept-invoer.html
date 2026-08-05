@@ -92,7 +92,8 @@
     display: flex; align-items: center; justify-content: center; font-size: 15px; color: #999; background: #fff;
   }
   .re-badge-field label { font-weight: 700; }
-  .re-badge-field input {
+  .re-badge-field input,
+  .re-badge-field select {
     border: 2px solid var(--line);
     font-weight: 700;
     transition: background-color 0.15s, color 0.15s, border-color 0.15s;
@@ -237,11 +238,22 @@
           </div>
           <div class="re-field re-badge-field">
             <label for="veld-bier_risico">Beer risk</label>
-            <input type="text" id="veld-bier_risico" />
+            <select id="veld-bier_risico">
+              <option value="">—</option>
+              <option value="Standaard">Standaard</option>
+              <option value="Gevaarlijk">Gevaarlijk</option>
+              <option value="Suikerhoudend">Suikerhoudend</option>
+              <option value="Gevoelig">Gevoelig</option>
+            </select>
           </div>
           <div class="re-field re-badge-field">
             <label for="veld-bier_status">Beer status</label>
-            <input type="text" id="veld-bier_status" />
+            <select id="veld-bier_status">
+              <option value="">—</option>
+              <option value="Standaard">Standaard</option>
+              <option value="NPI">NPI</option>
+              <option value="Te verbeteren">Te verbeteren</option>
+            </select>
           </div>
           <div class="re-field wide">
             <label>Recipe Color <span style="text-transform:none; font-weight:normal;">(used in brewing planning)</span></label>
@@ -1225,8 +1237,8 @@ function pasBadgeKleurToe(inputEl, kleurenSchema) {
 function initBadgeKleuren() {
   const risicoVeld = document.getElementById('veld-bier_risico');
   const statusVeld = document.getElementById('veld-bier_status');
-  risicoVeld.addEventListener('input', () => pasBadgeKleurToe(risicoVeld, BIER_RISICO_KLEUREN));
-  statusVeld.addEventListener('input', () => pasBadgeKleurToe(statusVeld, BIER_STATUS_KLEUREN));
+  risicoVeld.addEventListener('change', () => pasBadgeKleurToe(risicoVeld, BIER_RISICO_KLEUREN));
+  statusVeld.addEventListener('change', () => pasBadgeKleurToe(statusVeld, BIER_STATUS_KLEUREN));
 }
 initBadgeKleuren();
 
