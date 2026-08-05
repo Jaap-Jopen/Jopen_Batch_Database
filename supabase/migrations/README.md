@@ -66,3 +66,9 @@ productie-wijziging zodra dit gepusht wordt.
   actief/inactief/uitgefaseerd-status), `aangemaakt_op`/`gewijzigd_op`
   (met trigger die `gewijzigd_op` automatisch bijwerkt) en een nieuwe
   `ingredient_revisies`-tabel (één-op-één qua vorm met `recipe_revisies`).
+- `20260805140000_ingredients_delete_policy.sql` — DELETE-policy op
+  `ingredients` voor editor/admin, zelfde patroon als de recipes-variant.
+- `20260805140500_gebruikers_laatst_ingelogd.sql` — `laatst_ingelogd`-kolom
+  op `gebruikers` + een SECURITY DEFINER-functie `zet_laatst_ingelogd()`
+  die login.html na een geslaagde login aanroept (schrijft alleen de eigen
+  rij weg, dus geen brede UPDATE-policy nodig).

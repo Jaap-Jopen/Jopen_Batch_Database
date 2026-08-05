@@ -101,6 +101,10 @@
         return;
       }
 
+      // Bewust niet blokkerend op een eventuele fout hier: het bijwerken van
+      // het laatst-ingelogd-tijdstip mag nooit de login zelf laten mislukken.
+      try { await supabaseClient.rpc('zet_laatst_ingelogd'); } catch (e) { /* stil negeren */ }
+
       window.location.href = nieuweRedirectDoel();
     });
 

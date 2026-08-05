@@ -655,12 +655,13 @@ function renderDetailAlleen(id) {
           <span>${val !== null && val !== undefined && val !== '' ? escapeHtml(String(val)) + (unit ? ' ' + unit : '') : '—'}</span>
         </div>`).join('')}
       <div class="ing-latest-revisie" id="ing-latest-revisie-houder" style="display:none;"></div>
-      ${magBewerken ? `<button class="ing-bewerk-btn" id="ing-bewerk-btn">Edit</button>` : ''}
+      ${magBewerken ? `<button class="ing-bewerk-btn" id="ing-bewerk-btn">Edit</button> <button class="ing-annuleer-btn" id="ing-verwijder-btn" style="border-color:#a33f2c; color:#a33f2c;">Delete</button>` : ''}
     </div>
   `;
 
   if (magBewerken) {
     document.getElementById('ing-bewerk-btn').addEventListener('click', () => renderDetailBewerken(i));
+    document.getElementById('ing-verwijder-btn').addEventListener('click', () => verwijderIngredient(i));
   }
 
   // Als de revisies voor dit ingrediënt al eerder geladen zijn (bv. terug
@@ -670,8 +671,28 @@ function renderDetailAlleen(id) {
   }
 }
 
-function renderDetailBewerken(i) {
-  const container = document.getElementById('ing-detail-container');
+async function verwijderIngredient(i) {
+  if (!confirm(`Are you sure you want to delete ${i.naam}? This cannot be undone.`)) return;
+
+  const btn = document.getElementById('ing-verwijder-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Deleting…'; }
+
+  const { error } = await supabaseClient.from('ingredients').delete().eq('id', i.id);
+
+  if (error) {
+    alert('Could not delete: ' + error.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Delete'; }
+    return;
+  }
+
+  alleIngredienten = alleIngredienten.filter(x => String(x.id) !== String(i.id));
+  document.getElementById('ing-detail').classList.remove('actief');
+  document.getElementById('ing-list-view').style.display = 'block';
+  renderFilterToggles();
+  pasFiltersToe();
+}
+
+function renderDetailBewerken(i) {  const container = document.getElementById('ing-detail-container');
 
   const veld = (label, key, unit = '', type = 'text') => `
     <div class="ing-edit-row">

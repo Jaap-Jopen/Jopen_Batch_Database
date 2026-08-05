@@ -196,11 +196,17 @@
       };
     });
 
-    async function laadGebruikersLijst() {
-      const container = document.getElementById('gebruikers-lijst');
+    function formatLaatstIngelogd(iso) {
+      if (!iso) return '<span class="jopen-subtitel" style="margin:0;">Never</span>';
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) +
+        ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    async function laadGebruikersLijst() {      const container = document.getElementById('gebruikers-lijst');
       const { data, error } = await supabaseClient
         .from('gebruikers')
-        .select('id, naam, rol, actief, aangemaakt_op')
+        .select('id, naam, rol, actief, aangemaakt_op, laatst_ingelogd')
         .order('naam');
 
       if (error) {
@@ -228,6 +234,7 @@
                  </select>`}
           </td>
           <td>${g.actief ? 'Yes' : '<span class="actief-nee">No</span>'}</td>
+          <td>${formatLaatstIngelogd(g.laatst_ingelogd)}</td>
           <td>
             ${isZelf
               ? `<span class="gebr-zelf">(you)</span>`
@@ -239,7 +246,7 @@
 
       container.innerHTML = `
         <table class="gebruikers-tabel">
-          <thead><tr><th>Name</th><th>Role</th><th>Active</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>Role</th><th>Active</th><th>Last login</th><th></th></tr></thead>
           <tbody>${rijen}</tbody>
         </table>`;
 
