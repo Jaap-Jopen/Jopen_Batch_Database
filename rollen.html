@@ -22,6 +22,9 @@
     .rl-cel input[type="checkbox"] { cursor: pointer; }
     .rl-cel input[type="checkbox"]:disabled { cursor: not-allowed; opacity: 0.4; }
     .rl-slot { font-size: 0.8em; color: #999; font-style: italic; }
+    .rl-rolnaam-input { font-weight: 600; font-size: 1em; padding: 4px 6px; border: 1px solid transparent; border-radius: 4px; width: 140px; }
+    .rl-rolnaam-input:hover { border-color: var(--line); }
+    .rl-rolnaam-input:focus { border-color: var(--line); outline: none; background: #fafafa; }
     .rl-vergrendeld-kolom { color: #999; font-style: italic; font-size: 0.85em; }
     .rl-melding-inline { font-size: 0.8em; margin-left: 4px; }
     .rl-melding-inline.ok { color: #2a7a3b; }
@@ -102,7 +105,13 @@
             </td>`;
         }).join('');
 
-        return `<tr class="${isAdminRol ? 'rl-admin-rij' : ''}"><td class="rl-rolnaam">${escapeHtmlNav(rolLabel(rol.naam))}${isAdminRol ? ' <span class="rl-slot">(locked)</span>' : ''}</td>${cellenHtml}</tr>`;
+        const rolNaamCel = isAdminRol
+          ? `<td class="rl-rolnaam">${escapeHtmlNav(rolLabel(rol.naam))} <span class="rl-slot">(locked)</span></td>`
+          : `<td class="rl-rolnaam">
+               <input type="text" class="rl-rolnaam-input" data-role-id="${rol.id}" value="${escapeHtmlNav(rol.naam)}" />
+               <span class="rl-melding-inline"></span>
+             </td>`;
+        return `<tr class="${isAdminRol ? 'rl-admin-rij' : ''}">${rolNaamCel}${cellenHtml}</tr>`;
       }).join('');
 
       container.innerHTML = `
@@ -116,6 +125,39 @@
           cb.addEventListener('change', () => slaRechtOp(cel));
         });
       });
+
+      container.querySelectorAll('.rl-rolnaam-input').forEach(input => {
+        input.addEventListener('change', () => slaRolNaamOp(input));
+      });
+    }
+
+    async function slaRolNaamOp(input) {
+      const roleId = Number(input.dataset.roleId);
+      const nieuweNaam = input.value.trim();
+      const melding = input.nextElementSibling;
+
+      if (!nieuweNaam) {
+        melding.textContent = 'Failed: name cannot be empty';
+        melding.className = 'rl-melding-inline fout';
+        return;
+      }
+
+      melding.textContent = 'Saving…';
+      melding.className = 'rl-melding-inline';
+
+      const { error } = await supabaseClient
+        .from('roles')
+        .update({ naam: nieuweNaam })
+        .eq('id', roleId);
+
+      if (error) {
+        melding.textContent = 'Failed: ' + error.message;
+        melding.className = 'rl-melding-inline fout';
+        return;
+      }
+      melding.textContent = 'Saved';
+      melding.className = 'rl-melding-inline ok';
+      setTimeout(() => { melding.textContent = ''; }, 1500);
     }
 
     async function slaRechtOp(cel) {
