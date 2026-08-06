@@ -246,6 +246,9 @@
     let capaciteitMap = {};              // `${group}_${week}` -> max_brouwsels
     let planningPerWeek = {};            // week -> { jk:[], wp_60hl:[], wp_120hl:[], wp_320hl:[] }
     let huidigeGebruikerId = null;
+    let magBpBewerken = false;
+    let magBpVerwijderen = false;
+    let magBatchesBewerken = false;
 
     // Modal-context
     let modalContext = { mode: 'add', item: null, group: 'jk' };
@@ -428,10 +431,10 @@
               <span class="bp-weekdatum">${weekDatumRange(huidigJaar, week)}</span>
               <span class="bp-weekdatum">Total volume: ${formatHl(jkHl + wpHl)} hl</span>
               ${weekOver ? '<span class="bp-over-badge">Over capacity</span>' : ''}
-              <button type="button" class="bp-add-inline bp-add-wp" data-week="${week}">+ Brews WP</button>
-              <span class="bp-cap ${wpOver ? 'over' : ''}">WP ${wpSom}/<input type="number" min="0" class="bp-cap-input" data-group="wp" data-week="${week}" value="${wpMax}" /> brws</span>
-              <button type="button" class="bp-add-inline bp-add-jk" data-week="${week}">+ Brews JK</button>
-              <span class="bp-cap ${jkOver ? 'over' : ''}">JK ${jkSom}/<input type="number" min="0" class="bp-cap-input" data-group="jk" data-week="${week}" value="${jkMax}" /> brws</span>
+              ${magBpBewerken ? `<button type="button" class="bp-add-inline bp-add-wp" data-week="${week}">+ Brews WP</button>` : ''}
+              <span class="bp-cap ${wpOver ? 'over' : ''}">WP ${wpSom}/<input type="number" min="0" class="bp-cap-input" data-group="wp" data-week="${week}" value="${wpMax}" ${magBpBewerken ? '' : 'disabled'} /> brws</span>
+              ${magBpBewerken ? `<button type="button" class="bp-add-inline bp-add-jk" data-week="${week}">+ Brews JK</button>` : ''}
+              <span class="bp-cap ${jkOver ? 'over' : ''}">JK ${jkSom}/<input type="number" min="0" class="bp-cap-input" data-group="jk" data-week="${week}" value="${jkMax}" ${magBpBewerken ? '' : 'disabled'} /> brws</span>
             </div>
             <div class="bp-kolommen">
               <div class="bp-col ${wpOver ? 'over' : ''}">${p.wp_60hl.map(renderItem).join('')}</div>
@@ -630,8 +633,9 @@
       modalContext = { mode, item, group };
       document.getElementById('bp-modal-titel').textContent = mode === 'edit' ? 'Edit brew' : 'Add brews';
       document.getElementById('bp-modal-melding').textContent = '';
-      document.getElementById('bp-modal-delete').style.display = mode === 'edit' ? 'inline-block' : 'none';
-      document.getElementById('bp-modal-create-batch').style.display = mode === 'edit' ? 'inline-block' : 'none';
+      document.getElementById('bp-modal-delete').style.display = (mode === 'edit' && magBpVerwijderen) ? 'inline-block' : 'none';
+      document.getElementById('bp-modal-create-batch').style.display = (mode === 'edit' && magBatchesBewerken) ? 'inline-block' : 'none';
+      document.getElementById('bp-modal-save').style.display = magBpBewerken ? 'inline-block' : 'none';
       document.getElementById('bp-modal-prio').checked = item ? !!item.prio : false;
 
       if (mode === 'edit') {
@@ -811,6 +815,9 @@
       if (!ok) return;
       const gebruiker = await getHuidigeGebruiker();
       huidigeGebruikerId = gebruiker ? gebruiker.id : null;
+      magBpBewerken = !!gebruiker && await magBewerkenModule('brewing_planning');
+      magBpVerwijderen = !!gebruiker && await magVerwijderenModule('brewing_planning');
+      magBatchesBewerken = !!gebruiker && await magBewerkenModule('batches');
 
       const { jaar: huidigIsoJaar, week: huidigeWeek } = huidigeIsoJaarEnWeek();
       document.getElementById('bp-huidige-week').textContent = `wk ${huidigeWeek} (${huidigIsoJaar})`;
