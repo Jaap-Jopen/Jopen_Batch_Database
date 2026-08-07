@@ -454,12 +454,24 @@ async function haalBatchDataOpBrowser(supabase, batchnummer) {
 }
 
 // ---------------------------------------------------------------------------
-// Rij-overloop Toegiften Brouwerij/Kelder
+// Rij-overloop Malt & Grains / Hops (boil + dry) / Toegiften Brouwerij/Kelder
 // ---------------------------------------------------------------------------
-// Het sjabloon heeft van origine 10 vaste sloten voor "Toegiften Brouwerij"
-// (Recept-voorblad rij 73-82) en 5 voor "Toegiften Kelder" (rij 89-93). Een
-// recept kan er inmiddels meer hebben. RIJOFFSET_BROUWHUIS/_KELDER geven de
-// eerste/laatste rij van elk blok in het ONGEWIJZIGDE sjabloon.
+// Het sjabloon heeft van origine een vast aantal sloten per blok. Een
+// recept kan er inmiddels meer hebben. Volgorde van boven naar beneden in
+// het sjabloon (belangrijk: elke latere constante moet met de cumulatieve
+// verschuiving van alle blokken ERBOVEN rekening houden):
+//   Malt & grains (30-39) -> Hops boil (43-57) -> Dry hop (58-63) ->
+//   [vaste tussenliggende rijen 64-72, o.a. Hop totaal gewicht] ->
+//   Toegiften Brouwerij (73-82) -> Toegiften Kelder (89-93)
+const RIJ_MOUT_EERSTE = 30;
+const RIJ_MOUT_LAATSTE = 39;      // = eerste + 10 sloten - 1
+const RIJ_MOUT_SJABLOON = 35;
+const RIJ_HOP_EERSTE = 43;
+const RIJ_HOP_LAATSTE = 57;       // = eerste + 15 sloten - 1
+const RIJ_HOP_SJABLOON = 50;
+const RIJ_DRYHOP_EERSTE = 58;
+const RIJ_DRYHOP_LAATSTE = 63;    // = eerste + 6 sloten - 1
+const RIJ_DRYHOP_SJABLOON = 60;
 const RIJ_BROUWHUIS_EERSTE = 73;
 const RIJ_BROUWHUIS_LAATSTE = 82;   // = eerste + 10 sloten - 1
 const RIJ_BROUWHUIS_SJABLOON = 78;  // "gewone" middenrij, voor het kopiëren van nieuwe rijen
@@ -469,30 +481,50 @@ const RIJ_KELDER_SJABLOON = 90;     // "gewone" middenrij
 
 /**
  * Voegt zo nodig extra rijen toe aan Recept-voorblad voor recepten met meer
- * dan 10 Toegiften Brouwerij en/of meer dan 5 Toegiften Kelder-regels, en
- * levert {n1, n2} (aantal toegevoegde rijen per blok) + een functie
- * `verschuifRij(origineleRij)` die voor ELKE andere Recept-voorblad-cel
- * (Gist, Water, Revisiehistorie, enz.) de juiste, mogelijk verschoven rij
- * teruggeeft. Moet als allereerste worden aangeroepen, vóór alle andere
- * writer.setCelWaarde-aanroepen op dit tabblad.
+ * regels dan een van de vaste blokken (Malt & grains, Hops boil, Dry hop,
+ * Toegiften Brouwerij, Toegiften Kelder) van origine aankan, en levert
+ * {n0..n2, verschuifRij, verschuifCel} -- een functie die voor ELKE andere
+ * Recept-voorblad-cel (Gist, Water, Revisiehistorie, enz.) de juiste,
+ * mogelijk verschoven rij teruggeeft. Moet als allereerste worden
+ * aangeroepen, vóór alle andere writer.setCelWaarde-aanroepen op dit
+ * tabblad.
  */
 async function brVoegOverloopRijenToe(writer, bundel) {
+  const moutAantal = bundel.recipe_ingredients.filter(r => r.rol === 'hoofdmout').length;
+  const hopAantal = bundel.recipe_ingredients.filter(r => r.rol === 'hopgift_kook').length;
+  const dryHopAantal = bundel.recipe_ingredients.filter(r => r.rol === 'dry_hop').length;
   const brouwhuisAantal = bundel.recipe_ingredients.filter(r => r.rol === 'toegift_brouwerij').length;
   const kelderAantal = bundel.recipe_ingredients.filter(r => r.rol === 'toegift_kelder').length;
+
+  const n0 = Math.max(0, moutAantal - (RIJ_MOUT_LAATSTE - RIJ_MOUT_EERSTE + 1));
+  const nHop = Math.max(0, hopAantal - (RIJ_HOP_LAATSTE - RIJ_HOP_EERSTE + 1));
+  const nDryHop = Math.max(0, dryHopAantal - (RIJ_DRYHOP_LAATSTE - RIJ_DRYHOP_EERSTE + 1));
   const n1 = Math.max(0, brouwhuisAantal - (RIJ_BROUWHUIS_LAATSTE - RIJ_BROUWHUIS_EERSTE + 1));
   const n2 = Math.max(0, kelderAantal - (RIJ_KELDER_LAATSTE - RIJ_KELDER_EERSTE + 1));
 
+  // Volgorde is belangrijk: van boven naar beneden, elk volgend inzetpunt
+  // ligt zelf al verschoven door alle blokken erboven.
+  if (n0 > 0) {
+    await writer.voegRijenToe('Recept-voorblad', RIJ_MOUT_LAATSTE, n0, RIJ_MOUT_SJABLOON);
+  }
+  if (nHop > 0) {
+    await writer.voegRijenToe('Recept-voorblad', RIJ_HOP_LAATSTE + n0, nHop, RIJ_HOP_SJABLOON + n0);
+  }
+  if (nDryHop > 0) {
+    await writer.voegRijenToe('Recept-voorblad', RIJ_DRYHOP_LAATSTE + n0 + nHop, nDryHop, RIJ_DRYHOP_SJABLOON + n0 + nHop);
+  }
   if (n1 > 0) {
-    await writer.voegRijenToe('Recept-voorblad', RIJ_BROUWHUIS_LAATSTE, n1, RIJ_BROUWHUIS_SJABLOON);
+    await writer.voegRijenToe('Recept-voorblad', RIJ_BROUWHUIS_LAATSTE + n0 + nHop + nDryHop, n1, RIJ_BROUWHUIS_SJABLOON + n0 + nHop + nDryHop);
   }
   if (n2 > 0) {
-    // Kelder-blok ligt na Brouwhuis, dus zijn "voor deze rij invoegen"-punt
-    // ligt zelf ook al n1 plekken verderop als daar al rijen zijn ingevoegd.
-    await writer.voegRijenToe('Recept-voorblad', RIJ_KELDER_LAATSTE + n1, n2, RIJ_KELDER_SJABLOON + n1);
+    await writer.voegRijenToe('Recept-voorblad', RIJ_KELDER_LAATSTE + n0 + nHop + nDryHop + n1, n2, RIJ_KELDER_SJABLOON + n0 + nHop + nDryHop + n1);
   }
 
   const verschuifRij = (origineleRij) => {
     let r = origineleRij;
+    if (origineleRij >= RIJ_MOUT_LAATSTE) r += n0;
+    if (origineleRij >= RIJ_HOP_LAATSTE) r += nHop;
+    if (origineleRij >= RIJ_DRYHOP_LAATSTE) r += nDryHop;
     if (origineleRij >= RIJ_BROUWHUIS_LAATSTE) r += n1;
     if (origineleRij >= RIJ_KELDER_LAATSTE) r += n2;
     return r;
@@ -505,7 +537,7 @@ async function brVoegOverloopRijenToe(writer, bundel) {
     return `${sheetNaam}!${m[1]}${verschuifRij(Number(m[2]))}`;
   };
 
-  return { n1, n2, verschuifRij, verschuifCel };
+  return { n0, nHop, nDryHop, n1, n2, verschuifRij, verschuifCel };
 }
 
 async function brVulScalaireVelden(writer, bundel, isWP, scalarMap, verschuifCel) {
@@ -564,18 +596,35 @@ function sorteerHopgiften(rijen, rol) {
 }
 
 async function brVulIngredientRijen(writer, bundel, ingredientMap, overloop) {
-  const { n1, verschuifCel } = overloop;
-  // Toegift Brouwerij/Kelder krijgen (i.t.t. de andere rollen) geen vaste
-  // sloten uit het JSON-veldenbestand meer, maar een rechtstreeks berekende
-  // rij -- want bij overloop zijn er meer rijen dan het sjabloon van origine
-  // had, en die extra rijen bestaan pas na brVoegOverloopRijenToe(). Zie de
-  // toelichting daar voor waarom "eersteRij + i" ook zonder overloop precies
-  // hetzelfde resultaat geeft als de oude vaste sloten-mapping.
+  const { n0, nHop, nDryHop, n1, verschuifCel } = overloop;
+  // Elke rol met een variabel aantal regels krijgt (i.t.t. de vaste-slot-
+  // rollen als Gist) geen sloten uit het JSON-veldenbestand meer, maar een
+  // rechtstreeks berekende rij -- want bij overloop bestaan de extra rijen
+  // pas na brVoegOverloopRijenToe(). "eersteRij + i" geeft ook zonder
+  // overloop precies hetzelfde resultaat als de oude vaste sloten-mapping
+  // (zie de toelichting bij brVoegOverloopRijenToe).
   const dynamischeBlokken = {
-    toegift_brouwerij: { eersteRij: RIJ_BROUWHUIS_EERSTE, vasteSloten: RIJ_BROUWHUIS_LAATSTE - RIJ_BROUWHUIS_EERSTE + 1 },
-    toegift_kelder: { eersteRij: RIJ_KELDER_EERSTE + n1, vasteSloten: RIJ_KELDER_LAATSTE - RIJ_KELDER_EERSTE + 1 },
+    hoofdmout: {
+      eersteRij: RIJ_MOUT_EERSTE, vasteSloten: RIJ_MOUT_LAATSTE - RIJ_MOUT_EERSTE + 1,
+      kolommen: { naam: 'A', hoeveelheid: 'D', kleur_ebc: 'E' },
+    },
+    hopgift_kook: {
+      eersteRij: RIJ_HOP_EERSTE + n0, vasteSloten: RIJ_HOP_LAATSTE - RIJ_HOP_EERSTE + 1,
+      kolommen: { naam: 'A', hdt: 'Q', alpha_pct: 'D', hoeveelheid: 'E', tijdstip: 'G' },
+    },
+    dry_hop: {
+      eersteRij: RIJ_DRYHOP_EERSTE + n0 + nHop, vasteSloten: RIJ_DRYHOP_LAATSTE - RIJ_DRYHOP_EERSTE + 1,
+      kolommen: { naam: 'A', hoeveelheid: 'E', tijdstip: 'G' },
+    },
+    toegift_brouwerij: {
+      eersteRij: RIJ_BROUWHUIS_EERSTE + n0 + nHop + nDryHop, vasteSloten: RIJ_BROUWHUIS_LAATSTE - RIJ_BROUWHUIS_EERSTE + 1,
+      kolommen: { naam: 'A', hoeveelheid: 'E', tijdstip: 'I' },
+    },
+    toegift_kelder: {
+      eersteRij: RIJ_KELDER_EERSTE + n0 + nHop + nDryHop + n1, vasteSloten: RIJ_KELDER_LAATSTE - RIJ_KELDER_EERSTE + 1,
+      kolommen: { naam: 'A', hoeveelheid: 'E', tijdstip: 'I' },
+    },
   };
-  const kolomPerAttr = { naam: 'A', hoeveelheid: 'E', tijdstip: 'I' };
 
   const rollen = ['hopgift_kook', 'dry_hop', 'hoofdmout', 'toegift_brouwerij', 'toegift_kelder', 'gist'];
   for (const rol of rollen) {
@@ -585,7 +634,7 @@ async function brVulIngredientRijen(writer, bundel, ingredientMap, overloop) {
       : ongesorteerd.sort((a, b) => (a.volgorde ?? 0) - (b.volgorde ?? 0));
 
     if (dynamischeBlokken[rol]) {
-      const { eersteRij, vasteSloten } = dynamischeBlokken[rol];
+      const { eersteRij, vasteSloten, kolommen } = dynamischeBlokken[rol];
       // Ook als er minder regels zijn dan het oorspronkelijke aantal sloten,
       // blijven we tot dat oorspronkelijke aantal doorlopen om eventuele
       // restjes van een vorige generatie/sjabloonwaarde leeg te maken.
@@ -593,8 +642,8 @@ async function brVulIngredientRijen(writer, bundel, ingredientMap, overloop) {
       for (let i = 0; i < totaalRijen; i++) {
         const rij = eersteRij + i;
         const regel = rijen[i];
-        for (const attr of ['naam', 'hoeveelheid', 'tijdstip']) {
-          const cel = `Recept-voorblad!${kolomPerAttr[attr]}${rij}`;
+        for (const attr in kolommen) {
+          const cel = `Recept-voorblad!${kolommen[attr]}${rij}`;
           if (!regel) { await writer.setCelWaarde(cel, null); continue; }
           const waarde = attr === 'naam'
             ? (bundel.ingredientNaam.get(regel.ingredient_id) || regel.notitie || null)
@@ -644,14 +693,19 @@ async function brVulFormaten(writer, bundel, formatenMap) {
   }
 }
 
-async function brVulHopRendementEnEbu(writer, bundel) {
+async function brVulHopRendementEnEbu(writer, bundel, overloop) {
+  const { n0, verschuifCel } = overloop;
   const og = bundel.recipe_specificaties.origineel_extract;
   const volumeKook = bundel.recipe_brouwspecificaties.volume_kook;
   const hopRijen = sorteerHopgiften(bundel.recipe_ingredients.filter(r => r.rol === 'hopgift_kook'), 'hopgift_kook');
 
+  const eersteRij = RIJ_HOP_EERSTE + n0;
+  const vasteSloten = RIJ_HOP_LAATSTE - RIJ_HOP_EERSTE + 1;
+  const totaalRijen = Math.max(hopRijen.length, vasteSloten);
+
   let totaalEbu = 0;
-  for (let i = 0; i < 15; i++) {
-    const rij = 43 + i;
+  for (let i = 0; i < totaalRijen; i++) {
+    const rij = eersteRij + i;
     const regel = hopRijen[i];
     if (!regel) {
       await writer.setCelWaarde(`Recept-voorblad!I${rij}`, null);
@@ -667,7 +721,7 @@ async function brVulHopRendementEnEbu(writer, bundel) {
     await writer.setCelWaarde(`Recept-voorblad!K${rij}`, ebu !== null ? Number(ebu.toFixed(1)) : null);
     if (ebu !== null) totaalEbu += ebu;
   }
-  await writer.setCelWaarde('Recept-voorblad!K64', Number(totaalEbu.toFixed(1)));
+  await writer.setCelWaarde(verschuifCel('Recept-voorblad!K64'), Number(totaalEbu.toFixed(1)));
 }
 
 function kolomNummerNaarLetter(num) {
@@ -680,7 +734,12 @@ function kolomNummerNaarLetter(num) {
   return letters;
 }
 
-async function brZetHopGroepRanden(writer, stylesManager, bundel) {
+async function brZetHopGroepRanden(writer, stylesManager, bundel, overloop) {
+  const { n0, nHop, nDryHop } = overloop;
+  const hopEersteRij = RIJ_HOP_EERSTE + n0;
+  const dryHopEersteRij = RIJ_DRYHOP_EERSTE + n0 + nHop;
+  const dryHopLaatsteRij = RIJ_DRYHOP_LAATSTE + n0 + nHop + nDryHop;
+
   async function zetRandOpRij(rijNr, kolomVan, kolomTot, stijl) {
     for (let col = kolomVan; col <= kolomTot; col++) {
       const sheetCel = `Recept-voorblad!${kolomNummerNaarLetter(col)}${rijNr}`;
@@ -692,7 +751,7 @@ async function brZetHopGroepRanden(writer, stylesManager, bundel) {
           const anker = await writer.haalMergeAnker(sheetCel);
           basisStijl = await writer.haalStijlIndexOp(anker);
         }
-        if (rijNr !== 43) {
+        if (rijNr !== hopEersteRij) {
           basisStijl = stylesManager.wisBovenrand(basisStijl);
         }
         const nieuweStijl = stylesManager.voegOnderrandToe(basisStijl, stijl);
@@ -703,7 +762,7 @@ async function brZetHopGroepRanden(writer, stylesManager, bundel) {
     }
   }
 
-  for (let rij = 43; rij <= 63; rij++) {
+  for (let rij = hopEersteRij; rij <= dryHopLaatsteRij; rij++) {
     await zetRandOpRij(rij, 1, 16, 'dotted');
   }
 
@@ -718,8 +777,8 @@ async function brZetHopGroepRanden(writer, stylesManager, bundel) {
   }
   const hopRijen = sorteerHopgiften(bundel.recipe_ingredients.filter(r => r.rol === 'hopgift_kook'), 'hopgift_kook');
   const dryHopRijen = sorteerHopgiften(bundel.recipe_ingredients.filter(r => r.rol === 'dry_hop'), 'dry_hop');
-  await dikkeRandenVoorBlok(hopRijen, 43);
-  await dikkeRandenVoorBlok(dryHopRijen, 58);
+  await dikkeRandenVoorBlok(hopRijen, hopEersteRij);
+  await dikkeRandenVoorBlok(dryHopRijen, dryHopEersteRij);
 }
 
 /**
@@ -764,8 +823,8 @@ async function genereerEnDownloadBatchrapport(supabase, batchnummer) {
   await brVulIngredientRijen(writer, bundel, ingredientMap, overloop);
   await brVulRevisies(writer, bundel, revisieMap, overloop.verschuifCel);
   await brVulFormaten(writer, bundel, formatenMap);
-  await brVulHopRendementEnEbu(writer, bundel);
-  await brZetHopGroepRanden(writer, stylesManager, bundel);
+  await brVulHopRendementEnEbu(writer, bundel, overloop);
+  await brZetHopGroepRanden(writer, stylesManager, bundel, overloop);
 
   await writer.setCelWaarde('Recept-voorblad!K3', bundel.batch.batchnummer);
   // Fallback naar 1 (niet null/blank): elke "Totaal gram"-cel op dit tabblad

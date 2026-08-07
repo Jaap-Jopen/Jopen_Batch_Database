@@ -247,24 +247,43 @@ class XlsxDirectWriter {
    * Voegt `aantal` nieuwe (lege) rijen in vóór `voorRij` op tabblad
    * `sheetNaam`, met de stijl/kolomindeling/samenvoegingen van `sjabloonRij`
    * gekopieerd. Alles wat op of na `voorRij` stond (rijen, samenvoegingen,
-   * en kruisverwijzingen vanuit ANDERE tabbladen naar dit tabblad) schuift
-   * `aantal` plekken op. Bedoeld voor blokken met een oorspronkelijk vast
-   * aantal sloten (Toegiften Brouwerij/Kelder) die nu meer regels kunnen
+   * formules bínnen `sheetNaam` die naar deze rijen verwijzen, en
+   * kruisverwijzingen vanuit ANDERE tabbladen) schuift `aantal` plekken op.
+   * Bedoeld voor blokken met een oorspronkelijk vast aantal sloten (Malt &
+   * grains, Hops, Toegiften Brouwerij/Kelder) die nu meer regels kunnen
    * bevatten dan het sjabloon van origine had.
    *
-   * AANNAME (geverifieerd voor dit sjabloon): binnen `sheetNaam` zelf komen
-   * geen formules voor die naar rijen op/na `voorRij` verwijzen (de enige
-   * formules op Recept-voorblad zitten allemaal boven rij 71, ruim boven elk
-   * inzetpunt dat wij gebruiken) -- dus alleen rijen/cellen/samenvoegingen
-   * zelf hoeven binnen dit tabblad verschoven te worden, geen formules. Wel
-   * verschuiven we kruisverwijzingen ('Recept-voorblad'!A82 e.d.) op ANDERE
-   * tabbladen, want Brouwen/Gistkaart Invoer lezen giftnamen rechtstreeks
-   * uit deze cellen.
+   * Voor formules bínnen `sheetNaam` zelf: een kale celverwijzing (zonder
+   * "Andertabblad!"-voorvoegsel) hoort altijd bij `sheetNaam` zelf en
+   * schuift dus mee zodra de rij ≥ `voorRij` is -- ook als de formule
+   * toevallig een bereik is dat over `voorRij` heen loopt (bv.
+   * `SUM(D30:D39)` invoegen vóór rij 39 wordt correct `SUM(D30:D42)` i.p.v.
+   * dat het hele bereik in zijn geheel verschuift). Een celverwijzing MET
+   * een ander tabblad ervoor (bv. `Brouwen!$F$16`) wordt met rust gelaten.
    */
   async voegRijenToe(sheetNaam, voorRij, aantal, sjabloonRij) {
     if (!aantal || aantal <= 0) return;
     const bestand = await this._laadSheetXml(sheetNaam);
     let xml = this.sheetXmlPerBestand[bestand];
+
+    // Formules bínnen dit tabblad: kale celverwijzingen (geen sheet-prefix,
+    // of expliciet 'sheetNaam'! zelf) schuiven mee; verwijzingen naar een
+    // ANDER tabblad blijven onaangeroerd.
+    const formuleVerwijzingPatroon = new RegExp(
+      `((?:'([^']+)'|([A-Za-z_][A-Za-z0-9_ ]*))!)?(\\$?)([A-Z]+)(\\$?)(\\d+)`, 'g'
+    );
+    function verschuifFormuleTekst(tekst) {
+      return tekst.replace(formuleVerwijzingPatroon, (heleMatch, prefixVolledig, gequoteNaam, kaleNaam, dollarKol, kol, dollarRij, rijStr) => {
+        const andereSheet = gequoteNaam || kaleNaam;
+        if (andereSheet && andereSheet !== sheetNaam) return heleMatch; // ander tabblad, met rust laten
+        const rij = Number(rijStr);
+        if (rij < voorRij) return heleMatch;
+        return `${prefixVolledig || ''}${dollarKol}${kol}${dollarRij}${rij + aantal}`;
+      });
+    }
+    function verschuifFormulesInInhoud(inhoud) {
+      return inhoud.replace(/<f>([\s\S]*?)<\/f>/g, (heleMatch, formule) => `<f>${verschuifFormuleTekst(formule)}</f>`);
+    }
 
     // --- 1. Alle <row>-elementen ontleden ---
     const rowRegex = /<row r="(\d+)"([^>]*)>([\s\S]*?)<\/row>/g;
@@ -278,6 +297,33 @@ class XlsxDirectWriter {
 
     function verschuifCellenInRij(inhoud, nieuweRij) {
       return inhoud.replace(/<c r="([A-Z]+)\d+"/g, (_, kol) => `<c r="${kol}${nieuweRij}"`);
+    }
+
+    // Voor GEKOPIEERDE sjabloonrijen: een kale (niet-$) rijverwijzing die
+    // precies naar de sjabloonrij zelf verwijst (bv. "D35" in sjabloonrij 35)
+    // is een zelfverwijzing van die rij naar zichzelf, en moet meeschuiven
+    // naar de nieuwe rij (D39, D40, ...) -- net als Excel's normale "kopieer
+    // rij" gedrag met relatieve referenties. Verwijzingen naar een ANDERE
+    // rij (bv. het absolute "$D$40" dat naar de totaalrij van het blok
+    // wijst) volgen gewoon de normale drempel-verschuiving -- ook al hebben
+    // ze een $, want die rij verplaatst in dit bestand ECHT fysiek, dus elke
+    // verwijzing ernaartoe moet meeschuiven, los van wat $ ooit betekende in
+    // Excels eigen kopieer/plak-semantiek. Alleen een verwijzing met een
+    // expliciet ANDER sheet-voorvoegsel blijft met rust.
+    function verschuifSjabloonFormule(tekst, vanRij, naarRij) {
+      const patroon = /((?:'([^']+)'|([A-Za-z_][A-Za-z0-9_ ]*))!)?(\$?)([A-Z]+)(\$?)(\d+)/g;
+      return tekst.replace(patroon, (heleMatch, prefixVolledig, gequoteNaam, kaleNaam, dollarKol, kol, dollarRij, rijStr) => {
+        if (gequoteNaam || kaleNaam) return heleMatch;
+        const rij = Number(rijStr);
+        if (rij === vanRij) return `${dollarKol}${kol}${dollarRij}${naarRij}`;
+        if (rij >= voorRij) return `${dollarKol}${kol}${dollarRij}${rij + aantal}`;
+        return heleMatch;
+      });
+    }
+    function verschuifSjabloonInhoud(inhoud, vanRij, naarRij) {
+      const metCellenVerschoven = verschuifCellenInRij(inhoud, naarRij);
+      return metCellenVerschoven.replace(/<f>([\s\S]*?)<\/f>/g, (heleMatch, formule) =>
+        `<f>${verschuifSjabloonFormule(formule, vanRij, naarRij)}</f>`);
     }
 
     const nieuweRijen = [];
@@ -295,10 +341,23 @@ class XlsxDirectWriter {
     const ingevoegd = [];
     for (let i = 0; i < aantal; i++) {
       const nieuweRijNr = voorRij + i;
-      ingevoegd.push({ rij: nieuweRijNr, attrs: sjabloon.attrs, inhoud: verschuifCellenInRij(sjabloon.inhoud, nieuweRijNr) });
+      ingevoegd.push({
+        rij: nieuweRijNr, attrs: sjabloon.attrs,
+        inhoud: verschuifSjabloonInhoud(sjabloon.inhoud, sjabloonRij, nieuweRijNr),
+        _nieuw: true,
+      });
     }
     nieuweRijen.splice(invoegIdx, 0, ...ingevoegd);
     nieuweRijen.sort((a, b) => a.rij - b.rij);
+
+    // Formules bínnen dit tabblad (bv. SUM(D30:D39)) kunnen in ELKE
+    // BESTAANDE rij voorkomen, niet alleen in rijen die zelf verschuiven --
+    // dus deze stap is los van de rij-verschuiving hierboven. Gekopieerde
+    // rijen (_nieuw) slaan we hier bewust over, zie toelichting hierboven.
+    for (const r of nieuweRijen) {
+      if (r._nieuw) continue;
+      r.inhoud = verschuifFormulesInInhoud(r.inhoud);
+    }
 
     const nieuweSheetDataInhoud = nieuweRijen
       .map(r => `<row r="${r.rij}"${r.attrs}>${r.inhoud}</row>`)

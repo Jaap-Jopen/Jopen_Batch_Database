@@ -58,8 +58,8 @@ async function test() {
   await vulIngredientRijen(writer, bundel, overloop);
   await vulRevisies(writer, bundel, overloop.verschuifCel);
   await vulFormaten(writer, bundel);
-  await vulHopRendementEnEbu(writer, bundel);
-  await zetHopGroepRanden(writer, stylesManager, bundel);
+  await vulHopRendementEnEbu(writer, bundel, overloop);
+  await zetHopGroepRanden(writer, stylesManager, bundel, overloop);
 
   await writer.setCelWaarde('Recept-voorblad!K3', bundel.batch.batchnummer);
   await writer.setCelWaarde('Recept-voorblad!Q1', bundel.recipes.short_name);
