@@ -374,13 +374,20 @@ async function vulFormaten(writer, bundel) {
 }
 
 // Rendement%/EBU per hopgift (Recept-voorblad!I43:I57 / K43:K57) + Calculated
-// total EBU (K64). Deze cellen zijn geen live-formules meer in het sjabloon
-// (verwezen ooit naar het verwijderde EBU Berekening-tabblad), dus hier
-// herberekend met dezelfde logica als recept-invoer.html en als waarde geplakt.
+// total EBU (K64).
+// - Rendement% (kolom I) blijft een GEPLAKTE waarde: die komt uit de JS-
+//   lookuptabel die het verwijderde EBU Berekening-tabblad vervangt, er is
+//   geen live Excel-lookup-equivalent meer in het sjabloon.
+// - EBU (kolom K) is weer een ECHTE Excel-formule (gewicht × alpha% ×
+//   rendement% / kookvolume, incl. de *1000-factor), i.p.v. een geplakt getal.
+//   Reden: de operator vult tijdens/na het brouwen soms het werkelijke gewicht
+//   in kolom E bij (verschil t.o.v. het receptplan) — met een geplakt getal
+//   bleef de EBU dan het oude, geplande cijfer tonen i.p.v. mee te rekenen.
+//   Rendement% (I) en volume ('Brouwen'!F16) worden hierbij als celverwijzing
+//   gebruikt, niet opnieuw als los getal geplakt.
 async function vulHopRendementEnEbu(writer, bundel, overloop) {
   const { n0, verschuifCel } = overloop;
   const og = bundel.recipe_specificaties.origineel_extract;
-  const volumeKook = bundel.recipe_brouwspecificaties.volume_kook;
 
   const hopRijen = sorteerHopgiften(bundel.recipe_ingredients.filter(r => r.rol === 'hopgift_kook'), 'hopgift_kook');
 
@@ -388,7 +395,6 @@ async function vulHopRendementEnEbu(writer, bundel, overloop) {
   const vasteSloten = RIJ_HOP_LAATSTE - RIJ_HOP_EERSTE + 1;
   const totaalRijen = Math.max(hopRijen.length, vasteSloten);
 
-  let totaalEbu = 0;
   for (let i = 0; i < totaalRijen; i++) {
     const rij = eersteRij + i;
     const regel = hopRijen[i];
@@ -400,13 +406,20 @@ async function vulHopRendementEnEbu(writer, bundel, overloop) {
     const kooktijd = regel.tijdstip !== null && regel.tijdstip !== undefined && regel.tijdstip !== ''
       ? Number(regel.tijdstip) : null;
     const rendement = (kooktijd !== null && og) ? bepaalHopRendement(kooktijd, og) : null;
-    const ebu = (kooktijd !== null && og) ? bepaalHopEbu(regel.hoeveelheid, regel.alpha_pct, kooktijd, og, volumeKook) : null;
 
     await writer.setCelWaarde(`Recept-voorblad!I${rij}`, rendement !== null ? Number(rendement.toFixed(1)) : null);
-    await writer.setCelWaarde(`Recept-voorblad!K${rij}`, ebu !== null ? Number(ebu.toFixed(1)) : null);
-    if (ebu !== null) totaalEbu += ebu;
+    if (rendement !== null) {
+      await writer.setCelWaarde(`Recept-voorblad!K${rij}`, {
+        formula: `(E${rij}*1000)*(D${rij}/100)*(I${rij}/100)/('Brouwen'!$F$16*100)`,
+      });
+    } else {
+      await writer.setCelWaarde(`Recept-voorblad!K${rij}`, null);
+    }
   }
-  await writer.setCelWaarde(verschuifCel('Recept-voorblad!K64'), Number(totaalEbu.toFixed(1)));
+  const laatsteRij = eersteRij + totaalRijen - 1;
+  await writer.setCelWaarde(verschuifCel('Recept-voorblad!K64'), {
+    formula: `SUM(K${eersteRij}:K${laatsteRij})`,
+  });
 }
 
 function kolomNummerNaarLetter(num) {

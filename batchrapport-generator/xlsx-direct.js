@@ -176,7 +176,7 @@ class XlsxDirectWriter {
       }
     }
 
-    this.sheetXmlPerBestand[bestand] = xml.replace(cellPattern, nieuweCel);
+    this.sheetXmlPerBestand[bestand] = xml.replace(cellPattern, () => nieuweCel);
   }
 
   /** Huidige `s="..."`-waarde van een cel opvragen (voor de border-helper). */
@@ -201,7 +201,7 @@ class XlsxDirectWriter {
     let attrs = match[1];
     if (/\bs="\d+"/.test(attrs)) attrs = attrs.replace(/\bs="\d+"/, `s="${nieuweIndex}"`);
     else attrs = ` s="${nieuweIndex}"` + attrs;
-    this.sheetXmlPerBestand[bestand] = xml.replace(cellPattern, `<c r="${cel}"${attrs}${match[2]}`);
+    this.sheetXmlPerBestand[bestand] = xml.replace(cellPattern, () => `<c r="${cel}"${attrs}${match[2]}`);
   }
 
   /** Of een cel al als element bestaat in de sheet-XML. */
