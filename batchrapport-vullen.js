@@ -472,12 +472,12 @@ const RIJ_HOP_SJABLOON = 50;
 const RIJ_DRYHOP_EERSTE = 58;
 const RIJ_DRYHOP_LAATSTE = 63;    // = eerste + 6 sloten - 1
 const RIJ_DRYHOP_SJABLOON = 60;
-const RIJ_BROUWHUIS_EERSTE = 73;
-const RIJ_BROUWHUIS_LAATSTE = 82;   // = eerste + 10 sloten - 1
-const RIJ_BROUWHUIS_SJABLOON = 78;  // "gewone" middenrij, voor het kopiëren van nieuwe rijen
-const RIJ_KELDER_EERSTE = 89;
-const RIJ_KELDER_LAATSTE = 93;      // = eerste + 5 sloten - 1
-const RIJ_KELDER_SJABLOON = 90;     // "gewone" middenrij
+const RIJ_BROUWHUIS_EERSTE = 75;
+const RIJ_BROUWHUIS_LAATSTE = 84;   // = eerste + 10 sloten - 1
+const RIJ_BROUWHUIS_SJABLOON = 80;  // "gewone" middenrij, voor het kopiëren van nieuwe rijen
+const RIJ_KELDER_EERSTE = 91;
+const RIJ_KELDER_LAATSTE = 95;      // = eerste + 5 sloten - 1
+const RIJ_KELDER_SJABLOON = 92;     // "gewone" middenrij
 
 /**
  * Voegt zo nodig extra rijen toe aan Recept-voorblad voor recepten met meer

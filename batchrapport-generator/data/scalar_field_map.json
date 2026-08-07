@@ -34,7 +34,7 @@
  {
   "key": "Alkalinity (water)",
   "locaties": [
-   "Recept-voorblad!P97"
+   "Recept-voorblad!P99"
   ],
   "db_veld": "recipe_water.alkalinity",
   "categorie": "water"
@@ -154,7 +154,7 @@
  {
   "key": "Ca (water)",
   "locaties": [
-   "Recept-voorblad!A97"
+   "Recept-voorblad!A99"
   ],
   "db_veld": "recipe_water.ca",
   "categorie": "water"
@@ -162,7 +162,7 @@
  {
   "key": "Cl (water)",
   "locaties": [
-   "Recept-voorblad!G97"
+   "Recept-voorblad!G99"
   ],
   "db_veld": "recipe_water.cl",
   "categorie": "water"
@@ -370,7 +370,7 @@
  {
   "key": "Mg (water)",
   "locaties": [
-   "Recept-voorblad!C97"
+   "Recept-voorblad!C99"
   ],
   "db_veld": "recipe_water.mg",
   "categorie": "water"
@@ -378,7 +378,7 @@
  {
   "key": "Na (water)",
   "locaties": [
-   "Recept-voorblad!E97"
+   "Recept-voorblad!E99"
   ],
   "db_veld": "recipe_water.na",
   "categorie": "water"
@@ -434,7 +434,7 @@
  {
   "key": "Ratio CL:SO4 (water)",
   "locaties": [
-   "Recept-voorblad!M97"
+   "Recept-voorblad!M99"
   ],
   "db_veld": "recipe_water.ratio_cl_so4",
   "categorie": "water"
@@ -458,7 +458,7 @@
  {
   "key": "SO4 (water)",
   "locaties": [
-   "Recept-voorblad!J97"
+   "Recept-voorblad!J99"
   ],
   "db_veld": "recipe_water.so4",
   "categorie": "water"

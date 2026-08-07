@@ -162,12 +162,12 @@ const RIJ_HOP_SJABLOON = 50;
 const RIJ_DRYHOP_EERSTE = 58;
 const RIJ_DRYHOP_LAATSTE = 63;
 const RIJ_DRYHOP_SJABLOON = 60;
-const RIJ_BROUWHUIS_EERSTE = 73;
-const RIJ_BROUWHUIS_LAATSTE = 82;
-const RIJ_BROUWHUIS_SJABLOON = 78;
-const RIJ_KELDER_EERSTE = 89;
-const RIJ_KELDER_LAATSTE = 93;
-const RIJ_KELDER_SJABLOON = 90;
+const RIJ_BROUWHUIS_EERSTE = 75;
+const RIJ_BROUWHUIS_LAATSTE = 84;
+const RIJ_BROUWHUIS_SJABLOON = 80;
+const RIJ_KELDER_EERSTE = 91;
+const RIJ_KELDER_LAATSTE = 95;
+const RIJ_KELDER_SJABLOON = 92;
 
 async function voegOverloopRijenToe(writer, bundel) {
   const moutAantal = bundel.recipe_ingredients.filter(r => r.rol === 'hoofdmout').length;
