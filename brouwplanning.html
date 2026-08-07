@@ -330,7 +330,7 @@
     async function laadRecepten() {
       const { data, error } = await supabaseClient
         .from('recipes')
-        .select('id, naam, short_name, brouwsel_hl, status, kleur')
+        .select('id, naam, short_name, brouwsel_hl, status, kleur, locatie')
         .neq('status', 'gearchiveerd')
         .order('naam');
       if (error) { console.error('Kon recepten niet laden:', error); return; }
@@ -543,8 +543,10 @@
         const term = e.target.value.trim().toLowerCase();
         const resultaten = rij.querySelector('.bp-bier-resultaten');
         if (term === '') { resultaten.style.display = 'none'; return; }
+        const locatieGroep = huidigeModalLocatieGroep();
         const matches = alleRecepten.filter(r =>
           r.status === 'actief' &&
+          receptPastBijLocatieGroep(r, locatieGroep) &&
           (r.naam.toLowerCase().includes(term) || (r.short_name || '').toLowerCase().includes(term))
         ).slice(0, 20);
         resultaten.innerHTML = matches.length
@@ -630,6 +632,26 @@
     // ------------------------------------------------------------------
     // Modal openen / sluiten
     // ------------------------------------------------------------------
+    // Welke locatie-groep ('jk' of 'wp') hoort bij de modal die nu open is
+    // (of geopend wordt) -- bepaalt welke recepten in de zoekresultaten mogen
+    // verschijnen. Bij bewerken volgt dit uit het bestaande plan_group van het
+    // item, bij toevoegen uit de knop waarmee de modal geopend is.
+    function huidigeModalLocatieGroep() {
+      if (!modalContext) return null;
+      if (modalContext.mode === 'edit' && modalContext.item) {
+        return modalContext.item.plan_group === 'jk' ? 'jk' : 'wp';
+      }
+      return modalContext.group === 'jk' ? 'jk' : 'wp';
+    }
+
+    // "De Werf"-recepten hebben nog geen locatie ingevuld (bekend, nog niet
+    // opgelost datagat) -- die blijven bewust in beide filters zichtbaar i.p.v.
+    // helemaal onvindbaar te worden totdat dat rechtgezet is.
+    function receptPastBijLocatieGroep(recept, locatieGroep) {
+      if (!locatieGroep || !recept.locatie) return true;
+      return locatieGroep === 'jk' ? recept.locatie === 'Jopen Kerk' : recept.locatie === 'Waarderpolder';
+    }
+
     function openModal(mode, item, weken, group) {
       modalContext = { mode, item, group };
       document.getElementById('bp-modal-titel').textContent = mode === 'edit' ? 'Edit brew' : 'Add brews';
