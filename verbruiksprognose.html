@@ -44,6 +44,35 @@
   .vp-detail-rij ul { margin: 4px 0 0 0; padding-left: 18px; }
   .vp-leeg { padding: 24px; text-align: center; color: #999; }
   .vp-skeleton { color: #bbb; padding: 20px; }
+
+  .vp-export-btn {
+    padding: 8px 16px; border-radius: 6px; border: 1px solid var(--jopen-red); background: none;
+    color: var(--jopen-red); font-size: 0.9em; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .vp-export-btn:hover { background: var(--jopen-red-tint); }
+  .vp-export-btn:disabled { border-color: #ccc; color: #999; cursor: not-allowed; background: none; }
+
+  .vp-modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    align-items: center; justify-content: center; z-index: 1000;
+  }
+  .vp-modal-overlay.open { display: flex; }
+  .vp-modal {
+    background: #fff; border-radius: 10px; padding: 24px 28px; width: 380px; max-width: 90vw;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  }
+  .vp-modal h3 { margin: 0 0 6px 0; font-size: 1.05em; color: var(--jopen-red); }
+  .vp-modal p { margin: 0 0 14px 0; font-size: 0.85em; color: #6b6b6b; }
+  .vp-modal-categorie-rij {
+    display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #eee; font-size: 0.95em;
+  }
+  .vp-modal-categorie-rij:last-of-type { border-bottom: none; }
+  .vp-modal-categorie-rij input { width: auto; }
+  .vp-modal-knoppen { display: flex; gap: 8px; margin-top: 18px; justify-content: flex-end; }
+  .vp-modal-knoppen button { padding: 8px 16px; border-radius: 6px; font-size: 0.9em; cursor: pointer; }
+  .vp-modal-knoppen .vp-btn-cancel { background: #fff; border: 1px solid #ccc; }
+  .vp-modal-knoppen .vp-btn-export { background: var(--jopen-red); color: #fff; border: 1px solid var(--jopen-red); }
+  .vp-modal-melding { font-size: 0.85em; margin-top: 10px; color: #a33f2c; }
 </style>
 </head>
 <body>
@@ -68,6 +97,7 @@
         <input type="number" id="vp-tot" min="1" max="53" value="12" />
       </div>
       <div class="vp-samenvatting" id="vp-samenvatting">—</div>
+      <button type="button" id="vp-export-btn" class="vp-export-btn" disabled>Export to Excel</button>
     </div>
 
     <div class="vp-filter-tabs" id="vp-filter-tabs">
@@ -84,7 +114,21 @@
     </div>
   </main>
 
+  <div class="vp-modal-overlay" id="vp-export-modal-overlay">
+    <div class="vp-modal">
+      <h3>Export to Excel</h3>
+      <p>Choose which raw material categories to include in the export.</p>
+      <div id="vp-export-categorieen"></div>
+      <div class="vp-modal-melding" id="vp-export-melding"></div>
+      <div class="vp-modal-knoppen">
+        <button type="button" class="vp-btn-cancel" id="vp-export-cancel">Cancel</button>
+        <button type="button" class="vp-btn-export" id="vp-export-confirm">Export</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="config.js"></script>
   <script src="nav.js"></script>
   <script>
@@ -154,6 +198,8 @@
 
       if (!van || !tot || van < 1 || tot > 53 || van > tot) {
         resultaatEl.innerHTML = '<div class="vp-leeg">Enter a valid week range (from ≤ to).</div>';
+        laatsteResultaat = null;
+        document.getElementById('vp-export-btn').disabled = true;
         return;
       }
 
@@ -170,11 +216,15 @@
 
       if (planErr) {
         resultaatEl.innerHTML = `<div class="vp-leeg">Could not load brew planning: ${escapeHtml(planErr.message)}</div>`;
+        laatsteResultaat = null;
+        document.getElementById('vp-export-btn').disabled = true;
         return;
       }
       if (!planning || planning.length === 0) {
         document.getElementById('vp-samenvatting').textContent = 'No brews planned in this range.';
         resultaatEl.innerHTML = '<div class="vp-leeg">No brews planned in the selected week range.</div>';
+        laatsteResultaat = null;
+        document.getElementById('vp-export-btn').disabled = true;
         return;
       }
 
@@ -254,6 +304,7 @@
     function renderResultaat() {
       const resultaatEl = document.getElementById('vp-resultaat');
       if (!laatsteResultaat) return;
+      document.getElementById('vp-export-btn').disabled = Object.keys(laatsteResultaat.perRol).length === 0;
 
       const rollenTeTonen = actieveRolFilter === 'alle' ? ROL_VOLGORDE : [actieveRolFilter];
       let html = '';
@@ -315,6 +366,126 @@
       // Nette weergave: geen overbodige decimalen, max 2.
       return Math.round(n * 100) / 100;
     }
+
+    // ------------------------------------------------------------------
+    // Export to Excel
+    // ------------------------------------------------------------------
+    function vulExportModal() {
+      const container = document.getElementById('vp-export-categorieen');
+      container.innerHTML = ROL_VOLGORDE.map(rol => `
+        <label class="vp-modal-categorie-rij">
+          <input type="checkbox" class="vp-export-categorie" value="${rol}" checked />
+          ${ROL_LABEL[rol] || rol}
+        </label>`).join('');
+    }
+
+    function openExportModal() {
+      if (!laatsteResultaat || Object.keys(laatsteResultaat.perRol).length === 0) return;
+      document.getElementById('vp-export-melding').textContent = '';
+      vulExportModal();
+      document.getElementById('vp-export-modal-overlay').classList.add('open');
+    }
+    function sluitExportModal() {
+      document.getElementById('vp-export-modal-overlay').classList.remove('open');
+    }
+
+    async function exporteerNaarExcel(gekozenRollen) {
+      const jaar = document.getElementById('vp-jaar').value;
+      const van = document.getElementById('vp-van').value;
+      const tot = document.getElementById('vp-tot').value;
+
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Consumption Forecast');
+      sheet.getColumn(1).width = 38;
+      sheet.getColumn(2).width = 20;
+      sheet.getColumn(3).width = 14;
+
+      const kopCel = sheet.getCell('A1');
+      kopCel.value = `Selected weeks: wk ${van} - ${tot} (${jaar})`;
+      kopCel.font = { bold: true, size: 13 };
+
+      let rijIndex = 3;
+      let tabellenGeschreven = 0;
+
+      ROL_VOLGORDE.forEach(rol => {
+        if (!gekozenRollen.includes(rol)) return;
+        const ingredientenVanRol = laatsteResultaat.perRol[rol];
+        if (!ingredientenVanRol || Object.keys(ingredientenVanRol).length === 0) return;
+
+        const rijen = Object.values(ingredientenVanRol).sort((a, b) => b.totaal - a.totaal);
+
+        const titelCel = sheet.getCell(`A${rijIndex}`);
+        titelCel.value = ROL_LABEL[rol] || rol;
+        titelCel.font = { bold: true, size: 12 };
+        rijIndex += 1;
+
+        const tabelStartRij = rijIndex;
+        sheet.addTable({
+          name: `Tabel_${rol}`,
+          ref: `A${tabelStartRij}`,
+          headerRow: true,
+          style: { theme: 'TableStyleLight15', showRowStripes: true },
+          columns: [
+            { name: 'Ingredient' },
+            { name: 'Total needed' },
+            { name: 'Checked' },
+          ],
+          rows: rijen.map(r => [
+            r.naam,
+            `${formatGetal(r.totaal)}${r.eenheid ? ' ' + r.eenheid : ''}`,
+            null,
+          ]),
+        });
+
+        tabellenGeschreven += 1;
+        rijIndex = tabelStartRij + 1 + rijen.length + 2; // header + datarijen + 2 lege rijen ervoor de volgende categorie
+      });
+
+      if (tabellenGeschreven === 0) return false;
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const bestandsnaam = `Consumption Forecast Week ${van} - ${tot}.xlsx`;
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = bestandsnaam;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(link.href);
+      return true;
+    }
+
+    document.getElementById('vp-export-btn').addEventListener('click', openExportModal);
+    document.getElementById('vp-export-cancel').addEventListener('click', sluitExportModal);
+    document.getElementById('vp-export-modal-overlay').addEventListener('click', (e) => {
+      if (e.target.id === 'vp-export-modal-overlay') sluitExportModal();
+    });
+    document.getElementById('vp-export-confirm').addEventListener('click', async () => {
+      const gekozenRollen = [...document.querySelectorAll('.vp-export-categorie:checked')].map(cb => cb.value);
+      const melding = document.getElementById('vp-export-melding');
+      if (gekozenRollen.length === 0) {
+        melding.textContent = 'Choose at least one category.';
+        return;
+      }
+      melding.textContent = '';
+      const knop = document.getElementById('vp-export-confirm');
+      knop.disabled = true;
+      knop.textContent = 'Exporting…';
+      try {
+        const gelukt = await exporteerNaarExcel(gekozenRollen);
+        if (!gelukt) {
+          melding.textContent = 'Nothing to export for the chosen categories.';
+        } else {
+          sluitExportModal();
+        }
+      } catch (err) {
+        melding.textContent = 'Export failed: ' + err.message;
+      } finally {
+        knop.disabled = false;
+        knop.textContent = 'Export';
+      }
+    });
 
     // ------------------------------------------------------------------
     // Init
