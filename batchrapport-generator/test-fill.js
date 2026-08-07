@@ -3,7 +3,7 @@ const JSZip = require('jszip');
 const { XlsxDirectWriter, StylesManager } = require('./xlsx-direct');
 const {
   vulScalaireVelden, vulWpKerkVelden, vulReceptnaamKruisVelden, vulIngredientRijen, vulRevisies,
-  vulFormaten, vulHopRendementEnEbu, zetHopGroepRanden,
+  vulFormaten, vulHopRendementEnEbu, zetHopGroepRanden, voegOverloopRijenToe,
 } = require('./generate-batchrapport');
 
 async function test() {
@@ -50,11 +50,13 @@ async function test() {
   const stylesManager = new StylesManager(zip);
   await stylesManager.init();
 
-  await vulScalaireVelden(writer, bundel, true);
+  const overloop = await voegOverloopRijenToe(writer, bundel);
+
+  await vulScalaireVelden(writer, bundel, true, overloop.verschuifCel);
   await vulWpKerkVelden(writer, bundel, true);
   await vulReceptnaamKruisVelden(writer, bundel, true);
-  await vulIngredientRijen(writer, bundel);
-  await vulRevisies(writer, bundel);
+  await vulIngredientRijen(writer, bundel, overloop);
+  await vulRevisies(writer, bundel, overloop.verschuifCel);
   await vulFormaten(writer, bundel);
   await vulHopRendementEnEbu(writer, bundel);
   await zetHopGroepRanden(writer, stylesManager, bundel);

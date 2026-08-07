@@ -453,14 +453,69 @@ async function haalBatchDataOpBrowser(supabase, batchnummer) {
   };
 }
 
-async function brVulScalaireVelden(writer, bundel, isWP, scalarMap) {
+// ---------------------------------------------------------------------------
+// Rij-overloop Toegiften Brouwerij/Kelder
+// ---------------------------------------------------------------------------
+// Het sjabloon heeft van origine 10 vaste sloten voor "Toegiften Brouwerij"
+// (Recept-voorblad rij 73-82) en 5 voor "Toegiften Kelder" (rij 89-93). Een
+// recept kan er inmiddels meer hebben. RIJOFFSET_BROUWHUIS/_KELDER geven de
+// eerste/laatste rij van elk blok in het ONGEWIJZIGDE sjabloon.
+const RIJ_BROUWHUIS_EERSTE = 73;
+const RIJ_BROUWHUIS_LAATSTE = 82;   // = eerste + 10 sloten - 1
+const RIJ_BROUWHUIS_SJABLOON = 78;  // "gewone" middenrij, voor het kopiëren van nieuwe rijen
+const RIJ_KELDER_EERSTE = 89;
+const RIJ_KELDER_LAATSTE = 93;      // = eerste + 5 sloten - 1
+const RIJ_KELDER_SJABLOON = 90;     // "gewone" middenrij
+
+/**
+ * Voegt zo nodig extra rijen toe aan Recept-voorblad voor recepten met meer
+ * dan 10 Toegiften Brouwerij en/of meer dan 5 Toegiften Kelder-regels, en
+ * levert {n1, n2} (aantal toegevoegde rijen per blok) + een functie
+ * `verschuifRij(origineleRij)` die voor ELKE andere Recept-voorblad-cel
+ * (Gist, Water, Revisiehistorie, enz.) de juiste, mogelijk verschoven rij
+ * teruggeeft. Moet als allereerste worden aangeroepen, vóór alle andere
+ * writer.setCelWaarde-aanroepen op dit tabblad.
+ */
+async function brVoegOverloopRijenToe(writer, bundel) {
+  const brouwhuisAantal = bundel.recipe_ingredients.filter(r => r.rol === 'toegift_brouwerij').length;
+  const kelderAantal = bundel.recipe_ingredients.filter(r => r.rol === 'toegift_kelder').length;
+  const n1 = Math.max(0, brouwhuisAantal - (RIJ_BROUWHUIS_LAATSTE - RIJ_BROUWHUIS_EERSTE + 1));
+  const n2 = Math.max(0, kelderAantal - (RIJ_KELDER_LAATSTE - RIJ_KELDER_EERSTE + 1));
+
+  if (n1 > 0) {
+    await writer.voegRijenToe('Recept-voorblad', RIJ_BROUWHUIS_LAATSTE, n1, RIJ_BROUWHUIS_SJABLOON);
+  }
+  if (n2 > 0) {
+    // Kelder-blok ligt na Brouwhuis, dus zijn "voor deze rij invoegen"-punt
+    // ligt zelf ook al n1 plekken verderop als daar al rijen zijn ingevoegd.
+    await writer.voegRijenToe('Recept-voorblad', RIJ_KELDER_LAATSTE + n1, n2, RIJ_KELDER_SJABLOON + n1);
+  }
+
+  const verschuifRij = (origineleRij) => {
+    let r = origineleRij;
+    if (origineleRij >= RIJ_BROUWHUIS_LAATSTE) r += n1;
+    if (origineleRij >= RIJ_KELDER_LAATSTE) r += n2;
+    return r;
+  };
+  const verschuifCel = (sheetCel) => {
+    const [sheetNaam, cel] = sheetCel.split('!');
+    if (sheetNaam !== 'Recept-voorblad') return sheetCel;
+    const m = cel.match(/^([A-Z]+)(\d+)$/);
+    if (!m) return sheetCel;
+    return `${sheetNaam}!${m[1]}${verschuifRij(Number(m[2]))}`;
+  };
+
+  return { n1, n2, verschuifRij, verschuifCel };
+}
+
+async function brVulScalaireVelden(writer, bundel, isWP, scalarMap, verschuifCel) {
   for (const veld of scalarMap) {
     if (veld.wp_only && !isWP) continue;
     const [tabel, kolom] = veld.db_veld.split('.');
     const bron = bundel[tabel];
     if (!bron) continue;
     const waarde = bron[kolom];
-    for (const loc of veld.locaties) await writer.setCelWaarde(loc, waarde);
+    for (const loc of veld.locaties) await writer.setCelWaarde(verschuifCel(loc), waarde);
   }
 }
 
@@ -508,43 +563,77 @@ function sorteerHopgiften(rijen, rol) {
   return rijen;
 }
 
-async function brVulIngredientRijen(writer, bundel, ingredientMap) {
+async function brVulIngredientRijen(writer, bundel, ingredientMap, overloop) {
+  const { n1, verschuifCel } = overloop;
+  // Toegift Brouwerij/Kelder krijgen (i.t.t. de andere rollen) geen vaste
+  // sloten uit het JSON-veldenbestand meer, maar een rechtstreeks berekende
+  // rij -- want bij overloop zijn er meer rijen dan het sjabloon van origine
+  // had, en die extra rijen bestaan pas na brVoegOverloopRijenToe(). Zie de
+  // toelichting daar voor waarom "eersteRij + i" ook zonder overloop precies
+  // hetzelfde resultaat geeft als de oude vaste sloten-mapping.
+  const dynamischeBlokken = {
+    toegift_brouwerij: { eersteRij: RIJ_BROUWHUIS_EERSTE, vasteSloten: RIJ_BROUWHUIS_LAATSTE - RIJ_BROUWHUIS_EERSTE + 1 },
+    toegift_kelder: { eersteRij: RIJ_KELDER_EERSTE + n1, vasteSloten: RIJ_KELDER_LAATSTE - RIJ_KELDER_EERSTE + 1 },
+  };
+  const kolomPerAttr = { naam: 'A', hoeveelheid: 'E', tijdstip: 'I' };
+
   const rollen = ['hopgift_kook', 'dry_hop', 'hoofdmout', 'toegift_brouwerij', 'toegift_kelder', 'gist'];
   for (const rol of rollen) {
-    const cellenPerRij = ingredientMap[rol];
-    if (!cellenPerRij) continue;
     const ongesorteerd = bundel.recipe_ingredients.filter(r => r.rol === rol);
     const rijen = (rol === 'hopgift_kook' || rol === 'dry_hop')
       ? sorteerHopgiften(ongesorteerd, rol)
       : ongesorteerd.sort((a, b) => (a.volgorde ?? 0) - (b.volgorde ?? 0));
 
+    if (dynamischeBlokken[rol]) {
+      const { eersteRij, vasteSloten } = dynamischeBlokken[rol];
+      // Ook als er minder regels zijn dan het oorspronkelijke aantal sloten,
+      // blijven we tot dat oorspronkelijke aantal doorlopen om eventuele
+      // restjes van een vorige generatie/sjabloonwaarde leeg te maken.
+      const totaalRijen = Math.max(rijen.length, vasteSloten);
+      for (let i = 0; i < totaalRijen; i++) {
+        const rij = eersteRij + i;
+        const regel = rijen[i];
+        for (const attr of ['naam', 'hoeveelheid', 'tijdstip']) {
+          const cel = `Recept-voorblad!${kolomPerAttr[attr]}${rij}`;
+          if (!regel) { await writer.setCelWaarde(cel, null); continue; }
+          const waarde = attr === 'naam'
+            ? (bundel.ingredientNaam.get(regel.ingredient_id) || regel.notitie || null)
+            : regel[attr];
+          await writer.setCelWaarde(cel, waarde);
+        }
+      }
+      continue;
+    }
+
+    const cellenPerRij = ingredientMap[rol];
+    if (!cellenPerRij) continue;
     const slots = Object.keys(cellenPerRij).sort((a, b) => Number(a) - Number(b));
     for (let i = 0; i < slots.length; i++) {
       const regel = rijen[i];
       const cellen = cellenPerRij[slots[i]];
       if (!regel) {
-        for (const attr in cellen) await writer.setCelWaarde(cellen[attr], null);
+        for (const attr in cellen) await writer.setCelWaarde(verschuifCel(cellen[attr]), null);
         continue;
       }
       for (const attr in cellen) {
         const waarde = attr === 'naam'
           ? (bundel.ingredientNaam.get(regel.ingredient_id) || regel.notitie || null)
           : regel[attr];
-        await writer.setCelWaarde(cellen[attr], waarde);
+        await writer.setCelWaarde(verschuifCel(cellen[attr]), waarde);
       }
     }
   }
 }
 
-async function brVulRevisies(writer, bundel, revisieMap) {
+async function brVulRevisies(writer, bundel, revisieMap, verschuifCel) {
   for (let i = 0; i < bundel.recipe_revisies.length; i++) {
     const rv = bundel.recipe_revisies[i];
     const cellen = revisieMap[String(i + 1)];
     if (!cellen) continue;
-    if (cellen.versienummer) await writer.setCelWaarde(cellen.versienummer, `${rv.versie_major}.${rv.versie_minor}`);
-    if (cellen.datum) await writer.setCelWaarde(cellen.datum, rv.datum);
-    if (cellen.door) await writer.setCelWaarde(cellen.door, rv.door);
-    if (cellen.wijziging) await writer.setCelWaarde(cellen.wijziging, rv.wijziging);
+    if (cellen.versienummer) await writer.setCelWaarde(verschuifCel(cellen.versienummer), `${rv.versie_major}.${rv.versie_minor}`);
+    if (cellen.datum) await writer.setCelWaarde(verschuifCel(cellen.datum), rv.datum);
+    if (cellen.door) await writer.setCelWaarde(verschuifCel(cellen.door), rv.door);
+    if (cellen.wijziging) await writer.setCelWaarde(verschuifCel(cellen.wijziging), rv.wijziging);
   }
 }
 
@@ -662,11 +751,18 @@ async function genereerEnDownloadBatchrapport(supabase, batchnummer) {
   const stylesManager = new StylesManager(zip);
   await stylesManager.init();
 
-  await brVulScalaireVelden(writer, bundel, isWP, scalarMap);
+  // Moet als allereerste, vóór alle andere schrijfacties op Recept-voorblad:
+  // recepten met meer dan 10 Toegiften Brouwerij- en/of 5 Toegiften Kelder-
+  // regels krijgen hier zo nodig extra rijen, en alle latere writer.setCelWaarde-
+  // aanroepen op dit tabblad moeten via verschuifCel() de eventueel verschoven
+  // rij gebruiken (Gist, Water, Revisiehistorie zitten allemaal ná deze blokken).
+  const overloop = await brVoegOverloopRijenToe(writer, bundel);
+
+  await brVulScalaireVelden(writer, bundel, isWP, scalarMap, overloop.verschuifCel);
   await brVulWpKerkVelden(writer, bundel, isWP);
   await brVulReceptnaamKruisVelden(writer, bundel, isWP);
-  await brVulIngredientRijen(writer, bundel, ingredientMap);
-  await brVulRevisies(writer, bundel, revisieMap);
+  await brVulIngredientRijen(writer, bundel, ingredientMap, overloop);
+  await brVulRevisies(writer, bundel, revisieMap, overloop.verschuifCel);
   await brVulFormaten(writer, bundel, formatenMap);
   await brVulHopRendementEnEbu(writer, bundel);
   await brZetHopGroepRanden(writer, stylesManager, bundel);

@@ -243,10 +243,151 @@ class XlsxDirectWriter {
     this.sheetXmlPerBestand[bestand] = xml.replace(rowPattern, `$1${nieuweInhoud}$3`);
   }
 
+  /**
+   * Voegt `aantal` nieuwe (lege) rijen in vóór `voorRij` op tabblad
+   * `sheetNaam`, met de stijl/kolomindeling/samenvoegingen van `sjabloonRij`
+   * gekopieerd. Alles wat op of na `voorRij` stond (rijen, samenvoegingen,
+   * en kruisverwijzingen vanuit ANDERE tabbladen naar dit tabblad) schuift
+   * `aantal` plekken op. Bedoeld voor blokken met een oorspronkelijk vast
+   * aantal sloten (Toegiften Brouwerij/Kelder) die nu meer regels kunnen
+   * bevatten dan het sjabloon van origine had.
+   *
+   * AANNAME (geverifieerd voor dit sjabloon): binnen `sheetNaam` zelf komen
+   * geen formules voor die naar rijen op/na `voorRij` verwijzen (de enige
+   * formules op Recept-voorblad zitten allemaal boven rij 71, ruim boven elk
+   * inzetpunt dat wij gebruiken) -- dus alleen rijen/cellen/samenvoegingen
+   * zelf hoeven binnen dit tabblad verschoven te worden, geen formules. Wel
+   * verschuiven we kruisverwijzingen ('Recept-voorblad'!A82 e.d.) op ANDERE
+   * tabbladen, want Brouwen/Gistkaart Invoer lezen giftnamen rechtstreeks
+   * uit deze cellen.
+   */
+  async voegRijenToe(sheetNaam, voorRij, aantal, sjabloonRij) {
+    if (!aantal || aantal <= 0) return;
+    const bestand = await this._laadSheetXml(sheetNaam);
+    let xml = this.sheetXmlPerBestand[bestand];
+
+    // --- 1. Alle <row>-elementen ontleden ---
+    const rowRegex = /<row r="(\d+)"([^>]*)>([\s\S]*?)<\/row>/g;
+    const rijen = [];
+    let m;
+    while ((m = rowRegex.exec(xml)) !== null) {
+      rijen.push({ rij: Number(m[1]), attrs: m[2], inhoud: m[3] });
+    }
+    const sjabloon = rijen.find(r => r.rij === sjabloonRij);
+    if (!sjabloon) throw new Error(`Sjabloonrij ${sjabloonRij} niet gevonden op ${sheetNaam}`);
+
+    function verschuifCellenInRij(inhoud, nieuweRij) {
+      return inhoud.replace(/<c r="([A-Z]+)\d+"/g, (_, kol) => `<c r="${kol}${nieuweRij}"`);
+    }
+
+    const nieuweRijen = [];
+    for (const r of rijen) {
+      if (r.rij < voorRij) {
+        nieuweRijen.push(r);
+      } else {
+        nieuweRijen.push({ rij: r.rij + aantal, attrs: r.attrs, inhoud: verschuifCellenInRij(r.inhoud, r.rij + aantal) });
+      }
+    }
+    // Nieuwe, gekopieerde rijen invoegen op de juiste plek (oplopend op rijnummer)
+    const invoegIdx = nieuweRijen.findIndex(r => r.rij >= voorRij + aantal) === -1
+      ? nieuweRijen.length
+      : nieuweRijen.findIndex(r => r.rij === voorRij + aantal);
+    const ingevoegd = [];
+    for (let i = 0; i < aantal; i++) {
+      const nieuweRijNr = voorRij + i;
+      ingevoegd.push({ rij: nieuweRijNr, attrs: sjabloon.attrs, inhoud: verschuifCellenInRij(sjabloon.inhoud, nieuweRijNr) });
+    }
+    nieuweRijen.splice(invoegIdx, 0, ...ingevoegd);
+    nieuweRijen.sort((a, b) => a.rij - b.rij);
+
+    const nieuweSheetDataInhoud = nieuweRijen
+      .map(r => `<row r="${r.rij}"${r.attrs}>${r.inhoud}</row>`)
+      .join('');
+    xml = xml.replace(/<sheetData>[\s\S]*?<\/sheetData>/, `<sheetData>${nieuweSheetDataInhoud}</sheetData>`);
+
+    // --- 2. mergeCells: bestaande verschuiven, sjabloonrij-merges dupliceren ---
+    const mergeBlockMatch = xml.match(/<mergeCells count="(\d+)">([\s\S]*?)<\/mergeCells>/);
+    if (mergeBlockMatch) {
+      const merges = [...mergeBlockMatch[2].matchAll(/<mergeCell ref="([^"]+)"\/>/g)].map(mm => mm[1]);
+      const parseRef = (ref) => {
+        const [a, b] = ref.split(':');
+        const pa = ontleedCelRef(a), pb = b ? ontleedCelRef(b) : pa;
+        return { c1: pa.col, r1: pa.row, c2: pb.col, r2: pb.row };
+      };
+      const sjabloonMerges = merges.filter(ref => {
+        const { r1, r2 } = parseRef(ref);
+        return r1 === sjabloonRij && r2 === sjabloonRij;
+      });
+      const nieuweMerges = [];
+      for (const ref of merges) {
+        const { c1, r1, c2, r2 } = parseRef(ref);
+        if (r1 >= voorRij) {
+          nieuweMerges.push(`${kolomNummerNaarLetter(c1)}${r1 + aantal}:${kolomNummerNaarLetter(c2)}${r2 + aantal}`);
+        } else {
+          nieuweMerges.push(ref);
+        }
+      }
+      for (let i = 0; i < aantal; i++) {
+        const nieuweRijNr = voorRij + i;
+        for (const ref of sjabloonMerges) {
+          const { c1, c2 } = parseRef(ref);
+          nieuweMerges.push(`${kolomNummerNaarLetter(c1)}${nieuweRijNr}:${kolomNummerNaarLetter(c2)}${nieuweRijNr}`);
+        }
+      }
+      xml = xml.replace(
+        /<mergeCells count="\d+">[\s\S]*?<\/mergeCells>/,
+        `<mergeCells count="${nieuweMerges.length}">${nieuweMerges.map(r => `<mergeCell ref="${r}"/>`).join('')}</mergeCells>`
+      );
+    }
+
+    // --- 3. <dimension> ophogen ---
+    xml = xml.replace(/<dimension ref="([A-Z]+)(\d+):([A-Z]+)(\d+)"\/>/, (_, c1, r1, c2, r2) => {
+      const nieuweR2 = Number(r2) >= voorRij ? Number(r2) + aantal : Number(r2);
+      return `<dimension ref="${c1}${r1}:${c2}${nieuweR2}"/>`;
+    });
+
+    this.sheetXmlPerBestand[bestand] = xml;
+
+    // --- 4. Print_Area (workbook.xml) ophogen ---
+    await this._verschuifPrintArea(sheetNaam, voorRij, aantal);
+
+    // --- 5. Kruisverwijzingen vanuit ANDERE tabbladen verschuiven ---
+    for (const [andereSheetNaam, andereBestand] of Object.entries(this.sheetNaarBestand)) {
+      if (andereSheetNaam === sheetNaam) continue;
+      await this._laadSheetXml(andereSheetNaam);
+      let andereXml = this.sheetXmlPerBestand[andereBestand];
+      const patroon = new RegExp(`('?${sheetNaam}'?!)(\\$?)([A-Z]+)(\\$?)(\\d+)`, 'g');
+      andereXml = andereXml.replace(patroon, (heleMatch, prefix, dollarKol, kol, dollarRij, rijStr) => {
+        const rij = Number(rijStr);
+        if (rij < voorRij) return heleMatch;
+        return `${prefix}${dollarKol}${kol}${dollarRij}${rij + aantal}`;
+      });
+      this.sheetXmlPerBestand[andereBestand] = andereXml;
+    }
+  }
+
+  async _verschuifPrintArea(sheetNaam, voorRij, aantal) {
+    if (!this._workbookXml) {
+      this._workbookXml = await this.zip.file('xl/workbook.xml').async('string');
+    }
+    const patroon = new RegExp(`('${sheetNaam}'!\\$[A-Z]+\\$\\d+:\\$[A-Z]+\\$)(\\d+)`);
+    const match = this._workbookXml.match(patroon);
+    if (match) {
+      const eindRij = Number(match[2]);
+      if (eindRij >= voorRij) {
+        this._workbookXml = this._workbookXml.replace(patroon, `$1${eindRij + aantal}`);
+        this._workbookXmlGewijzigd = true;
+      }
+    }
+  }
+
   /** Schrijft alle gewijzigde sheet-XML terug in de zip en levert de zip. */
   async finalize() {
     for (const [bestand, xml] of Object.entries(this.sheetXmlPerBestand)) {
       this.zip.file(bestand, xml);
+    }
+    if (this._workbookXmlGewijzigd) {
+      this.zip.file('xl/workbook.xml', this._workbookXml);
     }
     return this.zip;
   }
