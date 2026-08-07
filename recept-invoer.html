@@ -201,7 +201,10 @@
             <select id="re-kopieer-select"><option value="">— start blank —</option></select>
           </div>
         </div>
-        <button type="button" class="re-btn secundair" id="re-kopieer-btn">Copy into this form</button>
+        <div class="re-subkop" style="margin-top:14px;">Blocks to copy</div>
+        <p class="re-versie-uitleg" style="margin-top:-4px;">All blocks are copied by default — untick anything you'd rather fill in yourself.</p>
+        <div id="re-kopieer-blokken" class="re-grid"></div>
+        <button type="button" class="re-btn secundair" id="re-kopieer-btn" style="margin-top:14px;">Copy into this form</button>
         <span id="re-kopieer-melding" class="re-melding"></span>
       </div>
 
@@ -1394,7 +1397,46 @@ async function initReceptInvoer() {
   document.getElementById('re-inhoud').style.display = 'block';
 }
 
+// Blokken die de gebruiker aan/uit kan vinken bij "Copy into this form".
+// `rollen` (indien aanwezig) koppelt een blok aan de recipe_ingredients-rollen
+// die het bestrijkt -- zo kan de ingrediëntenlijst per rol gefilterd worden i.p.v.
+// alles-of-niets.
+const KOPIEER_BLOKKEN = [
+  { id: 'algemeen', label: 'General' },
+  { id: 'specs', label: 'End product specifications' },
+  { id: 'proces', label: 'Process parameters' },
+  { id: 'brouw', label: 'Brewing parameters' },
+  { id: 'mout', label: 'Malt & Grains', rollen: ['hoofdmout'] },
+  { id: 'hop', label: 'Hops and Herbs', rollen: ['hopgift_kook', 'dry_hop'] },
+  { id: 'brouwtoegift', label: 'Additions Brewing', rollen: ['toegift_brouwerij'] },
+  { id: 'gist', label: 'Yeasts', rollen: ['gist'] },
+  { id: 'keldertoegift', label: 'Additions Cellar', rollen: ['toegift_kelder'] },
+  { id: 'water', label: 'Target water profile' },
+  { id: 'verpakking', label: 'Packaging' },
+  { id: 'processtappen', label: 'Process steps' },
+  { id: 'kosten', label: 'Costs' },
+  { id: 'comments', label: 'Comments' },
+];
+
+function renderKopieerBlokken() {
+  const container = document.getElementById('re-kopieer-blokken');
+  container.innerHTML = KOPIEER_BLOKKEN.map(b => `
+    <label style="display:flex; align-items:center; gap:6px; font-family: var(--serif); font-size: 14px;">
+      <input type="checkbox" id="re-kopieer-blok-${b.id}" checked />
+      ${b.label}
+    </label>`).join('');
+}
+
+function leesGekozenKopieerBlokken() {
+  const gekozen = new Set();
+  KOPIEER_BLOKKEN.forEach(b => {
+    if (document.getElementById('re-kopieer-blok-' + b.id).checked) gekozen.add(b.id);
+  });
+  return gekozen;
+}
+
 async function vulKopieerSelect() {
+  renderKopieerBlokken();
   const select = document.getElementById('re-kopieer-select');
   const { data, error } = await supabaseClient
     .from('recipes')
@@ -1473,28 +1515,62 @@ document.getElementById('re-kopieer-btn').addEventListener('click', async () => 
   }
 
   const bron = recipe.data;
+  const blokken = leesGekozenKopieerBlokken();
 
-  document.getElementById('veld-naam').value = `Copy of ${bron.naam}`;
-  document.getElementById('veld-short_name').value = bron.short_name || '';
-  document.getElementById('veld-bierstijl').value = bron.bierstijl || '';
-  document.getElementById('veld-locatie').value = bron.locatie || '';
-  document.getElementById('veld-brouwsel_hl').value = bron.brouwsel_hl ?? '';
-  document.getElementById('veld-status').value = 'concept';
-  window.zetKleurPicker(bron.kleur || '');
+  if (blokken.has('algemeen')) {
+    document.getElementById('veld-naam').value = `Copy of ${bron.naam}`;
+    document.getElementById('veld-short_name').value = bron.short_name || '';
+    document.getElementById('veld-bierstijl').value = bron.bierstijl || '';
+    document.getElementById('veld-locatie').value = bron.locatie || '';
+    document.getElementById('veld-brouwsel_hl').value = bron.brouwsel_hl ?? '';
+    document.getElementById('veld-status').value = 'concept';
+    window.zetKleurPicker(bron.kleur || '');
+    document.getElementById('veld-bier_risico').value = (ferm.data && ferm.data.bier_risico) || '';
+    document.getElementById('veld-bier_status').value = (ferm.data && ferm.data.bier_status) || '';
+    pasBadgeKleurToe(document.getElementById('veld-bier_risico'), BIER_RISICO_KLEUREN);
+    pasBadgeKleurToe(document.getElementById('veld-bier_status'), BIER_STATUS_KLEUREN);
+  }
 
-  renderParamGrid('re-specs-grid', SPECS_FIELDS, specs.data || {});
-  renderParamGrid('re-ferm-grid', FERM_FIELDS, ferm.data || {});
-  renderBrouwSecties('re-brouw-grid', BROUW_SECTIES, brouw.data || {});
-  renderVeldenGrid('re-water-grid', WATER_FIELDS, water.data || {});
-  renderVeldenGrid('re-verpakking-grid', VERPAKKING_FIELDS, verpakking.data || {});
-  renderFormatenCheckboxen('re-formaten-checkboxen', (verpakking.data && verpakking.data.formaten) || []);
-  renderCheckboxGrid('re-processtappen-checkboxen', PROCESSTAPPEN_FIELDS, processtappen.data || {});
-  renderVeldenGrid('re-kosten-grid', KOSTEN_FIELDS, kosten.data || {});
-  vulExtraVeldenUit(ferm.data || {}, processtappen.data || {});
-  const bronComments = (comments.data && comments.data.comments) || [];
-  document.getElementById('veld-comments').value = bronComments.join(' ');
+  if (blokken.has('specs')) renderParamGrid('re-specs-grid', SPECS_FIELDS, specs.data || {});
+  if (blokken.has('proces')) renderParamGrid('re-ferm-grid', FERM_FIELDS, ferm.data || {});
+  if (blokken.has('brouw')) renderBrouwSecties('re-brouw-grid', BROUW_SECTIES, brouw.data || {});
+  if (blokken.has('water')) renderVeldenGrid('re-water-grid', WATER_FIELDS, water.data || {});
+  if (blokken.has('verpakking')) {
+    renderVeldenGrid('re-verpakking-grid', VERPAKKING_FIELDS, verpakking.data || {});
+    renderFormatenCheckboxen('re-formaten-checkboxen', (verpakking.data && verpakking.data.formaten) || []);
+  }
+  if (blokken.has('processtappen')) renderCheckboxGrid('re-processtappen-checkboxen', PROCESSTAPPEN_FIELDS, processtappen.data || {});
+  if (blokken.has('kosten')) renderVeldenGrid('re-kosten-grid', KOSTEN_FIELDS, kosten.data || {});
 
-  vulIngredientSectiesUit(ingredients.data || []);
+  // Dry hop-notities horen bij het "Hops and Herbs"-blok, kelder-notities bij
+  // "Additions Cellar" -- allebei los van elkaar overneembaar, ook al komen ze
+  // uit dezelfde recipe_processtappen-rij.
+  if (blokken.has('hop')) {
+    document.getElementById('veld-dry_hop_comment_warm').value = (processtappen.data && processtappen.data.dry_hop_comment_warm) || '';
+    document.getElementById('veld-dry_hop_methode_warm').value = (processtappen.data && processtappen.data.dry_hop_methode_warm) || '';
+    document.getElementById('veld-dry_hop_comment_16c').value = (processtappen.data && processtappen.data.dry_hop_comment_16c) || '';
+    document.getElementById('veld-dry_hop_methode_16c').value = (processtappen.data && processtappen.data.dry_hop_methode_16c) || '';
+    document.getElementById('veld-dry_hop_1_dag').value = (processtappen.data && processtappen.data.dry_hop_1_dag != null) ? processtappen.data.dry_hop_1_dag : '';
+    document.getElementById('veld-dry_hop_2_dag').value = (processtappen.data && processtappen.data.dry_hop_2_dag != null) ? processtappen.data.dry_hop_2_dag : '';
+  }
+  if (blokken.has('keldertoegift')) {
+    document.getElementById('veld-kelder_toevoeging_dag').value = (processtappen.data && processtappen.data.kelder_toevoeging_dag != null) ? processtappen.data.kelder_toevoeging_dag : '';
+    document.getElementById('veld-comment_verwerken').value = (processtappen.data && processtappen.data.comment_verwerken) || '';
+  }
+
+  if (blokken.has('comments')) {
+    const bronComments = (comments.data && comments.data.comments) || [];
+    document.getElementById('veld-comments').value = bronComments.join(' ');
+  }
+
+  // Ingrediëntenrijen filteren op de blokken die aangevinkt staan (elk blok
+  // dekt zijn eigen rol(len) -- zie KOPIEER_BLOKKEN), zodat bv. een niet-
+  // aangevinkt "Hops and Herbs" ook echt geen hopregels meeneemt.
+  const toegestaneRollen = new Set(
+    KOPIEER_BLOKKEN.filter(b => b.rollen && blokken.has(b.id)).flatMap(b => b.rollen)
+  );
+  const gefilterdeIngredienten = (ingredients.data || []).filter(r => toegestaneRollen.has(r.rol));
+  vulIngredientSectiesUit(gefilterdeIngredienten);
 
   melding.textContent = `Copied from "${bron.naam}". Review and adjust below, then create the recipe.`;
   melding.className = 're-melding ok';
